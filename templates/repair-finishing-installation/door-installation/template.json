@@ -1,0 +1,45 @@
+{
+  "code": "repair-finishing-installation.door-installation",
+  "category": "repair-finishing-installation",
+  "parent": "repair-finishing-installation.general",
+  "type": "specialized",
+  "ui_reference": "/UI",
+  "ui_strict": true,
+  "theme_hint_palette": "cool-blue-teal-neutral",
+  "cta_label": "Показать дверной проём",
+  "title": "Покажите место установки",
+  "intro": "Сделайте несколько фотографий проёма и места вокруг него. Сначала покажите всё целиком, затем снимите проём ближе и добавьте важные детали — так мастер быстрее поймёт условия монтажа.",
+  "media": {
+    "video_allowed": true,
+    "video_recommended": false,
+    "slots": [
+      {"key":"opening_overall","label":"Проём целиком","required":false,"recommended":true,"hint":"Сфотографируйте дверной проём прямо спереди так, чтобы он полностью помещался в кадр вместе с частью стены вокруг.","hint_image":"hints/opening-overall.png"},
+      {"key":"opening_left","label":"Левая сторона","required":false,"hint":"Снимите левую сторону проёма ближе — от пола до верхнего угла.","hint_image":"hints/opening-left.png"},
+      {"key":"opening_right","label":"Правая сторона","required":false,"hint":"Снимите правую сторону проёма ближе — от пола до верхнего угла.","hint_image":"hints/opening-right.png"},
+      {"key":"opening_top","label":"Верх проёма","required":false,"hint":"Сфотографируйте верхнюю часть проёма и оба верхних угла ближе.","hint_image":"hints/opening-top.png"},
+      {"key":"floor_threshold","label":"Пол и порог","required":false,"hint":"Покажите нижнюю часть проёма, уровень пола с обеих сторон и существующий порог, если он есть.","hint_image":"hints/floor-threshold.png"},
+      {"key":"existing_door","label":"Есть старая дверь?","required":false,"hint":"Если дверь ещё установлена, сфотографируйте её целиком и покажите старую коробку, наличники и петли.","hint_image":"hints/existing-door.png"},
+      {"key":"problem_detail","label":"Есть сложное или повреждённое место?","required":false,"hint":"Добавьте крупный план, если проём неровный, есть трещина, повреждение стены, выступ, труба, проводка или другой элемент, который может повлиять на монтаж.","hint_image":"hints/problem-detail.png"},
+      {"key":"reference_door","label":"Уже выбрали дверь?","required":false,"role":"reference","hint":"Можно добавить фотографию, скриншот или пример двери, которую вы хотите установить."}
+    ]
+  },
+  "fields": [
+    {"key":"opening_width_mm","type":"number","label":"Ширина проёма","required":false,"placeholder":"Например: 900 мм"},
+    {"key":"opening_height_mm","type":"number","label":"Высота проёма","required":false,"placeholder":"Например: 2050 мм"},
+    {"key":"wall_thickness_mm","type":"number","label":"Толщина стены","required":false,"placeholder":"Например: 120 мм"},
+    {"key":"door_request_type","type":"select","label":"Что вы хотите сделать?","required":false,"options":["Установить новую дверь в пустой проём","Заменить существующую дверь","Установить дверь после ремонта","Установить только коробку / элементы","Не знаю — хочу обсудить с мастером"]},
+    {"key":"door_type","type":"select","label":"Какая дверь планируется?","required":false,"options":["Межкомнатная","Входная","Раздвижная","Другая","Ещё не выбрал(а)"]},
+    {"key":"comment","type":"textarea","label":"Что ещё важно знать?","required":false,"placeholder":"Например: старую дверь нужно снять, новая дверь уже куплена, наличники тоже нужно установить."},
+    {"key":"phone","type":"phone","label":"Ваш номер телефона","required":true}
+  ],
+  "submit_label": "Отправить мастеру",
+  "success_title": "Готово!",
+  "success_text": "Фотографии проёма отправлены мастеру. Он посмотрит их и свяжется с вами.",
+  "push_prompt": {
+    "title": "Не пропустите ответ",
+    "text": "Разрешите уведомления, и мы сообщим, когда мастер ответит."
+  },
+  "tenant_can_disable": ["opening_width_mm","opening_height_mm","wall_thickness_mm","door_request_type","door_type","reference_door","video","existing_door","problem_detail"],
+  "phone_required": true,
+  "customer_email_enabled": false
+}
