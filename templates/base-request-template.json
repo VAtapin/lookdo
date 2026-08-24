@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "code": "base-request-template",
+  "name": "Base Request Template",
+  "immutable": {
+    "flow": [
+      "intro",
+      "media",
+      "extra_fields",
+      "comment",
+      "phone",
+      "submit",
+      "success",
+      "push_prompt",
+      "messages"
+    ],
+    "phone_required": true,
+    "customer_email_required": false,
+    "shared_request_api": true,
+    "shared_media_engine": true,
+    "shared_messages_engine": true,
+    "shared_push_engine": true,
+    "shared_database_schema": true,
+    "new_public_screen_per_template": false,
+    "specialized_database_table_per_template": false
+  },
+  "configurable": {
+    "category": null,
+    "primary_action_label": "Показать задачу",
+    "title": "Покажите, что нужно сделать",
+    "intro_text": "Добавьте фотографии или короткое видео и оставьте номер телефона.",
+    "media": {
+      "photos_min": 1,
+      "photos_max": 4,
+      "video_allowed": false,
+      "video_hint": null,
+      "slots": [
+        {
+          "key": "overall",
+          "type": "image",
+          "label": "Общий вид",
+          "hint": "Сфотографируйте объект целиком",
+          "required": true,
+          "max_files": 1,
+          "sort_order": 10
+        }
+      ]
+    },
+    "fields": [],
+    "comment": {
+      "enabled": true,
+      "required": false,
+      "label": "Комментарий",
+      "placeholder": "Коротко опишите, что нужно сделать"
+    },
+    "phone": {
+      "enabled": true,
+      "required": true,
+      "label": "Номер телефона",
+      "placeholder": "+7 ..."
+    },
+    "preferred_reply_channel": {
+      "enabled": true,
+      "required": false
+    },
+    "submit_text": "Отправить заявку",
+    "success": {
+      "title": "Заявка отправлена",
+      "text": "Мастер получил вашу заявку и сможет связаться с вами по указанному номеру."
+    },
+    "locales": ["de", "en", "ru"],
+    "ai_phrases": []
+  },
+  "allowed_field_types": [
+    "text",
+    "textarea",
+    "select",
+    "number",
+    "checkbox"
+  ]
+}
