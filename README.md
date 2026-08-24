@@ -1,30 +1,30 @@
 # LOOKDO
 
-**Working concept:** «Покажи — я сделаю.» / **Show it. Get it done.**
+**Рабочая концепция:** «Покажи — я сделаю.» / **Show it. Get it done.**
 
-LOOKDO is a multi-tenant SaaS platform for creating branded mobile-first Web Apps/PWAs for service businesses. A customer shows a task with photos/video, leaves a required phone number, and communicates directly with the business through the app.
+LOOKDO — мультитенантная SaaS-платформа для создания брендированных мобильных Web App/PWA для сервисного бизнеса. Клиент показывает задачу с помощью фото или короткого видео, оставляет обязательный номер телефона и дальше общается с мастером прямо через приложение.
 
-Primary domain: **lookdo.app**
+Основной домен платформы: **lookdo.app**
 
-## Core stack
+## Основной стек
 
 - Laravel API
 - Vue 3
 - Vite
 - PWA
-- Capacitor-ready
-- Multi-tenant SaaS architecture
-- Client admin + Super Admin
-- DE / EN / RU localization
+- готовность к Capacitor
+- мультитенантная SaaS-архитектура
+- админка клиента + Super Admin
+- локализация DE / EN / RU
 
-## Product principle
+## Главный принцип продукта
 
-Keep the end-customer app extremely simple. New business categories must **not create new screens**. Categories only change wording, hints, fields and the photo/video capture logic.
+Клиентское приложение должно оставаться предельно простым. Новые виды бизнеса **не должны создавать новые экраны**. Категории и шаблоны меняют только тексты, подсказки, поля формы и логику фото/видео.
 
-Customer navigation:
+Основная навигация клиента:
 
-**Home · Show/Request · Messages**
+**Главная · Показать / Отправить заявку · Сообщения**
 
-The first real tenant is Leonid's steering-wheel upholstery business, but there must be **no Leonid-specific code path**. Leonid is an ordinary tenant with a free plan assigned from Super Admin.
+Первый реальный tenant — мастерская Леонида по перетяжке рулей, но в коде не должно быть отдельной логики только для Леонида. Это обычный клиент SaaS, которому через Super Admin назначается бесплатный тариф.
 
-See [CODEX.md](CODEX.md) for the full implementation specification.
+Полное техническое задание находится в [CODEX.md](CODEX.md).
