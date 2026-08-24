@@ -1,130 +1,130 @@
-# LOOKDO — Technical Specification for Codex
+# LOOKDO — техническое задание для Codex
 
-## 1. Product definition
+## 1. Определение продукта
 
-LOOKDO is a **multi-tenant SaaS** for service businesses whose customers can show a task/problem with photos or short video and receive a response from a real specialist.
+LOOKDO — **мультитенантный SaaS** для сервисного бизнеса, где клиент может показать задачу, объект или проблему с помощью фотографий или короткого видео и получить ответ от реального специалиста.
 
-Core idea:
+Основная идея:
 
 > **Покажи — я сделаю.**  
 > **Show it. Get it done.**
 
-This is not a classical website builder, not a CRM-heavy system and not an online price calculator. The product must remain simple.
+Это не классический конструктор сайтов, не тяжёлая CRM и не онлайн-калькулятор стоимости. Продукт должен оставаться простым.
 
-The end-customer flow is always approximately:
+Типовой путь конечного клиента:
 
-1. See the business and examples of work.
-2. Tap the main action.
-3. Take/upload photos or short video.
-4. Add minimal task information.
-5. Enter a **required phone number**.
-6. Send the request.
-7. Optionally enable push notifications.
-8. Continue conversation with the business inside the Web App or via an enabled external channel.
+1. Увидеть бизнес и примеры работ.
+2. Нажать основную кнопку действия.
+3. Сделать или загрузить фото/короткое видео.
+4. Добавить минимум информации о задаче.
+5. Ввести **обязательный номер телефона**.
+6. Отправить заявку.
+7. При желании разрешить push-уведомления.
+8. Продолжить общение с бизнесом внутри Web App или через подключённый внешний канал.
 
-**Do not calculate binding prices automatically.** The owner answers after reviewing the request.
+**Не рассчитывать обязательную цену автоматически.** Владелец бизнеса отвечает после просмотра заявки.
 
 ---
 
-## 2. Mandatory technology stack
+## 2. Обязательный технологический стек
 
-Use this stack as the project baseline:
+Базовый стек проекта:
 
 - **Backend:** Laravel API
 - **Frontend:** Vue 3
-- **Build:** Vite
-- **Web App:** installable PWA
-- **Native-ready:** Capacitor-ready from the beginning
-- **Database:** MariaDB/MySQL-compatible schema unless there is a strong implementation reason to use PostgreSQL
-- **Queue:** Laravel queues
-- **Cache/session:** Redis-ready
-- **Storage:** Laravel filesystem abstraction; local/S3-compatible storage
+- **Сборка:** Vite
+- **Web App:** устанавливаемая PWA
+- **Готовность к native:** архитектура сразу должна быть Capacitor-ready
+- **База данных:** MariaDB/MySQL-совместимая схема, если нет веской причины использовать PostgreSQL
+- **Очереди:** Laravel Queues
+- **Кэш/сессии:** готовность к Redis
+- **Хранилище:** Laravel Filesystem, локальное и S3-совместимое
 
-Frontend and backend must be cleanly separated through API contracts.
+Frontend и backend должны быть чётко разделены через API-контракты.
 
-Do not build Blade-first UI and later retrofit Vue.
-
----
-
-## 3. Multi-tenancy
-
-LOOKDO is SaaS from the first commit.
-
-Every business is a `tenant`.
-
-A tenant owns its own:
-
-- business profile;
-- branding;
-- domain(s);
-- staff/admin users;
-- requests;
-- conversations/messages;
-- media;
-- before/after examples;
-- videos;
-- reviews;
-- notification settings;
-- integrations;
-- subscription/plan;
-- localization/content settings.
-
-Tenant data must never leak between tenants.
-
-Implement tenant resolution by hostname/domain with a safe fallback for platform-owned preview/subdomain use.
-
-### First tenant
-
-Leonid's steering-wheel upholstery business will be the first real tenant.
-
-**Do not create special Leonid-only logic.**
-
-Leonid receives an ordinary plan assigned as free/complimentary from Super Admin.
+Не строить интерфейс сначала на Blade с последующей переделкой на Vue.
 
 ---
 
-## 4. Custom domains
+## 3. Мультитенантность
 
-Primary platform domain: **lookdo.app**.
+LOOKDO является SaaS **с первого коммита**.
 
-Each SaaS customer may use their own domain.
+Каждый бизнес — отдельный `tenant`.
 
-Expected workflow:
+Каждый tenant имеет собственные:
 
-1. Customer registers a domain externally.
-2. LOOKDO shows DNS instructions.
-3. Customer points DNS to our server.
-4. Tenant admin adds the domain.
-5. System verifies DNS.
-6. Super Admin or automated provisioning activates it.
-7. SSL is issued.
-8. Domain resolves directly to the tenant Web App.
+- профиль бизнеса;
+- брендинг;
+- домен(ы);
+- пользователей/администраторов;
+- заявки;
+- переписки и сообщения;
+- медиафайлы;
+- примеры «до/после»;
+- видео;
+- отзывы;
+- настройки уведомлений;
+- интеграции;
+- подписку/тариф;
+- языковые и контентные настройки.
 
-The visitor should see the tenant's own brand, not LOOKDO branding, unless platform branding is intentionally enabled by plan/settings.
+Данные одного tenant никогда не должны быть доступны другому tenant.
 
-Store domain status such as:
+Tenant определяется по hostname/domain. Нужен безопасный fallback для служебного preview или платформенного поддомена.
 
-- pending
-- dns_detected
-- verifying
-- active
-- failed
+### Первый tenant
+
+Первым реальным клиентом будет мастерская Леонида по перетяжке рулей.
+
+**Не делать специальную логику только для Леонида.**
+
+Леонид получает обычный тариф, который через Super Admin назначается ему бесплатно/бессрочно.
 
 ---
 
-## 5. End-customer Web App — strict simplicity rule
+## 4. Собственные домены клиентов
 
-The public/customer UI is a **mobile app-style interface**, not a long landing page.
+Основной домен платформы: **lookdo.app**.
 
-Main navigation must remain small:
+Каждый SaaS-клиент может использовать собственный домен.
 
-- **Home**
-- **Primary action / Show request**
-- **Messages**
+Сценарий подключения:
 
-Do not add a separate permanent Works/Gallery tab in v1. Work examples belong on Home.
+1. Клиент самостоятельно регистрирует домен у любого регистратора.
+2. LOOKDO показывает необходимые DNS-настройки.
+3. Клиент направляет DNS на наш сервер.
+4. В админке tenant добавляет домен.
+5. Система проверяет DNS.
+6. Super Admin или автоматическая система активирует домен.
+7. Выпускается SSL-сертификат.
+8. Домен открывает PWA конкретного tenant.
 
-A tenant can customize the wording of the primary action, for example:
+Посетитель должен видеть бренд конкретного бизнеса, а не бренд LOOKDO, если только отображение платформенного бренда специально не предусмотрено тарифом или настройкой.
+
+Статусы домена, например:
+
+- `pending`
+- `dns_detected`
+- `verifying`
+- `active`
+- `failed`
+
+---
+
+## 5. Клиентское Web App — жёсткое правило простоты
+
+Публичный интерфейс — это **мобильное приложение по стилю и логике**, а не длинный сайт-лендинг.
+
+Основная навигация должна оставаться минимальной:
+
+- **Главная**
+- **Основное действие / Показать задачу**
+- **Сообщения**
+
+В первой версии не делать отдельный постоянный раздел «Работы». Примеры работ показываются на Главной.
+
+Tenant может менять текст центральной кнопки, например:
 
 - Оценить мой руль
 - Показать повреждение
@@ -133,391 +133,391 @@ A tenant can customize the wording of the primary action, for example:
 - Показать мебель
 - Отправить фото
 
-The number of screens should **not grow when a new business category is added**.
+Количество экранов **не должно увеличиваться при добавлении новых профессий или категорий бизнеса**.
 
-Business templates only change:
+Бизнес-шаблон меняет только:
 
-- labels;
-- field visibility;
-- field wording;
-- photo/video hints;
-- required media types;
-- default content.
+- подписи;
+- видимость полей;
+- тексты полей;
+- подсказки для фото/видео;
+- обязательные типы медиа;
+- стартовый контент.
 
 ---
 
-## 6. Public/customer screens
+## 6. Публичные экраны клиента
 
-### 6.1 Home
+### 6.1 Главная
 
-App-like one-screen-first layout, not a content "scroll wall".
+Главная должна ощущаться как экран приложения, а не как «портянка» сайта.
 
-Must support:
+Поддержать:
 
-- tenant logo/name;
-- hero photo or optional short muted video;
-- short headline/subheadline;
-- compact **before/after** showcase;
-- selected advantages/benefits;
-- compact business/master profile block;
-- customer reviews preview;
-- phone/contact button;
-- VK/Telegram/contact action depending on tenant market/integrations;
-- persistent bottom navigation.
+- логотип и название tenant;
+- крупное hero-фото или короткое видео без звука;
+- короткий заголовок и подзаголовок;
+- компактный блок **До / После**;
+- несколько преимуществ;
+- компактный профиль мастера/бизнеса;
+- превью отзывов;
+- кнопку звонка/контактов;
+- VK/Telegram/другой контакт в зависимости от рынка и интеграций;
+- постоянную нижнюю навигацию.
 
-Some vertical scrolling is acceptable for smaller screens, but the information architecture must feel like an app, not a classical landing page.
+Небольшая вертикальная прокрутка допустима, но архитектура должна ощущаться как приложение, а не классический лендинг.
 
-### 6.2 Request / primary action
+### 6.2 Основное действие / заявка
 
-This is the main conversion screen.
+Это главный конверсионный экран.
 
-Support:
+Поддержать:
 
-- camera capture;
-- gallery/file upload;
-- 1–4 photos by default, configurable per template;
-- optional short video;
-- media preview;
-- remove/re-take;
-- photo guidance;
-- template-specific minimal fields;
-- free-text comment;
-- required customer phone number;
-- preferred reply channel.
+- съёмку камерой;
+- загрузку из галереи/файлов;
+- по умолчанию 1–4 фотографии, настраиваемо шаблоном;
+- короткое видео, если разрешено шаблоном;
+- предпросмотр медиа;
+- удаление и пересъёмку;
+- визуальные подсказки для фото;
+- минимум шаблонных полей;
+- свободный комментарий;
+- **обязательный номер телефона клиента**;
+- предпочтительный канал ответа.
 
-**Customer e-mail is not required in the standard flow and should not be shown by default.**
+**E-mail клиента в стандартном сценарии не нужен и по умолчанию не показывается.**
 
-Request owner's internal notification e-mail is separate.
+E-mail владельца бизнеса для служебных уведомлений — отдельная настройка.
 
-### 6.3 Camera / media capture state
+### 6.3 Камера / добавление медиа
 
-Provide clear visual guidance such as:
+Показывать понятные инструкции, например:
 
-- overall view;
-- left/right/detail;
-- damage close-up;
-- model/label plate;
-- installation location;
-- reference/example.
+- общий вид;
+- левая/правая сторона;
+- повреждение крупным планом;
+- шильдик/модель;
+- место установки;
+- пример/референс.
 
-The guidance is defined by the business template.
+Набор подсказок определяется бизнес-шаблоном.
 
-Support:
+Поддержать:
 
-- camera capture on capable browsers;
-- normal file input fallback;
-- multiple image upload;
-- short video;
-- preview and delete;
-- compression/resizing before upload where safe;
-- server-side validation.
+- открытие камеры в поддерживаемых браузерах;
+- обычный file input как fallback;
+- загрузку нескольких фото;
+- короткое видео;
+- предпросмотр и удаление;
+- разумное сжатие/уменьшение до отправки;
+- обязательную серверную валидацию.
 
-### 6.4 Request sent
+### 6.4 Заявка отправлена
 
-Show:
+Показать:
 
-- success state;
-- request number/reference;
-- short request summary;
-- business contact summary;
-- prompt to enable notifications.
+- успешное состояние;
+- номер/идентификатор заявки;
+- краткое содержание;
+- контакты бизнеса;
+- предложение разрешить уведомления.
 
-### 6.5 Push permission pre-prompt
+### 6.5 Предварительный запрос push-разрешения
 
-Never trigger the browser notification permission immediately on first visit.
+Никогда не показывать системный запрос браузера на уведомления сразу при первом посещении.
 
-First show a human-readable internal prompt explaining:
+Сначала показать собственный понятный экран:
 
-> Enable notifications so we can tell you when the business replies.
+> Разрешите уведомления, чтобы мы сообщили вам, когда мастер ответит.
 
-Only after the user taps **Enable notifications** should the real browser permission prompt be triggered.
+Только после нажатия **Разрешить уведомления** вызывается настоящий системный запрос браузера.
 
-Service notifications and marketing consent must be treated separately.
+Сервисные уведомления и рекламное согласие должны быть разделены.
 
-### 6.6 Messages
+### 6.6 Сообщения
 
-Simple request-linked conversation UI.
+Простая переписка, привязанная к заявке.
 
-Support:
+Поддержать:
 
-- messages from customer and business;
-- attachments/photos;
-- message timestamps;
-- request context;
-- unread counters;
-- push notification deep-link to the correct conversation/request.
+- сообщения клиента и бизнеса;
+- вложения/фотографии;
+- время сообщений;
+- контекст заявки;
+- счётчик непрочитанных;
+- deep link из push прямо в нужную переписку.
 
-Do not build a complex social messenger.
+Не строить полноценную социальную сеть или сложный мессенджер.
 
-### 6.7 Reviews
+### 6.7 Отзывы
 
-Public reviews screen/view must support:
+Публичный экран/раздел отзывов должен поддерживать:
 
-- average rating;
-- total count;
-- text review;
-- optional photos;
-- optional short video;
-- business reply;
-- moderation/publish state;
-- link review to completed request when possible.
+- средний рейтинг;
+- количество отзывов;
+- текст;
+- фотографии;
+- короткое видео;
+- ответ бизнеса;
+- статус публикации/модерации;
+- привязку к выполненной заявке, если возможно.
 
-After a completed job, tenant can send a service notification asking for a review.
+После завершения работы tenant может отправить сервисное уведомление с просьбой оставить отзыв.
 
-### 6.8 Contacts modal / bottom sheet
+### 6.8 Контакты
 
-Not a permanent main screen.
+Контакты — не отдельный основной экран, а modal/bottom sheet.
 
-Support configurable actions:
+Настраиваемые действия:
 
-- call;
+- позвонить;
 - VK;
-- Telegram where enabled;
-- address;
-- route/navigation link;
-- opening hours.
+- Telegram, если включён;
+- адрес;
+- построить маршрут;
+- часы работы.
 
 ---
 
-## 7. Admin login
+## 7. Вход администратора tenant
 
-Tenant staff/admin has a simple login screen.
+Для владельца/сотрудника бизнеса нужен простой вход.
 
-Support:
+Поддержать:
 
-- login/phone + password;
-- remember me;
-- password recovery;
-- architecture ready for one-time code login.
+- телефон или логин + пароль;
+- «Запомнить меня»;
+- восстановление пароля;
+- архитектурную готовность к одноразовому коду.
 
-Do not label this area as Leonid-only.
-
----
-
-## 8. Tenant Admin
-
-Tenant Admin is required.
-
-Recommended navigation:
-
-- Dashboard
-- Requests
-- Messages
-- Content
-- Reviews
-- Profile
-- Integrations
-- Domain
-- Subscription
-- Settings
-
-Keep the mobile experience usable.
-
-### 8.1 Requests
-
-Owner can:
-
-- view new requests;
-- open customer phone/contact;
-- inspect all uploaded media;
-- reply;
-- mark status;
-- archive;
-- download media if needed.
-
-Minimal statuses:
-
-- new
-- in_progress
-- answered
-- completed
-- archived
-
-Avoid building a huge CRM workflow in v1.
-
-### 8.2 Profile screen
-
-The Profile screen **is required**.
-
-Tenant can manage:
-
-- company/business name;
-- logo;
-- avatar/master photo if applicable;
-- description;
-- phone;
-- address;
-- opening hours;
-- external contact links;
-- languages;
-- primary colors;
-- notification preferences.
-
-### 8.3 Branding
-
-The current black/gold Leonid mockups are the initial visual direction, but the SaaS must allow tenant branding.
-
-At minimum tenant admin can change:
-
-- primary/accent color;
-- secondary/supporting color;
-- logo;
-- hero image/video.
-
-Do **not** build a free-form page designer in v1.
-
-The structure remains fixed and polished.
-
-### 8.4 Media/content management
-
-Provide very easy mobile-friendly upload and management for:
-
-- hero image;
-- hero video;
-- work photos;
-- before/after pairs;
-- gallery media;
-- review media.
-
-Required UX:
-
-- drag/drop on desktop;
-- camera/gallery on mobile;
-- reorder;
-- delete;
-- crop/thumbnail where useful;
-- progress indicator;
-- sensible compression/transcoding strategy.
-
-### 8.5 Before/After component
-
-Implement a reusable **before/after slider component**.
-
-Tenant admin can create a pair:
-
-- before image;
-- after image;
-- title;
-- optional short caption.
-
-Public UI renders a touch-friendly comparison slider.
-
-### 8.6 Video
-
-Support short business videos and customer/request videos.
-
-Do not assume direct unbounded original upload storage forever.
-
-Implement:
-
-- size limits;
-- duration limits configurable by plan;
-- MIME validation;
-- thumbnail/poster generation strategy;
-- background processing/transcoding-ready architecture.
+Не называть эту зону «только для Леонида».
 
 ---
 
-## 9. Notifications
+## 8. Админка клиента SaaS
 
-### Customer
+Админка tenant обязательна.
 
-- reply received;
-- request status changed if useful;
-- completed/review request;
-- optional marketing only with separate consent.
+Рекомендуемая навигация:
 
-### Tenant owner/staff
+- Обзор
+- Заявки
+- Сообщения
+- Контент
+- Отзывы
+- Профиль
+- Интеграции
+- Домен
+- Тариф
+- Настройки
 
-- new request;
-- new customer message;
-- optionally new review.
+Админка должна быть удобна и на телефоне.
 
-Channels:
+### 8.1 Заявки
+
+Владелец может:
+
+- видеть новые заявки;
+- открыть телефон/контакт клиента;
+- просмотреть все загруженные фото/видео;
+- ответить;
+- изменить статус;
+- архивировать;
+- скачать медиа при необходимости.
+
+Минимальные статусы:
+
+- `new`
+- `in_progress`
+- `answered`
+- `completed`
+- `archived`
+
+Не превращать первую версию в большую CRM.
+
+### 8.2 Профиль
+
+Экран **Профиль обязателен**.
+
+Tenant управляет:
+
+- названием бизнеса;
+- логотипом;
+- фото мастера/аватаром, если нужно;
+- описанием;
+- телефоном;
+- адресом;
+- часами работы;
+- внешними контактами;
+- языками;
+- основными цветами;
+- настройками уведомлений.
+
+### 8.3 Брендинг
+
+Чёрно-золотые макеты Леонида — исходное направление дизайна, но SaaS должен поддерживать брендинг каждого tenant.
+
+Минимум можно менять:
+
+- основной/акцентный цвет;
+- дополнительный цвет;
+- логотип;
+- hero-фото или hero-видео.
+
+**Не делать свободный конструктор страниц в v1.**
+
+Структура приложения остаётся фиксированной и аккуратной.
+
+### 8.4 Управление фото и видео
+
+Нужна очень простая мобильная загрузка и управление:
+
+- hero-фото;
+- hero-видео;
+- фотографиями работ;
+- парами До / После;
+- прочими медиа;
+- медиа отзывов.
+
+UX:
+
+- drag & drop на компьютере;
+- камера/галерея на телефоне;
+- изменение порядка;
+- удаление;
+- crop/thumbnail при необходимости;
+- индикатор загрузки;
+- разумная стратегия сжатия/транскодирования.
+
+### 8.5 Компонент До / После
+
+Сделать переиспользуемый touch-friendly **Before/After Slider**.
+
+В админке tenant создаёт пару:
+
+- фото «до»;
+- фото «после»;
+- заголовок;
+- необязательное короткое описание.
+
+На публичной стороне — удобный свайп/ползунок сравнения.
+
+### 8.6 Видео
+
+Поддержать короткие видео бизнеса и видео в заявках клиентов.
+
+Нельзя рассчитывать на бесконечное хранение оригинальных видео без ограничений.
+
+Предусмотреть:
+
+- ограничения размера;
+- ограничения длительности по тарифу;
+- MIME-валидацию;
+- генерацию poster/thumbnail;
+- архитектуру, готовую к фоновой обработке и транскодированию.
+
+---
+
+## 9. Уведомления
+
+### Клиенту
+
+- мастер ответил;
+- при необходимости изменился статус заявки;
+- работа завершена / просьба оставить отзыв;
+- реклама только при отдельном согласии.
+
+### Владельцу/сотруднику tenant
+
+- новая заявка;
+- новое сообщение клиента;
+- при необходимости новый отзыв.
+
+Каналы:
 
 - Web Push/PWA;
-- e-mail to tenant owner;
-- VK integration where configured;
-- Telegram integration for supported markets.
+- e-mail владельцу бизнеса;
+- VK, если подключён;
+- Telegram для соответствующих рынков.
 
-Customer e-mail should not be required for normal request submission.
-
----
-
-## 10. Telegram bot
-
-A Telegram bot is part of the SaaS concept, especially for non-Russian deployments where appropriate.
-
-It must use the same backend data, not create a second business logic implementation.
-
-Initial bot functions:
-
-- notify tenant of new request;
-- show request summary;
-- show/link media;
-- notify of new customer message;
-- quick link back to Tenant Admin;
-- later allow replies through the bot if cleanly implemented.
-
-Telegram is an integration, not a separate product.
+E-mail клиента для обычной заявки не требуется.
 
 ---
 
-## 11. VK integration
+## 10. Telegram-бот
 
-For tenants using VK, allow configuration of VK community/contact integration.
+Telegram-бот является частью SaaS-концепции, прежде всего для рынков, где это удобно.
 
-Do not assume the platform can message arbitrary VK users without permission/interaction.
+Он должен использовать тот же backend и те же данные. Не создавать отдельную бизнес-логику для бота.
 
-Use VK as an optional communication/notification channel according to current API permissions.
+Начальные функции:
 
-Keep the customer phone number as the reliable mandatory fallback contact.
+- уведомление tenant о новой заявке;
+- краткая информация о заявке;
+- показ/ссылка на фото и видео;
+- уведомление о новом сообщении клиента;
+- быстрая ссылка в Tenant Admin;
+- позже — возможность отвечать через бота, если это реализуется чисто.
 
----
-
-## 12. Localization
-
-Platform must be localization-first.
-
-Required locales:
-
-- German (`de`)
-- English (`en`)
-- Russian (`ru`)
-
-No user-facing strings should be hardcoded in Vue components.
-
-Separate:
-
-- platform translations;
-- tenant-editable business text;
-- template-specific labels/hints.
-
-Tenant may enable only selected languages for its public app.
+Telegram — интеграция, а не отдельный продукт.
 
 ---
 
-## 13. Business onboarding and AI classification
+## 11. VK
 
-During tenant registration, ask the user to describe their business/activity in natural language.
+Для tenant, использующих VK, дать возможность подключить сообщество/контакт VK.
 
-Example inputs:
+Не считать, что платформа может сама писать любому пользователю VK без его предварительного взаимодействия/разрешения.
 
-- "перетягиваю автомобильные рули"
-- "устанавливаю входные двери"
-- "ремонтирую стиральные машины"
+VK используется как дополнительный канал в рамках актуальных возможностей API.
 
-The system searches a database of known phrases/synonyms and may use AI to select the best matching **fixed category + fixed variation**.
+Обязательный номер телефона клиента остаётся надёжным резервным контактом.
 
-**AI must not invent a new workflow/template.**
+---
 
-Its job is classification only.
+## 12. Локализация
 
-If confidence is low, show 2–3 likely matches and ask the tenant to select one.
+Платформа изначально строится мультиязычной.
 
-Store classification phrases by locale.
+Обязательные локали:
 
-Suggested phrase table concept:
+- немецкий (`de`)
+- английский (`en`)
+- русский (`ru`)
+
+Не хардкодить пользовательские строки в Vue-компонентах.
+
+Разделять:
+
+- системные переводы платформы;
+- редактируемые tenant тексты бизнеса;
+- шаблонные подписи и подсказки.
+
+Tenant может включить только нужные языки своего публичного приложения.
+
+---
+
+## 13. Регистрация бизнеса и AI-классификация
+
+При регистрации пользователь описывает свою деятельность обычным текстом.
+
+Примеры:
+
+- «перетягиваю автомобильные рули»
+- «устанавливаю входные двери»
+- «ремонтирую стиральные машины»
+
+Система ищет совпадения в базе фраз/синонимов и при необходимости использует ИИ, чтобы выбрать подходящую **фиксированную категорию + фиксированную вариацию**.
+
+**ИИ не имеет права создавать новый workflow или новый шаблон.**
+
+Его задача — только классификация.
+
+Если уверенность низкая, показать 2–3 наиболее вероятных варианта и попросить пользователя выбрать.
+
+Фразы хранить с привязкой к языку.
+
+Пример таблицы:
 
 ```text
 business_phrases
@@ -532,131 +532,131 @@ business_phrases
 
 ---
 
-## 14. Fixed business taxonomy v1
+## 14. Фиксированная бизнес-таксономия v1
 
-The UI/logic is driven by a fixed taxonomy. The current agreed v1 taxonomy contains the following categories and variations.
+UI и логика строятся на жёстко определённой таксономии. Добавление профессии не означает создание нового экрана.
 
-### 1. Automobiles and auto service
+### 1. Автомобили и автосервис
 
-- External damage
-- Interior / vehicle elements
-- Fault / malfunction
-- Desired modification
+- Внешнее повреждение
+- Салон / элементы автомобиля
+- Неисправность
+- Желаемое изменение
 
-### 2. Repair, finishing and installation
+### 2. Ремонт, отделка и монтаж
 
-- Damage repair
-- Installation / mounting
-- Finishing work
-- Large object/project
+- Ремонт повреждения
+- Монтаж / установка
+- Отделочные работы
+- Большой объект / проект
 
-### 3. Household appliance repair
+### 3. Ремонт бытовой техники
 
-- Not working
-- Mechanical damage
-- Error/code
-- Noise / movement / leak
+- Не работает
+- Механическое повреждение
+- Ошибка / код ошибки
+- Шум / движение / протечка
 
-### 4. Computers and electronics
+### 4. Компьютеры и электроника
 
-- Device malfunction
-- Physical damage
-- Software error
-- General/other electronics request
+- Неисправность устройства
+- Физическое повреждение
+- Ошибка ПО
+- Общий запрос по электронике
 
-### 5. Furniture and interior
+### 5. Мебель и интерьер
 
-- Repair / restoration
-- Upholstery
-- Manufacturing / modification
-- General interior object
+- Ремонт / реставрация
+- Перетяжка
+- Изготовление / изменение
+- Общий интерьерный объект
 
-### 6. Garden and property
+### 6. Сад и участок
 
-- Specific object
-- Whole property/area
-- Damage/problem
-- General garden work
+- Конкретный объект
+- Участок целиком
+- Повреждение / проблема
+- Общие садовые работы
 
-### 7. Cleaning and cleaning services
+### 7. Уборка и чистка
 
-- Room/object
-- Local contamination
-- Large area
-- Special cleaning request
+- Помещение / объект
+- Локальное загрязнение
+- Большая площадь
+- Специальная уборка
 
-### 8. Repair and restoration of items
+### 8. Ремонт и реставрация вещей
 
-- Damage
-- Restoration
-- Modification
-- General item request
+- Повреждение
+- Реставрация
+- Переделка
+- Общий запрос по изделию
 
-### 9. Bicycles, machinery and equipment
+### 9. Велосипеды, техника и оборудование
 
-- Breakdown
-- External damage
-- Operational problem
-- General equipment request
+- Поломка
+- Внешнее повреждение
+- Проблема в работе
+- Общий запрос по оборудованию
 
-### 10. Tailoring and custom-made items
+### 10. Ателье и индивидуальные изделия
 
-- Repair / modification
-- Manufacturing
-- Reference/example based request
-- General custom request
+- Ремонт / переделка
+- Изготовление
+- Работа по референсу/образцу
+- Общий индивидуальный заказ
 
-### 11. Advertising, signs and visual installation
+### 11. Реклама, вывески и оформление
 
-- New installation
-- Replacement / repair
-- Manufacturing
-- General visual/sign request
+- Новая установка
+- Замена / ремонт
+- Изготовление
+- Общий запрос по рекламе/вывеске
 
-Architecture must support adding/removing taxonomy entries later without adding new public screens.
-
----
-
-## 15. Business phrase dictionary
-
-Seed the database with many realistic phrases/synonyms mapped to category + variation.
-
-Examples:
-
-- `перетяжка руля` → automobiles / interior
-- `удаление вмятин` → automobiles / external damage
-- `установка дверей` → repair+installation / installation
-- `ремонт стиральных машин` → appliances / not working
-- `ошибка стиральной машины` → appliances / error
-- `перетяжка дивана` → furniture / upholstery
-- `реставрация мебели` → furniture / restoration
-- `обрезка деревьев` → garden / specific object
-- `химчистка дивана` → cleaning / local contamination
-- `ремонт обуви` → item repair / damage
-- `ремонт ноутбука` → computers / malfunction
-- `разбит экран` → computers / physical damage
-- `ремонт велосипеда` → equipment / breakdown
-- `пошив одежды` → tailoring / manufacturing
-- `установка вывески` → advertising/signs / installation
-
-The dictionary will later be expanded in DE/EN/RU.
+Архитектура должна позволять позже добавлять или убирать элементы таксономии **без появления новых публичных экранов**.
 
 ---
 
-## 16. Template logic
+## 15. Словарь деятельности и ключевых фраз
 
-Each category variation defines a small schema, not a new Vue screen.
+В базу нужно заранее загрузить большое количество реалистичных фраз и синонимов, связанных с парой `категория + вариация`.
 
-Example schema idea:
+Примеры:
+
+- `перетяжка руля` → автомобили / салон
+- `удаление вмятин` → автомобили / внешнее повреждение
+- `установка дверей` → ремонт и монтаж / установка
+- `ремонт стиральных машин` → бытовая техника / не работает
+- `ошибка стиральной машины` → бытовая техника / ошибка
+- `перетяжка дивана` → мебель / перетяжка
+- `реставрация мебели` → мебель / реставрация
+- `обрезка деревьев` → сад / конкретный объект
+- `химчистка дивана` → уборка / локальное загрязнение
+- `ремонт обуви` → ремонт вещей / повреждение
+- `ремонт ноутбука` → компьютеры / неисправность
+- `разбит экран` → компьютеры / физическое повреждение
+- `ремонт велосипеда` → техника / поломка
+- `пошив одежды` → ателье / изготовление
+- `установка вывески` → реклама / установка
+
+Словарь позднее расширяется на DE/EN/RU.
+
+---
+
+## 16. Логика шаблонов
+
+Каждая вариация категории определяет небольшой schema/config, а не отдельный Vue-экран.
+
+Пример:
 
 ```json
 {
-  "primary_action_label": "Show the damage",
+  "primary_action_label": "Показать повреждение",
   "media": {
     "photos_min": 1,
     "photos_max": 4,
     "video_allowed": true,
-    "hints": ["Overall view", "Damage close-up"]
+    "hints": ["Общий вид", "Повреждение крупным планом"]
   },
   "fields": [
     {"key":"subject", "type":"text", "required":false},
@@ -666,280 +666,280 @@ Example schema idea:
 }
 ```
 
-Implement this as DB/config driven behavior.
+Логика должна быть управляемой из БД/config.
 
-Do not fork components by profession.
+Не создавать отдельные компоненты под каждую профессию.
 
 ---
 
-## 17. Reviews workflow
+## 17. Отзывы
 
-Tenant can request a review after completion.
+После завершения работы tenant может попросить клиента оставить отзыв.
 
-Customer review supports:
+Отзыв клиента поддерживает:
 
-- stars;
-- text;
-- photos;
-- short video.
+- звёзды;
+- текст;
+- фотографии;
+- короткое видео.
 
-Tenant can:
+Tenant может:
 
-- reply;
-- publish/hide where lawful and appropriate;
-- feature selected reviews on Home.
+- ответить;
+- опубликовать/скрыть там, где это допустимо;
+- закрепить выбранные отзывы на Главной.
 
-Keep moderation/audit metadata.
+Хранить данные модерации и audit metadata.
 
 ---
 
 ## 18. Super Admin
 
-Separate Super Admin area is required.
+Нужна отдельная панель Super Admin.
 
-Functions:
+Функции:
 
 - tenants;
-- tenant users;
-- domains;
-- plans;
-- subscriptions;
-- payments;
-- complimentary/free plan assignment;
-- usage/limits;
-- storage usage;
-- push usage/status;
-- integrations status;
-- business taxonomy;
-- business phrase dictionary;
-- global localization strings/config;
-- system settings.
+- пользователи tenant;
+- домены;
+- тарифы;
+- подписки;
+- платежи;
+- бесплатные/комплиментарные назначения тарифов;
+- использование и лимиты;
+- использование хранилища;
+- статус push;
+- статусы интеграций;
+- бизнес-таксономия;
+- словарь деятельности;
+- глобальные локализации/конфигурация;
+- системные настройки.
 
-Leonid can be assigned a paid-tier feature set at price 0 without changing tenant code.
-
----
-
-## 19. Plans and limits
-
-Design for plans even if billing is implemented later.
-
-Potential limit dimensions:
-
-- media storage;
-- number of active requests/history retention;
-- video upload allowance;
-- custom domain;
-- number of tenant staff users;
-- integrations;
-- branding options;
-- advanced notifications.
-
-Do not hardcode plan checks throughout components. Use centralized feature/entitlement service.
+Леониду можно назначить функциональность платного тарифа с ценой 0, не меняя код tenant.
 
 ---
 
-## 20. Suggested core data model
+## 19. Тарифы и лимиты
 
-At minimum plan for entities similar to:
+Архитектуру тарифов закладывать сразу, даже если биллинг появится позже.
 
-- users
-- tenants
-- tenant_users
-- tenant_profiles
-- tenant_branding
-- tenant_domains
-- plans
-- subscriptions
-- entitlements
-- business_categories
-- business_variations
-- business_phrases
-- tenant_business_profile
-- request_templates
-- requests
-- request_fields / request_payload
-- media
-- conversations
-- messages
-- push_subscriptions
-- notification_consents
-- notifications
-- integrations
-- reviews
-- review_media
-- before_after_items
-- audit_logs
+Возможные ограничения:
 
-Use appropriate polymorphism only where it simplifies rather than obscures the model.
+- объём медиа-хранилища;
+- количество активных заявок / срок хранения истории;
+- возможность видео;
+- собственный домен;
+- число сотрудников tenant;
+- интеграции;
+- возможности брендинга;
+- расширенные уведомления.
 
-Every tenant-owned record must be tenant-scoped.
+Не размазывать проверки тарифов по Vue-компонентам. Нужен централизованный сервис feature/entitlements.
 
 ---
 
-## 21. Security and privacy
+## 20. Основная модель данных
 
-Implement from the beginning:
+Минимально предусмотреть сущности:
 
-- tenant isolation;
+- `users`
+- `tenants`
+- `tenant_users`
+- `tenant_profiles`
+- `tenant_branding`
+- `tenant_domains`
+- `plans`
+- `subscriptions`
+- `entitlements`
+- `business_categories`
+- `business_variations`
+- `business_phrases`
+- `tenant_business_profile`
+- `request_templates`
+- `requests`
+- `request_fields` / `request_payload`
+- `media`
+- `conversations`
+- `messages`
+- `push_subscriptions`
+- `notification_consents`
+- `notifications`
+- `integrations`
+- `reviews`
+- `review_media`
+- `before_after_items`
+- `audit_logs`
+
+Polymorphic-связи использовать только там, где они реально упрощают модель.
+
+Каждая tenant-owned запись обязана быть tenant-scoped.
+
+---
+
+## 21. Безопасность и приватность
+
+С самого начала реализовать:
+
+- изоляцию tenant;
 - authorization policies;
 - rate limiting;
-- CSRF/auth strategy appropriate to SPA/API architecture;
-- secure upload validation;
-- MIME sniffing/validation;
-- image/video size limits;
-- safe filenames/storage keys;
-- signed/private media URLs where necessary;
-- phone and personal data protection;
-- audit trail for important admin actions;
-- consent timestamps for push/marketing.
+- корректную CSRF/auth стратегию для SPA/API;
+- безопасную загрузку файлов;
+- проверку MIME;
+- лимиты изображений/видео;
+- безопасные имена и storage keys;
+- signed/private URL для приватных медиа при необходимости;
+- защиту телефонов и персональных данных;
+- audit trail важных действий администраторов;
+- timestamp согласий на push и маркетинг.
 
-Do not expose internal storage paths or tenant data through predictable URLs.
+Не раскрывать внутренние пути хранилища и не использовать предсказуемые URL, через которые можно получить данные другого tenant.
 
 ---
 
-## 22. PWA / Capacitor readiness
+## 22. PWA и готовность к Capacitor
 
-PWA requirements:
+Требования PWA:
 
 - manifest;
-- tenant-aware app name/icon where technically possible;
+- tenant-aware название и иконка приложения там, где это технически возможно;
 - service worker;
-- offline-friendly shell/error state;
-- installability;
+- offline-friendly shell / понятное состояние без сети;
+- возможность установки;
 - Web Push;
-- deep links into requests/conversations.
+- deep links в конкретные заявки/переписки.
 
-Capacitor readiness:
+Требования к Capacitor-ready архитектуре:
 
-- keep browser/native capability wrappers isolated;
-- do not spread direct browser-only APIs across components;
-- create service abstractions for camera, notifications, files and sharing;
-- Web implementation first, Capacitor implementation later.
-
----
-
-## 23. UI principles
-
-The supplied/current visual direction is the baseline:
-
-- premium dark UI;
-- black/graphite surfaces;
-- large photography;
-- restrained gold accent for the first tenant;
-- rounded touch-friendly controls;
-- clear mobile hierarchy.
-
-But colors must be tenant configurable.
-
-Do not create separate designs per business category.
-
-Do not overfill screens with cards/settings.
-
-Customer UI must remain visually simple and task-focused.
+- изолировать browser/native capability wrappers;
+- не размазывать прямые browser API по компонентам;
+- создать сервисные абстракции для камеры, уведомлений, файлов и share;
+- сначала web-реализация, позже Capacitor/native реализация.
 
 ---
 
-## 24. MVP implementation order
+## 23. UI-принципы
 
-### Phase 1 — foundation
+Текущие макеты используются как визуальная база:
 
-1. Laravel API + Vue/Vite project structure.
-2. Authentication.
+- премиальный тёмный UI;
+- чёрные/графитовые поверхности;
+- крупные фотографии;
+- сдержанный золотой акцент у первого tenant;
+- скруглённые touch-friendly элементы;
+- ясная мобильная иерархия.
+
+Но цвета должны настраиваться tenant.
+
+Не создавать отдельный дизайн для каждой профессии.
+
+Не перегружать экраны карточками и настройками.
+
+Клиентский UI должен оставаться визуально простым и ориентированным на одно действие.
+
+---
+
+## 24. Порядок реализации MVP
+
+### Этап 1 — фундамент
+
+1. Laravel API + Vue/Vite структура.
+2. Аутентификация.
 3. Multi-tenancy.
-4. Tenant/domain resolution.
-5. Localization foundation.
-6. Basic tenant branding.
-7. Taxonomy + request-template model.
+4. Определение tenant по домену.
+5. Основа локализации.
+6. Базовый брендинг tenant.
+7. Таксономия и модель шаблонов заявок.
 
-### Phase 2 — customer app
+### Этап 2 — клиентское приложение
 
-1. Home.
-2. Before/after component.
-3. Request form.
-4. Camera/photo upload.
-5. Short video upload.
-6. Required phone.
-7. Request submitted state.
-8. Messages.
-9. Push permission flow.
-10. Contacts modal.
-11. Reviews.
+1. Главная.
+2. До / После.
+3. Форма заявки.
+4. Камера/фото.
+5. Короткое видео.
+6. Обязательный телефон.
+7. Экран «Заявка отправлена».
+8. Сообщения.
+9. Flow разрешения push.
+10. Контакты.
+11. Отзывы.
 
-### Phase 3 — Tenant Admin
+### Этап 3 — Tenant Admin
 
-1. Requests.
-2. Messages.
-3. Profile.
-4. Branding/colors.
-5. Easy media upload.
-6. Before/after management.
-7. Video management.
-8. Reviews.
-9. Domain settings.
-10. Notifications/integrations.
+1. Заявки.
+2. Сообщения.
+3. Профиль.
+4. Брендинг/цвета.
+5. Удобная загрузка медиа.
+6. Управление До / После.
+7. Управление видео.
+8. Отзывы.
+9. Настройки домена.
+10. Уведомления/интеграции.
 
-### Phase 4 — Super Admin / SaaS
+### Этап 4 — Super Admin / SaaS
 
 1. Tenants.
-2. Plans/entitlements.
-3. Complimentary plans.
-4. Domains.
-5. Taxonomy/dictionary administration.
-6. Usage/storage.
-7. Subscription/payment foundation.
+2. Тарифы/entitlements.
+3. Бесплатные тарифы.
+4. Домены.
+5. Управление таксономией и словарём.
+6. Использование/хранилище.
+7. Основа подписок/платежей.
 
-### Phase 5 — integrations
+### Этап 5 — интеграции
 
-1. Tenant e-mail notifications.
+1. E-mail уведомления tenant.
 2. Web Push.
-3. Telegram bot.
-4. VK integration.
-5. Capacitor wrappers / Android build when required.
+3. Telegram-бот.
+4. VK.
+5. Capacitor wrappers / Android build при необходимости.
 
 ---
 
-## 25. Explicit non-goals for MVP
+## 25. Что НЕ входит в MVP
 
-Do **not** add unless later requested:
+Без отдельного решения не добавлять:
 
-- automatic price calculator;
-- complex quotation engine;
-- large product catalog/e-commerce;
-- shopping cart;
-- full CRM;
-- appointment calendar;
+- автоматический калькулятор цены;
+- сложный генератор коммерческих предложений;
+- большой каталог товаров/e-commerce;
+- корзину;
+- полноценную CRM;
+- календарь записи;
 - marketplace;
-- social feed;
-- page builder;
-- separate frontend per profession;
-- dozens of public screens.
+- социальную ленту;
+- конструктор страниц;
+- отдельный frontend под каждую профессию;
+- десятки публичных экранов.
 
-The product advantage is **simplicity and interaction**, not feature count.
+Преимущество продукта — **простота и интерактивность**, а не количество функций.
 
 ---
 
-## 26. Definition of success for the first usable version
+## 26. Критерий готовности первой рабочей версии
 
-A new tenant should be able to:
+Новый tenant должен уметь:
 
-1. Register.
-2. Describe their activity.
-3. Be mapped to a fixed business category/variation.
-4. Add logo, colors, contact details and work media.
-5. Add before/after examples and reviews.
-6. Connect a custom domain.
-7. Publish their branded PWA.
+1. Зарегистрироваться.
+2. Описать свою деятельность.
+3. Получить подходящую фиксированную категорию/вариацию.
+4. Добавить логотип, цвета, контакты и медиа работ.
+5. Добавить примеры До / После и отзывы.
+6. Подключить собственный домен.
+7. Опубликовать брендированную PWA.
 
-Their customer should be able to:
+Его клиент должен уметь:
 
-1. Open the domain on a phone.
-2. Understand what the business does.
-3. See examples/reviews.
-4. Tap the primary action.
-5. Take/upload photos or video.
-6. Enter minimal details and required phone number.
-7. Send the request.
-8. Enable notifications.
-9. Receive and answer messages.
+1. Открыть домен на телефоне.
+2. Сразу понять, чем занимается бизнес.
+3. Посмотреть примеры и отзывы.
+4. Нажать основную кнопку действия.
+5. Сделать/загрузить фото или видео.
+6. Ввести минимум данных и обязательный телефон.
+7. Отправить заявку.
+8. Включить уведомления.
+9. Получать сообщения и отвечать.
 
-The tenant should receive the request through Tenant Admin plus configured notifications and be able to answer without using a heavyweight CRM.
+Tenant должен получить заявку в Tenant Admin и через настроенные уведомления и иметь возможность ответить клиенту без тяжёлой CRM.
