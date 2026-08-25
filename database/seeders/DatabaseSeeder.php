@@ -32,21 +32,24 @@ class DatabaseSeeder extends Seeder
 
         $automotive = BusinessCategory::updateOrCreate(['code' => 'automotive'], ['name' => ['de' => 'Auto & Fahrzeugservice', 'en' => 'Automotive services', 'ru' => 'Автомобили и автосервис'], 'sort_order' => 10]);
         $repair = BusinessCategory::updateOrCreate(['code' => 'repair-finishing-installation'], ['name' => ['de' => 'Reparatur & Montage', 'en' => 'Repair & installation', 'ru' => 'Ремонт, отделка и монтаж'], 'sort_order' => 20]);
+        $general = BusinessCategory::updateOrCreate(['code' => 'general-services'], ['name' => ['de' => 'Allgemeine Dienstleistungen', 'en' => 'General services', 'ru' => 'Другие услуги'], 'sort_order' => 999]);
         $autoGeneral = BusinessVariation::updateOrCreate(['code' => 'automotive.general'], ['category_id' => $automotive->id, 'name' => ['de' => 'Allgemeine Fahrzeuganfrage', 'en' => 'General vehicle request', 'ru' => 'Общая заявка по автомобилю'], 'template_code' => 'automotive.general', 'priority' => 10]);
         $steering = BusinessVariation::updateOrCreate(['code' => 'automotive.steering-wheel-upholstery'], ['category_id' => $automotive->id, 'name' => ['de' => 'Lenkrad neu beziehen', 'en' => 'Steering wheel upholstery', 'ru' => 'Перетяжка руля'], 'template_code' => 'automotive.steering-wheel-upholstery', 'priority' => 100]);
         $repairGeneral = BusinessVariation::updateOrCreate(['code' => 'repair-finishing-installation.general'], ['category_id' => $repair->id, 'name' => ['de' => 'Allgemeine Reparatur oder Montage', 'en' => 'General repair or installation', 'ru' => 'Общий ремонт или монтаж'], 'template_code' => 'repair-finishing-installation.general', 'priority' => 10]);
         $doors = BusinessVariation::updateOrCreate(['code' => 'repair-finishing-installation.door-installation'], ['category_id' => $repair->id, 'name' => ['de' => 'Türmontage', 'en' => 'Door installation', 'ru' => 'Установка дверей'], 'template_code' => 'repair-finishing-installation.door-installation', 'priority' => 90]);
+        $generalServices = BusinessVariation::updateOrCreate(['code' => 'general-services.general'], ['category_id' => $general->id, 'name' => ['de' => 'Universelle Anfrage', 'en' => 'Universal request', 'ru' => 'Универсальная заявка'], 'template_code' => 'general-services.general', 'priority' => 1]);
 
         RequestTemplate::updateOrCreate(['code' => 'automotive.general'], ['category_id' => $automotive->id, 'variation_id' => $autoGeneral->id, 'name' => $autoGeneral->name, 'configuration' => ['primary_action_label' => ['de' => 'Fahrzeug zeigen', 'en' => 'Show my vehicle', 'ru' => 'Показать автомобиль'], 'media' => ['photos_min' => 1, 'photos_max' => 4, 'video_allowed' => true], 'fields' => []], 'sort_order' => 10]);
         RequestTemplate::updateOrCreate(['code' => 'repair-finishing-installation.general'], ['category_id' => $repair->id, 'variation_id' => $repairGeneral->id, 'name' => $repairGeneral->name, 'configuration' => ['primary_action_label' => ['de' => 'Aufgabe zeigen', 'en' => 'Show the task', 'ru' => 'Показать задачу'], 'media' => ['photos_min' => 1, 'photos_max' => 5, 'video_allowed' => true], 'fields' => []], 'sort_order' => 20]);
+        RequestTemplate::updateOrCreate(['code' => 'general-services.general'], ['category_id' => $general->id, 'variation_id' => $generalServices->id, 'name' => $generalServices->name, 'configuration' => ['primary_action_label' => ['de' => 'Aufgabe zeigen', 'en' => 'Show the task', 'ru' => 'Показать задачу'], 'media' => ['photos_min' => 1, 'photos_max' => 5, 'video_allowed' => true], 'fields' => []], 'sort_order' => 999]);
         $this->seedTemplateFromJson(base_path('templates/automotive/steering-wheel/template.json'), $automotive, $steering, 'automotive.general');
         $this->seedTemplateFromJson(base_path('templates/repair-finishing-installation/door-installation/template.json'), $repair, $doors, 'repair-finishing-installation.general');
 
         $classifier = app(BusinessClassifier::class);
         $phraseSets = [
             [$autoGeneral, ['автосервис', 'ремонт автомобилей', 'ремонт авто', 'car repair', 'autowerkstatt']],
-            [$steering, ['перетяжка руля', 'перетягиваю рули', 'обшить руль кожей', 'реставрация руля', 'lenkrad beziehen', 'lenkrad neu beziehen', 'steering wheel upholstery']],
-            [$repairGeneral, ['ремонт и монтаж', 'отделочные работы', 'мастер по ремонту', 'reparatur und montage', 'repair and installation']],
+            [$steering, ['перетяжка руля', 'перетяжку руля', 'перетяжка автомобильного руля', 'перетяжка автомобильных рулей', 'перетягиваю рули', 'я перетягиваю рули', 'обшить руль кожей', 'реставрация руля', 'рули', 'lenkrad beziehen', 'lenkrad neu beziehen', 'steering wheel upholstery']],
+            [$repairGeneral, ['ремонт', 'строительство и ремонт', 'ремонт и монтаж', 'отделочные работы', 'мастер по ремонту', 'reparatur und montage', 'repair and installation']],
             [$doors, ['установка дверей', 'устанавливаю двери', 'монтаж дверей', 'поставить входную дверь', 'turen montieren', 'turmontage', 'door installation']],
         ];
         foreach ($phraseSets as [$variation,$phrases]) {
@@ -60,7 +63,7 @@ class DatabaseSeeder extends Seeder
                 'impressum' => 'Выходные данные','datenschutz' => 'Конфиденциальность','agb' => 'Условия использования','widerruf' => 'Отказ от договора','kontakt' => 'Контакты'
             }], 'content' => ['de' => 'Dieser Inhalt wird vor dem Produktionsstart vom Betreiber vervollständigt.', 'en' => 'This content will be completed by the operator before production launch.', 'ru' => 'Содержимое заполняется владельцем платформы перед рабочим запуском.'], 'is_published' => true]);
         }
-        foreach (['platform_name' => 'LOOKDO', 'default_locale' => 'ru', 'registration_enabled' => true, 'enabled_locales' => ['de', 'en', 'ru'], 'support_email' => 'support@lookdo.app', 'trial_days_default' => 0, 'upload_base_limit_mb' => 100, 'integrations' => ['stripe' => true, 'openai' => true], 'maintenance' => false] as $key => $value) {
+        foreach (['platform_name' => 'LOOKDO', 'default_locale' => 'ru', 'default_request_template_code' => 'general-services.general', 'registration_enabled' => true, 'enabled_locales' => ['de', 'en', 'ru'], 'support_email' => 'support@lookdo.app', 'trial_days_default' => 0, 'upload_base_limit_mb' => 100, 'integrations' => ['stripe' => true, 'openai' => true], 'maintenance' => false] as $key => $value) {
             SystemSetting::updateOrCreate(['key' => $key], ['value' => $value]);
         }
     }

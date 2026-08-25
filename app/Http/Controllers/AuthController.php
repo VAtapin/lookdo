@@ -35,14 +35,21 @@ class AuthController extends Controller
         return response()->json($result);
     }
 
-    public function register(Request $request, StripeService $stripe, AuditService $audit): JsonResponse
+    public function register(Request $request, StripeService $stripe, AuditService $audit, BusinessClassifier $classifier): JsonResponse
     {
         abort_unless((bool) SystemSetting::read('registration_enabled', true), 403, 'Registration is disabled.');
-        $data = $request->validate(['name' => 'required|string|max:120', 'email' => 'required|email|max:255|unique:users,email', 'password' => ['required', 'confirmed', PasswordRule::min(10)->letters()->numbers()], 'business_name' => 'required|string|max:160', 'slug' => 'nullable|string|max:63', 'country' => 'required|string|size:2', 'locale' => ['required', Rule::in(['de', 'en', 'ru'])], 'business_description' => 'required|string|max:1000', 'classification_id' => 'required|exists:business_classifications,id', 'variation_id' => 'required|exists:business_variations,id', 'plan_id' => 'required|exists:plans,id', 'billing_cycle' => ['nullable', Rule::in(['monthly', 'yearly'])], 'accept_terms' => 'accepted', 'accept_privacy' => 'accepted']);
+        $data = $request->validate(['name' => 'required|string|max:120', 'email' => 'required|email|max:255|unique:users,email', 'password' => ['required', 'confirmed', PasswordRule::min(10)->letters()->numbers()], 'business_name' => 'required|string|max:160', 'slug' => 'nullable|string|max:63', 'country' => 'required|string|size:2', 'locale' => ['required', Rule::in(['de', 'en', 'ru'])], 'business_description' => 'required|string|max:1000', 'classification_id' => 'nullable|exists:business_classifications,id', 'variation_id' => 'nullable|exists:business_variations,id', 'plan_id' => 'required|exists:plans,id', 'billing_cycle' => ['nullable', Rule::in(['monthly', 'yearly'])], 'accept_terms' => 'accepted', 'accept_privacy' => 'accepted']);
         $plan = Plan::where('is_active', true)->findOrFail($data['plan_id']);
-        $variation = BusinessVariation::with('category')->findOrFail($data['variation_id']);
+        $classification = ! empty($data['classification_id'])
+            ? BusinessClassification::find($data['classification_id'])
+            : $classifier->classify($data['business_description'], $data['locale']);
+        $variationId = $data['variation_id'] ?? $classification?->variation_id;
+        $variation = $variationId
+            ? BusinessVariation::with('category')->where('enabled', true)->find($variationId)
+            : null;
+        $variation ??= $classifier->defaultVariation();
         $slug = $this->uniqueSlug($data['slug'] ?? $data['business_name']);
-        [$user,$tenant,$subscription] = DB::transaction(function () use ($data, $plan, $variation, $slug, $request) {
+        [$user,$tenant,$subscription] = DB::transaction(function () use ($data, $plan, $variation, $classification, $slug, $request) {
             $user = User::create(['name' => $data['name'], 'email' => $data['email'], 'password' => $data['password'], 'locale' => $data['locale'], 'is_active' => true]);
             $tenant = Tenant::create(['name' => $data['business_name'], 'slug' => $slug, 'country' => strtoupper($data['country']), 'locale' => $data['locale'], 'business_description' => $data['business_description'], 'status' => 'active']);
             $tenant->users()->attach($user, ['role' => 'owner']);
@@ -51,7 +58,7 @@ class AuthController extends Controller
             $tenant->update(['primary_domain_id' => $domain->id]);
             $template = RequestTemplate::where('code', $variation->template_code)->first();
             $tenant->businessProfile()->create(['category_id' => $variation->category_id, 'variation_id' => $variation->id, 'request_template_id' => $template?->id, 'original_description' => $data['business_description']]);
-            BusinessClassification::whereKey($data['classification_id'])->update(['tenant_id' => $tenant->id, 'category_id' => $variation->category_id, 'variation_id' => $variation->id, 'confirmed_by_user_at' => now()]);
+            $classification?->update(['tenant_id' => $tenant->id, 'category_id' => $variation->category_id, 'variation_id' => $variation->id, 'confirmed_by_user_at' => now()]);
             $trial = $plan->trial_days > 0;
             $subscription = $tenant->subscriptions()->create(['plan_id' => $plan->id, 'provider' => $trial ? 'lookdo' : 'stripe', 'status' => $trial ? 'trialing' : 'incomplete', 'started_at' => now(), 'current_period_start' => now(), 'current_period_end' => $trial ? now()->addDays($plan->trial_days) : null]);
             DB::table('legal_acceptances')->insert([

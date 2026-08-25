@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Support\LocalizesJson;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RequestTemplate extends Model
 {
@@ -14,5 +15,15 @@ class RequestTemplate extends Model
     protected function casts(): array
     {
         return ['name' => 'array', 'configuration' => 'array', 'enabled' => 'boolean'];
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(BusinessCategory::class);
+    }
+
+    public function variation(): BelongsTo
+    {
+        return $this->belongsTo(BusinessVariation::class);
     }
 }

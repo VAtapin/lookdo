@@ -127,22 +127,26 @@ class BackupService
 
     private function archiveStorage(string $prefix): string
     {
+        $this->ensurePath();
         if (! class_exists(ZipArchive::class)) {
             throw new RuntimeException('PHP zip extension is required.');
         }
         $target = $this->path($prefix.'.storage.zip');
         $zip = new ZipArchive;
-        if ($zip->open($target.'.partial', ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+        if ($zip->open($target, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             throw new RuntimeException('Cannot create the storage archive.');
         }
+        $zip->addFromString('.lookdo-backup', 'LOOKDO storage backup created '.now()->toIso8601String());
         $root = storage_path('app');
         if (File::isDirectory($root)) {
             foreach (File::allFiles($root) as $file) {
                 $zip->addFile($file->getPathname(), str_replace('\\', '/', $file->getRelativePathname()));
             }
         }
-        $zip->close();
-        File::move($target.'.partial', $target);
+        if (! $zip->close() || ! File::exists($target)) {
+            File::delete($target);
+            throw new RuntimeException('Storage archive could not be finalized.');
+        }
 
         return $target;
     }

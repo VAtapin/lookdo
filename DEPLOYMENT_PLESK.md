@@ -86,7 +86,8 @@ $NODE_DIR/npm ci --include=dev
 $NODE_DIR/npm run build
 
 $PHP_BIN artisan migrate --seed --force
-$PHP_BIN artisan storage:link
+$PHP_BIN artisan lookdo:platform-data --repair
+test -L public/storage || $PHP_BIN artisan storage:link
 ```
 
 Если конкретная установка Plesk держит Node 22 в другом каталоге, меняется только значение `NODE_DIR`; дальше во всех командах используется полный путь.
@@ -173,7 +174,35 @@ $PHP_BIN $COMPOSER_PHAR install --no-dev --prefer-dist --optimize-autoloader --n
 $NODE_DIR/npm ci --include=dev
 $NODE_DIR/npm run build
 $PHP_BIN artisan migrate --force
+$PHP_BIN artisan lookdo:platform-data --repair
 $PHP_BIN artisan optimize
 $PHP_BIN artisan queue:restart
 $PHP_BIN artisan up
 ```
+
+Команда `lookdo:platform-data` выводит фактическое количество тарифов, категорий, вариантов, шаблонов, фраз словаря и страниц. Ключ `--repair` безопасно восстанавливает отсутствующие системные записи без дубликатов.
+
+Если обновление выполняется с версии, в которой уже сломаны `backup:create` или миграция `000002`, сначала получить исправленный код, а резервную копию сделать сразу после миграции:
+
+```bash
+cd /var/www/vhosts/lookdo.app/httpdocs
+
+PHP_BIN=/opt/plesk/php/8.5/bin/php
+NODE_DIR=/opt/plesk/node/22/bin
+COMPOSER_PHAR=/usr/lib/plesk-9.0/composer.phar
+export PATH="$NODE_DIR:$PATH"
+hash -r
+
+git pull --ff-only
+$PHP_BIN $COMPOSER_PHAR install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+$NODE_DIR/npm ci --include=dev
+$NODE_DIR/npm run build
+$PHP_BIN artisan migrate --force
+$PHP_BIN artisan lookdo:platform-data --repair
+$PHP_BIN artisan backup:create
+$PHP_BIN artisan backup:verify
+$PHP_BIN artisan optimize
+$PHP_BIN artisan queue:restart
+```
+
+Правильное имя команды кеширования — `artisan optimize`, без буквы `d` в конце.

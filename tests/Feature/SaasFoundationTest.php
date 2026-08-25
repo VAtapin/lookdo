@@ -3,15 +3,20 @@
 namespace Tests\Feature;
 
 use App\Models\BusinessClassification;
+use App\Models\BusinessPhrase;
 use App\Models\BusinessVariation;
 use App\Models\Plan;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\BackupService;
 use App\Services\StripeService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
+use ReflectionMethod;
 use Tests\TestCase;
 
 class SaasFoundationTest extends TestCase
@@ -37,6 +42,24 @@ class SaasFoundationTest extends TestCase
             ->assertOk()->assertJsonPath('source', 'fuzzy');
         $variationId = $response->json('candidates.0.variation_id');
         $this->assertDatabaseHas('business_variations', ['id' => $variationId, 'code' => 'automotive.steering-wheel-upholstery']);
+    }
+
+    public function test_exact_russian_phrases_and_combined_description_find_expected_templates(): void
+    {
+        $this->postJson('/api/classify', ['description' => 'ремонт', 'locale' => 'ru'])
+            ->assertOk()->assertJsonPath('candidates.0.template_code', 'repair-finishing-installation.general');
+
+        $this->postJson('/api/classify', ['description' => 'ремонт потом перетяжку руля', 'locale' => 'ru'])
+            ->assertOk()->assertJsonPath('candidates.0.template_code', 'automotive.steering-wheel-upholstery');
+    }
+
+    public function test_unknown_activity_uses_universal_template_and_never_blocks_registration(): void
+    {
+        $response = $this->postJson('/api/classify', ['description' => 'совершенно неизвестная новая деятельность', 'locale' => 'ru'])
+            ->assertOk()->assertJsonPath('source', 'fallback')
+            ->assertJsonPath('candidates.0.template_code', 'general-services.general');
+
+        $this->assertNotNull($response->json('candidates.0.variation_id'));
     }
 
     public function test_ai_can_only_choose_from_existing_classification_candidates(): void
@@ -70,6 +93,23 @@ class SaasFoundationTest extends TestCase
         $this->assertDatabaseHas('subscriptions', ['tenant_id' => $tenant->id, 'plan_id' => $plan->id, 'status' => 'incomplete']);
         $this->assertDatabaseHas('tenant_business_profiles', ['tenant_id' => $tenant->id, 'variation_id' => $variation->id]);
         $this->assertDatabaseHas('legal_acceptances', ['tenant_id' => $tenant->id, 'user_id' => $tenant->users()->firstOrFail()->id]);
+    }
+
+    public function test_registration_resolves_fallback_without_classification_or_variation_ids(): void
+    {
+        $plan = Plan::where('code', 'start')->firstOrFail();
+
+        $this->postJson('/api/register', [
+            'name' => 'Fallback Owner', 'email' => 'fallback@example.test', 'password' => 'SecurePass123', 'password_confirmation' => 'SecurePass123',
+            'business_name' => 'Fallback Service', 'country' => 'DE', 'locale' => 'ru', 'business_description' => 'неизвестная деятельность',
+            'plan_id' => $plan->id, 'billing_cycle' => 'monthly', 'accept_terms' => true, 'accept_privacy' => true,
+        ])->assertCreated();
+
+        $tenant = Tenant::where('slug', 'fallback-service')->firstOrFail();
+        $this->assertDatabaseHas('tenant_business_profiles', [
+            'tenant_id' => $tenant->id,
+            'variation_id' => BusinessVariation::where('code', 'general-services.general')->value('id'),
+        ]);
     }
 
     public function test_tenant_user_cannot_read_another_tenant(): void
@@ -150,6 +190,43 @@ class SaasFoundationTest extends TestCase
 
         $this->actingAs($admin)->getJson('/api/control/backups')
             ->assertOk()->assertJsonPath('keep', 14)->assertJsonPath('backups', []);
+    }
+
+    public function test_storage_backup_is_finalized_even_when_storage_has_no_user_files(): void
+    {
+        $path = storage_path('framework/testing/storage-backup');
+        File::deleteDirectory($path);
+        config(['backup.path' => $path]);
+        $method = new ReflectionMethod(BackupService::class, 'archiveStorage');
+
+        $archive = $method->invoke(app(BackupService::class), 'lookdo-test');
+
+        $this->assertFileExists($archive);
+        $zip = new \ZipArchive;
+        $this->assertTrue($zip->open($archive) === true);
+        $this->assertNotFalse($zip->locateName('.lookdo-backup'));
+        $zip->close();
+    }
+
+    public function test_operations_migration_can_resume_after_partial_execution(): void
+    {
+        $migration = require database_path('migrations/2026_08_25_000002_add_platform_operations.php');
+
+        $migration->up();
+
+        $this->assertTrue(Schema::hasColumn('plans', 'stripe_monthly_amount'));
+        $this->assertTrue(Schema::hasTable('legal_acceptances'));
+    }
+
+    public function test_platform_data_command_repairs_required_records(): void
+    {
+        BusinessPhrase::query()->delete();
+
+        $this->artisan('lookdo:platform-data', ['--repair' => true])->assertSuccessful();
+
+        $this->assertSame(3, Plan::where('is_active', true)->count());
+        $this->assertGreaterThan(20, BusinessPhrase::where('enabled', true)->count());
+        $this->assertDatabaseHas('request_templates', ['code' => 'general-services.general', 'enabled' => true]);
     }
 
     public function test_stripe_plan_sync_replaces_a_price_when_amount_changes(): void
