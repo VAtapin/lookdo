@@ -1,0 +1,38 @@
+{
+  "code": "beauty.brows",
+  "parent_template": "beauty.general",
+  "name": {"uk":"Брови / Brow Master","ru":"Брови / Brow Master","de":"Augenbrauen / Brow Artist"},
+  "primary_action": {"uk":"Записатися","ru":"Записаться","de":"Termin buchen"},
+  "capabilities": {
+    "request": true,
+    "booking": true,
+    "booking_primary": true,
+    "services": true,
+    "customers": true,
+    "reminders": true,
+    "repeat_visit": true,
+    "vacancy_fill": true,
+    "segments": true,
+    "before_after": true,
+    "ai_media": true,
+    "ai_media_profile": "face_brows_alignment",
+    "ai_communication": true,
+    "social_content": true
+  },
+  "media": {
+    "video_allowed": false,
+    "slots": [
+      {"key":"before","role":"before","type":"image","required":false},
+      {"key":"after","role":"after","type":"image","required":false},
+      {"key":"optional_side","role":"portfolio","type":"image","required":false}
+    ]
+  },
+  "booking": {"customer_registration_required":false,"customer_phone_required":true,"allow_reschedule":true,"allow_cancel":true,"allow_staff_selection":true},
+  "ai_rules": {"preserve_real_result":true,"allow_alignment":true,"allow_crop":true,"allow_exposure_normalization":true,"allow_brow_reshaping":false,"allow_hair_generation":false,"allow_face_beautification":false},
+  "locales": ["uk","ru","de"],
+  "ai_phrases": {
+    "uk":["брови","майстер брів","бровіст","корекція брів","фарбування брів","оформлення брів","моделювання брів","brow master","brow artist"],
+    "ru":["брови","мастер по бровям","бровист","коррекция бровей","окрашивание бровей","оформление бровей","моделирование бровей","brow master","brow artist"],
+    "de":["Augenbrauen","Augenbrauenstyling","Augenbrauenkorrektur","Augenbrauen färben","Brow Artist","Brow Stylist"]
+  }
+}
