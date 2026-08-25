@@ -52,7 +52,9 @@ return new class extends Migration
                 $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
                 $table->timestamp('terms_version_at')->nullable();
                 $table->timestamp('privacy_version_at')->nullable();
-                $table->timestamp('accepted_at');
+                // MariaDB 10.6 rejects a required TIMESTAMP without an explicit
+                // default when nullable TIMESTAMP columns precede it.
+                $table->timestamp('accepted_at')->useCurrent();
                 $table->string('ip_address', 45)->nullable();
                 $table->text('user_agent')->nullable();
                 $table->timestamps();
