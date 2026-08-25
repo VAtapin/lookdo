@@ -55,7 +55,7 @@ class AdminController extends Controller
             'name' => 'required|string|max:160', 'slug' => 'nullable|string|max:63|unique:tenants,slug',
             'owner_name' => 'required|string|max:120', 'owner_email' => 'required|email|max:255|unique:users,email',
             'owner_password' => ['required', Password::min(10)->letters()->numbers()],
-            'country' => 'nullable|string|size:2', 'locale' => ['nullable', Rule::in(['de', 'en', 'ru'])],
+            'country' => 'nullable|string|size:2', 'locale' => ['nullable', Rule::in(['de', 'en', 'ru', 'uk'])],
             'business_description' => 'nullable|string|max:1000', 'variation_id' => 'nullable|exists:business_variations,id',
             'plan_id' => 'required|exists:plans,id', 'complimentary' => 'nullable|boolean',
         ]);
@@ -306,7 +306,7 @@ class AdminController extends Controller
 
     public function savePhrase(Request $request, ?BusinessPhrase $phrase = null, ?AuditService $audit = null, ?BusinessClassifier $classifier = null): JsonResponse
     {
-        $data = $request->validate(['category_id' => 'required|exists:business_categories,id', 'variation_id' => 'nullable|exists:business_variations,id', 'locale' => ['required', Rule::in(['de', 'en', 'ru'])], 'phrase' => 'required|string|max:255', 'weight' => 'numeric|min:0.1|max:5', 'enabled' => 'boolean']);
+        $data = $request->validate(['category_id' => 'required|exists:business_categories,id', 'variation_id' => 'nullable|exists:business_variations,id', 'locale' => ['required', Rule::in(['de', 'en', 'ru', 'uk'])], 'phrase' => 'required|string|max:255', 'weight' => 'numeric|min:0.1|max:5', 'enabled' => 'boolean']);
         $data['normalized_phrase'] = $classifier->normalize($data['phrase']);
         $before = $phrase?->toArray();
         $phrase ? $phrase->update($data) : $phrase = BusinessPhrase::create($data);

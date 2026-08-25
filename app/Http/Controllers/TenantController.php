@@ -34,7 +34,7 @@ class TenantController extends Controller
     public function updateProfile(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
-        $data = $request->validate(['name' => 'required|string|max:160', 'locale' => ['nullable', Rule::in(['de', 'en', 'ru'])], 'contact_name' => 'nullable|string|max:120', 'email' => 'nullable|email|max:255', 'phone' => 'nullable|string|max:50', 'street' => 'nullable|string|max:160', 'postal_code' => 'nullable|string|max:30', 'city' => 'nullable|string|max:100', 'primary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'secondary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/']]);
+        $data = $request->validate(['name' => 'required|string|max:160', 'locale' => ['nullable', Rule::in(['de', 'en', 'ru', 'uk'])], 'contact_name' => 'nullable|string|max:120', 'email' => 'nullable|email|max:255', 'phone' => 'nullable|string|max:50', 'street' => 'nullable|string|max:160', 'postal_code' => 'nullable|string|max:30', 'city' => 'nullable|string|max:100', 'primary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'secondary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/']]);
         $before = $tenant->load('profile')->toArray();
         $tenant->update(['name' => $data['name'], 'locale' => $data['locale'] ?? $tenant->locale]);
         unset($data['name'], $data['locale']);

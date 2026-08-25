@@ -29,7 +29,7 @@ class AuthController extends Controller
 {
     public function classify(Request $request, BusinessClassifier $classifier): JsonResponse
     {
-        $data = $request->validate(['description' => 'required|string|min:3|max:1000', 'locale' => ['nullable', Rule::in(['de', 'en', 'ru'])]]);
+        $data = $request->validate(['description' => 'required|string|min:3|max:1000', 'locale' => ['nullable', Rule::in(['de', 'en', 'ru', 'uk'])]]);
         $result = $classifier->classify($data['description'], $data['locale'] ?? app()->getLocale());
 
         return response()->json($result);
@@ -38,7 +38,7 @@ class AuthController extends Controller
     public function register(Request $request, StripeService $stripe, AuditService $audit, BusinessClassifier $classifier): JsonResponse
     {
         abort_unless((bool) SystemSetting::read('registration_enabled', true), 403, 'Registration is disabled.');
-        $data = $request->validate(['name' => 'required|string|max:120', 'email' => 'required|email|max:255|unique:users,email', 'password' => ['required', 'confirmed', PasswordRule::min(10)->letters()->numbers()], 'business_name' => 'required|string|max:160', 'slug' => 'nullable|string|max:63', 'country' => 'required|string|size:2', 'locale' => ['required', Rule::in(['de', 'en', 'ru'])], 'business_description' => 'required|string|max:1000', 'classification_id' => 'nullable|exists:business_classifications,id', 'variation_id' => 'nullable|exists:business_variations,id', 'plan_id' => 'required|exists:plans,id', 'billing_cycle' => ['nullable', Rule::in(['monthly', 'yearly'])], 'accept_terms' => 'accepted', 'accept_privacy' => 'accepted']);
+        $data = $request->validate(['name' => 'required|string|max:120', 'email' => 'required|email|max:255|unique:users,email', 'password' => ['required', 'confirmed', PasswordRule::min(10)->letters()->numbers()], 'business_name' => 'required|string|max:160', 'slug' => 'nullable|string|max:63', 'country' => 'required|string|size:2', 'locale' => ['required', Rule::in(['de', 'en', 'ru', 'uk'])], 'business_description' => 'required|string|max:1000', 'classification_id' => 'nullable|exists:business_classifications,id', 'variation_id' => 'nullable|exists:business_variations,id', 'plan_id' => 'required|exists:plans,id', 'billing_cycle' => ['nullable', Rule::in(['monthly', 'yearly'])], 'accept_terms' => 'accepted', 'accept_privacy' => 'accepted']);
         $plan = Plan::where('is_active', true)->findOrFail($data['plan_id']);
         $classification = ! empty($data['classification_id'])
             ? BusinessClassification::find($data['classification_id'])
@@ -47,6 +47,9 @@ class AuthController extends Controller
         $variation = $variationId
             ? BusinessVariation::with('category')->where('enabled', true)->find($variationId)
             : null;
+        if ($variation && ! RequestTemplate::where('code', $variation->template_code)->where('enabled', true)->exists()) {
+            $variation = null;
+        }
         $variation ??= $classifier->defaultVariation();
         $slug = $this->uniqueSlug($data['slug'] ?? $data['business_name']);
         [$user,$tenant,$subscription] = DB::transaction(function () use ($data, $plan, $variation, $classification, $slug, $request) {
@@ -56,7 +59,7 @@ class AuthController extends Controller
             $tenant->profile()->create(['contact_name' => $data['name'], 'email' => $data['email']]);
             $domain = $tenant->domains()->create(['domain' => $slug.'.'.config('tenancy.platform_domain'), 'type' => 'platform', 'is_primary' => true, 'status' => 'active', 'verified_at' => now(), 'ssl_status' => 'active', 'ssl_issued_at' => now()]);
             $tenant->update(['primary_domain_id' => $domain->id]);
-            $template = RequestTemplate::where('code', $variation->template_code)->first();
+            $template = RequestTemplate::where('code', $variation->template_code)->where('enabled', true)->first();
             $tenant->businessProfile()->create(['category_id' => $variation->category_id, 'variation_id' => $variation->id, 'request_template_id' => $template?->id, 'original_description' => $data['business_description']]);
             $classification?->update(['tenant_id' => $tenant->id, 'category_id' => $variation->category_id, 'variation_id' => $variation->id, 'confirmed_by_user_at' => now()]);
             $trial = $plan->trial_days > 0;

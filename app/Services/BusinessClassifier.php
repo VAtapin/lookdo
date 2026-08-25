@@ -24,7 +24,12 @@ class BusinessClassifier
     public function classify(string $text, string $locale = 'ru'): BusinessClassification
     {
         $normalized = $this->normalize($text);
-        $phrases = BusinessPhrase::with(['category', 'variation'])->where('enabled', true)->whereIn('locale', [$locale, 'ru', 'de', 'en'])->get();
+        $enabledTemplateCodes = RequestTemplate::where('enabled', true)->pluck('code');
+        $phrases = BusinessPhrase::with(['category', 'variation'])
+            ->where('enabled', true)
+            ->whereIn('locale', array_unique([$locale, 'uk', 'ru', 'de', 'en']))
+            ->whereHas('variation', fn ($query) => $query->where('enabled', true)->whereIn('template_code', $enabledTemplateCodes))
+            ->get();
         $ranked = $phrases->map(function (BusinessPhrase $phrase) use ($normalized) {
             similar_text($normalized, $phrase->normalized_phrase, $percent);
             $exact = $normalized === $phrase->normalized_phrase;

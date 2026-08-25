@@ -78,7 +78,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
 
 Route::get('/sitemap.xml', function () {
     $base = rtrim(config('app.url'), '/');
-    $urls = ['/', '/de', '/en', '/ru', '/pricing', '/impressum', '/datenschutz', '/agb', '/widerruf', '/kontakt'];
+    $urls = ['/', '/de', '/en', '/ru', '/uk', '/pricing', '/de/pricing', '/en/pricing', '/ru/pricing', '/uk/pricing', '/impressum', '/datenschutz', '/agb', '/widerruf', '/kontakt'];
 
     return response(view('sitemap', ['urls' => array_map(fn ($u) => $base.$u, $urls)]), 200, ['Content-Type' => 'application/xml']);
 });

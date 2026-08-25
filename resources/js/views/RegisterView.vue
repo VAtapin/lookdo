@@ -82,8 +82,9 @@ function nextAccount() {
         <div class="form-grid">
           <label>{{ tr('name') }}<input v-model="form.name" required autocomplete="name"></label><label>{{ tr('email') }}<input v-model="form.email" required type="email" autocomplete="email"></label>
           <label>{{ tr('password') }}<input v-model="form.password" required type="password" autocomplete="new-password"></label><label>{{ tr('repeatPassword') }}<input v-model="form.password_confirmation" required type="password" autocomplete="new-password"></label>
-          <label class="wide">{{ tr('businessName') }}<input v-model="form.business_name" required></label><label>{{ tr('country') }}<select v-model="form.country"><option value="DE">Deutschland</option><option value="AT">Österreich</option><option value="CH">Schweiz</option><option value="RU">Россия</option><option value="GB">United Kingdom</option></select></label>
-          <label>{{ tr('language') }}<select v-model="form.locale"><option value="de">Deutsch</option><option value="en">English</option><option value="ru">Русский</option></select></label>
+          <label class="wide">{{ tr('businessName') }}<input v-model="form.business_name" required></label><label>{{ tr('country') }}<select v-model="form.country"><option value="DE">Deutschland</option><option value="AT">Österreich</option><option value="CH">Schweiz</option><option value="UA">Україна</option><option value="RU">Россия</option><option value="GB">United Kingdom</option></select></label>
+          <label>{{ tr('language') }}<select v-model="form.locale"><option value="de">Deutsch</option><option value="en">English</option><option value="ru">Русский</option><option value="uk">Українська</option></select></label>
+          <label class="wide">{{ tr('appAddress') }}<div class="slug-input"><input v-model="form.slug" maxlength="63" placeholder="mein-betrieb"><span>.lookdo.app</span></div><small>{{ tr('appAddressHelp') }}</small></label>
         </div><p v-if="error" class="alert error">{{ error }}</p><button class="button full">{{ tr('continue') }} →</button>
       </form>
       <form v-if="step === 2" @submit.prevent="classify">

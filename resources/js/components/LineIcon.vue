@@ -18,6 +18,7 @@ defineProps<{ name: string }>();
     <template v-else-if="name === 'washer'"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M4 7h16"/><circle cx="12" cy="14" r="5"/><path d="M7 5h.01M10 5h.01"/></template>
     <template v-else-if="name === 'sofa'"><path d="M5 12V9a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v3M3 12a2 2 0 0 1 2 2v4h14v-4a2 2 0 1 1 2 0v6H3v-6a2 2 0 0 1 0-2Z"/></template>
     <template v-else-if="name === 'leaf'"><path d="M12 22V9M12 15C7 15 4 12 4 7c5 0 8 3 8 8ZM12 12c0-5 3-8 8-8 0 5-3 8-8 8Z"/></template>
+    <template v-else-if="name === 'calendar'"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 2v6M17 2v6M3 10h18M7 14h3M14 14h3M7 18h3"/></template>
     <template v-else><path d="M4 19h16M7 19v-5M17 19v-8M10 14l7-7M14 7h3v3"/></template>
   </svg>
 </template>

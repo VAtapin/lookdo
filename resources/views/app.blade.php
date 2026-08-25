@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#0a0a0b">
+    <meta name="theme-color" content="#ff6a00">
     <meta name="description" content="LOOKDO — Kunden zeigen ihre Aufgabe mit Fotos oder Video. Fachbetriebe sehen sie und antworten persönlich.">
     @if(request()->is('app*') || request()->is('control*') || request()->is('login') || request()->is('register') || request()->is('reset-password*'))
         <meta name="robots" content="noindex,nofollow">
@@ -19,6 +19,7 @@
     <link rel="alternate" hreflang="de" href="{{ rtrim(config('app.url'), '/') }}/de">
     <link rel="alternate" hreflang="en" href="{{ rtrim(config('app.url'), '/') }}/en">
     <link rel="alternate" hreflang="ru" href="{{ rtrim(config('app.url'), '/') }}/ru">
+    <link rel="alternate" hreflang="uk" href="{{ rtrim(config('app.url'), '/') }}/uk">
     <link rel="alternate" hreflang="x-default" href="{{ rtrim(config('app.url'), '/') }}/de">
     <link rel="manifest" href="/build/manifest.webmanifest">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">

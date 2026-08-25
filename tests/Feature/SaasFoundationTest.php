@@ -6,6 +6,8 @@ use App\Models\BusinessClassification;
 use App\Models\BusinessPhrase;
 use App\Models\BusinessVariation;
 use App\Models\Plan;
+use App\Models\RequestTemplate;
+use App\Models\SystemSetting;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\BackupService;
@@ -42,6 +44,35 @@ class SaasFoundationTest extends TestCase
             ->assertOk()->assertJsonPath('source', 'fuzzy');
         $variationId = $response->json('candidates.0.variation_id');
         $this->assertDatabaseHas('business_variations', ['id' => $variationId, 'code' => 'automotive.steering-wheel-upholstery']);
+    }
+
+    public function test_four_language_catalog_contains_booking_first_brow_template(): void
+    {
+        $this->withHeader('X-Locale', 'uk')->getJson('/api/platform')
+            ->assertOk()
+            ->assertJsonPath('locale', 'uk')
+            ->assertJsonFragment(['code' => 'beauty'])
+            ->assertJsonFragment(['code' => 'beauty.brows']);
+
+        $this->postJson('/api/classify', ['description' => 'корекція та фарбування брів', 'locale' => 'uk'])
+            ->assertOk()
+            ->assertJsonPath('candidates.0.template_code', 'beauty.brows');
+
+        $template = RequestTemplate::where('code', 'beauty.brows')->firstOrFail();
+        $this->assertSame('booking', $template->configuration['engine']);
+        $this->assertTrue($template->configuration['capabilities']['booking_primary']);
+        $this->assertSame(['de', 'en', 'ru', 'uk'], SystemSetting::read('enabled_locales'));
+        $this->assertDatabaseHas('plan_entitlements', ['key' => 'booking_enabled', 'value' => '1']);
+    }
+
+    public function test_platform_repair_preserves_template_switches(): void
+    {
+        $template = RequestTemplate::where('code', 'beauty.brows')->firstOrFail();
+        $template->update(['enabled' => false]);
+
+        $this->artisan('lookdo:platform-data', ['--repair' => true])->assertSuccessful();
+
+        $this->assertFalse($template->fresh()->enabled);
     }
 
     public function test_exact_russian_phrases_and_combined_description_find_expected_templates(): void

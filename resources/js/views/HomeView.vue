@@ -8,12 +8,13 @@ defineProps<{ pricingOnly?: boolean }>();
 const plans = ref<any[]>([]);
 onMounted(async () => { plans.value = (await api('/platform')).plans; });
 const workflow = [['photo', 'howShow'], ['phone', 'howPhone'], ['bell', 'howReceive'], ['chat', 'howReply']];
-const audiences = [['car', 'audienceAuto'], ['door', 'audienceDoors'], ['washer', 'audienceAppliance'], ['sofa', 'audienceFurniture'], ['leaf', 'audienceGarden'], ['service', 'audienceCleaning']];
-const benefits = [['globe', 'benefitDomainTitle', 'linkDomain'], ['photo', 'benefitMediaTitle', 'photosVideos'], ['bell', 'benefitPushTitle', 'messagesPush'], ['star', 'benefitReviewTitle', 'reviews']];
+const audiences = [['car', 'audienceAuto'], ['door', 'audienceDoors'], ['washer', 'audienceAppliance'], ['sofa', 'audienceFurniture'], ['leaf', 'audienceGarden'], ['service', 'audienceCleaning'], ['star', 'audienceBrows']];
+const benefits = [['globe', 'benefitDomainTitle', 'linkDomain'], ['photo', 'benefitMediaTitle', 'photosVideos'], ['bell', 'benefitPushTitle', 'messagesPush'], ['star', 'benefitReviewTitle', 'reviews'], ['calendar', 'bookingTitle', 'bookingText'], ['chat', 'socialTitle', 'socialText']];
 const faqs = {
     de: [['Müssen Kunden etwas installieren?', 'Nein. Die App öffnet sich direkt über einen Link.'], ['Kann ich meine Domain nutzen?', 'Ja. Jede App erhält sofort eine LOOKDO Adresse; eine eigene Domain kann zusätzlich verbunden werden.']],
     en: [['Do customers install anything?', 'No. The app opens directly from a link.'], ['Can I use my domain?', 'Yes. Every app receives a LOOKDO address immediately; a custom domain can also be connected.']],
     ru: [['Клиенту нужно что-то устанавливать?', 'Нет. Приложение сразу открывается по ссылке.'], ['Можно использовать свой домен?', 'Да. Приложение сразу получает адрес LOOKDO, а собственный домен можно подключить дополнительно.']],
+    uk: [['Клієнту потрібно щось встановлювати?', 'Ні. Застосунок одразу відкривається за посиланням.'], ['Можна використовувати власний домен?', 'Так. Застосунок одразу отримує адресу LOOKDO, а власний домен можна підключити додатково.']],
 };
 </script>
 
