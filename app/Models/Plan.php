@@ -14,7 +14,7 @@ class Plan extends Model
 
     protected function casts(): array
     {
-        return ['name' => 'array', 'description' => 'array', 'badge_text' => 'array', 'price_monthly' => 'decimal:2', 'price_yearly' => 'decimal:2', 'is_active' => 'boolean', 'is_public' => 'boolean'];
+        return ['name' => 'array', 'description' => 'array', 'badge_text' => 'array', 'price_monthly' => 'decimal:2', 'price_yearly' => 'decimal:2', 'is_active' => 'boolean', 'is_public' => 'boolean', 'stripe_synced_at' => 'datetime'];
     }
 
     public function entitlements(): HasMany

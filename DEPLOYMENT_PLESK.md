@@ -1,57 +1,70 @@
 # LOOKDO — первая установка на Plesk
 
-Целевая конфигурация: Plesk Obsidian, PHP 8.5, Node.js 22, MariaDB 10.6. PostgreSQL для Части 1 не требуется: используем MariaDB, чтобы эксплуатация и резервное копирование оставались проще.
+Целевая конфигурация: Plesk, PHP 8.5, Node.js 22 и MariaDB 10.6. Команды выполняются по SSH. Значения `.env` редактируются встроенным редактором Plesk, не через `nano`.
 
-## 1. Настройки домена в Plesk
-
-- Document root: каталог `public` внутри проекта, например `/var/www/vhosts/lookdo.app/httpdocs/public`.
-- PHP handler: PHP 8.5 FPM.
-- Основной домен и `www` направить на сайт.
-- Создать wildcard DNS `*.lookdo.app` на тот же сервер и выпустить wildcard SSL для `lookdo.app` и `*.lookdo.app`.
-- Для custom domain tenant сначала направляет A/AAAA/CNAME на сервер, затем домен проверяется в кабинете и добавляется в Plesk/SSL.
-
-## 2. Пути Plesk
-
-Plesk не всегда использует системные `php`, `node` и `npm`. Для этого проекта указываем бинарники явно:
+## 1. Получение проекта
 
 ```bash
-PHP_BIN=/opt/plesk/php/8.5/bin/php
-NODE_DIR=/opt/plesk/node/22/bin
-COMPOSER_PHAR=/usr/lib/plesk-9.0/composer.phar
-export PATH="$NODE_DIR:$PATH"
-
-$PHP_BIN -v
-$NODE_DIR/node -v
-$NODE_DIR/npm -v
+cd /var/www/vhosts/lookdo.app/httpdocs
+git clone https://github.com/VAtapin/lookdo.git .
+cp .env.example .env
 ```
 
-Если Plesk установил Node 22 в каталог с минорной версией, точный путь можно найти так:
-
-```bash
-plesk bin extension --exec nodejs node_modules/.bin/node --version
-find /opt/plesk/node -maxdepth 3 -type f -name node
-```
-
-После этого заменить только значение `NODE_DIR`. Для всех следующих команд путь остаётся явным.
-
-## 3. База данных
-
-В Plesk создать базу и пользователя MariaDB. В `.env` использовать:
+Открыть `.env` в редакторе Plesk и заполнить его до продолжения. Для LOOKDO обязательно оставить:
 
 ```dotenv
+APP_ENV=production
+APP_KEY=
+APP_DEBUG=false
+APP_URL=https://lookdo.app
+APP_LOCALE=ru
+APP_FALLBACK_LOCALE=ru
+APP_TIMEZONE=Europe/Berlin
+
+PLATFORM_DOMAIN=lookdo.app
+SESSION_DOMAIN=.lookdo.app
+SESSION_SECURE_COOKIE=true
+
 DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
+DB_HOST=localhost
 DB_PORT=3306
-DB_DATABASE=lookdo
-DB_USERNAME=lookdo
-DB_PASSWORD=СИЛЬНЫЙ_ПАРОЛЬ
+DB_DATABASE=ИМЯ_БАЗЫ_ИЗ_PLESK
+DB_USERNAME=ПОЛЬЗОВАТЕЛЬ_БАЗЫ_ИЗ_PLESK
+DB_PASSWORD=ПАРОЛЬ_БАЗЫ_ИЗ_PLESK
+
+CACHE_STORE=database
+SESSION_DRIVER=database
+QUEUE_CONNECTION=database
+FILESYSTEM_DISK=local
+
+MAIL_MAILER=log
+MAIL_FROM_ADDRESS=noreply@lookdo.app
+MAIL_FROM_NAME=LOOKDO
+
+STRIPE_SECRET=sk_КЛЮЧ_STRIPE
+STRIPE_WEBHOOK_SECRET=
+STRIPE_AUTOMATIC_TAX=true
+
+OPENAI_API_KEY=sk_КЛЮЧ_OPENAI
+OPENAI_TEXT_MODEL=gpt-5.6-luna
+OPENAI_IMAGE_MODEL=gpt-image-2
+OPENAI_MONTHLY_BUDGET=20
+OPENAI_USER_DAILY_LIMIT=20
+OPENAI_TIMEOUT=300
+OPENAI_TEXT_INPUT_COST_PER_MILLION=0.20
+OPENAI_TEXT_OUTPUT_COST_PER_MILLION=1.20
+OPENAI_IMAGE_COST_LOW=0.006
+OPENAI_IMAGE_COST_MEDIUM=0.053
+OPENAI_IMAGE_COST_HIGH=0.211
+
+BACKUP_PATH=/var/www/vhosts/lookdo.app/private/backups
+BACKUP_KEEP=14
+MYSQLDUMP_PATH=/usr/bin/mysqldump
 ```
 
-Миграции совместимы с MariaDB 10.6 и не требуют возможностей MySQL 8.
+`STRIPE_WEBHOOK_SECRET` здесь оставляется пустым намеренно. Это не API-ключ: Stripe выдаёт секрет подписи вида `whsec_...` только при создании webhook endpoint. Команда установки ниже создаст endpoint и сама запишет полученный секрет в `.env`.
 
-## 4. Первая установка
-
-Пример предполагает, что репозиторий уже клонирован в `/var/www/vhosts/lookdo.app/httpdocs`:
+## 2. PHP, Node.js и сборка
 
 ```bash
 cd /var/www/vhosts/lookdo.app/httpdocs
@@ -60,8 +73,12 @@ PHP_BIN=/opt/plesk/php/8.5/bin/php
 NODE_DIR=/opt/plesk/node/22/bin
 COMPOSER_PHAR=/usr/lib/plesk-9.0/composer.phar
 export PATH="$NODE_DIR:$PATH"
+hash -r
 
-cp .env.example .env
+$PHP_BIN -v
+$NODE_DIR/node -v
+$NODE_DIR/npm -v
+
 $PHP_BIN $COMPOSER_PHAR install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 $PHP_BIN artisan key:generate
 
@@ -70,74 +87,93 @@ $NODE_DIR/npm run build
 
 $PHP_BIN artisan migrate --seed --force
 $PHP_BIN artisan storage:link
+```
+
+Если конкретная установка Plesk держит Node 22 в другом каталоге, меняется только значение `NODE_DIR`; дальше во всех командах используется полный путь.
+
+## 3. Super Admin и Stripe
+
+Super Admin создаётся только интерактивной командой. Имя, e-mail и скрытый пароль вводятся в командной строке и не хранятся в `.env`:
+
+```bash
+cd /var/www/vhosts/lookdo.app/httpdocs
+PHP_BIN=/opt/plesk/php/8.5/bin/php
+
+$PHP_BIN artisan lookdo:make-super-admin
+$PHP_BIN artisan lookdo:stripe:setup
+```
+
+`lookdo:stripe:setup` проверяет `STRIPE_SECRET`, создаёт/обновляет Products и Prices всех активных тарифов, создаёт endpoint `https://lookdo.app/api/stripe/webhook` и записывает полученный `STRIPE_WEBHOOK_SECRET` в `.env`, не печатая секрет в терминал.
+
+## 4. Права, первая резервная копия и кеш
+
+```bash
+cd /var/www/vhosts/lookdo.app/httpdocs
+PHP_BIN=/opt/plesk/php/8.5/bin/php
+
+mkdir -p /var/www/vhosts/lookdo.app/private/backups
+chmod -R ug+rwX storage bootstrap/cache
+chmod 750 /var/www/vhosts/lookdo.app/private/backups
+
+$PHP_BIN artisan backup:create
+$PHP_BIN artisan backup:verify
 $PHP_BIN artisan optimize
 ```
 
-До `migrate --seed` заполнить `.env`: `APP_URL`, базу и SMTP. После миграций создать Super Admin интерактивно; пароль вводится скрыто и в `.env` не хранится:
+Встроенная копия содержит согласованный dump MariaDB и `storage/app`, хранит SHA-256 и автоматически оставляет последние 14 комплектов. Она дополняет, но не заменяет внешнюю резервную копию подписки Plesk. Подробности: [BACKUP.md](BACKUP.md).
 
-```bash
-$PHP_BIN artisan lookdo:make-super-admin
-```
+## 5. Постоянные процессы
 
-Каталоги `storage` и `bootstrap/cache` должны быть доступны на запись системному пользователю домена Plesk.
-
-## 5. Обязательные production-переменные
-
-```dotenv
-APP_ENV=production
-APP_DEBUG=false
-APP_URL=https://lookdo.app
-APP_LOCALE=de
-PLATFORM_DOMAIN=lookdo.app
-SESSION_DOMAIN=.lookdo.app
-SESSION_SECURE_COOKIE=true
-CACHE_STORE=database
-SESSION_DRIVER=database
-QUEUE_CONNECTION=database
-```
-
-Stripe можно оставить пустым до подключения. Checkout API в этом случае возвращает понятный ответ о том, что billing ещё не настроен. Для webhook позднее указать `STRIPE_SECRET` и `STRIPE_WEBHOOK_SECRET`.
-
-## 6. Cron и очередь
-
-В Scheduled Tasks Plesk добавить Laravel scheduler раз в минуту:
+Команда Laravel scheduler в Scheduled Tasks Plesk, раз в минуту:
 
 ```bash
 /opt/plesk/php/8.5/bin/php /var/www/vhosts/lookdo.app/httpdocs/artisan schedule:run
 ```
 
-Для database queue добавить постоянный worker через Plesk Process Manager либо cron-задачу с блокировкой. На Части 1 синхронных операций достаточно, но production-конфигурация уже готова к очереди.
+Команда постоянного queue worker в Process Manager Plesk:
 
-## 7. Обновление после push
+```bash
+/opt/plesk/php/8.5/bin/php /var/www/vhosts/lookdo.app/httpdocs/artisan queue:work --sleep=3 --tries=3 --timeout=300
+```
+
+Scheduler ежедневно создаёт backup в 02:30 и проверяет последнюю копию в 04:00.
+
+## 6. Финальная проверка
 
 ```bash
 cd /var/www/vhosts/lookdo.app/httpdocs
-git pull --ff-only
-
 PHP_BIN=/opt/plesk/php/8.5/bin/php
-NODE_DIR=/opt/plesk/node/22/bin
-COMPOSER_PHAR=/usr/lib/plesk-9.0/composer.phar
-export PATH="$NODE_DIR:$PATH"
 
-$PHP_BIN artisan down
-$PHP_BIN $COMPOSER_PHAR install --no-dev --prefer-dist --optimize-autoloader --no-interaction
-$NODE_DIR/npm ci --include=dev
-$NODE_DIR/npm run build
-$PHP_BIN artisan migrate --force
-$PHP_BIN artisan optimize
-$PHP_BIN artisan up
-```
-
-Если команда между `artisan down` и `artisan up` завершится ошибкой, сначала исправить её и обязательно выполнить `$PHP_BIN artisan up`.
-
-## 8. Проверка после установки
-
-```bash
-/opt/plesk/php/8.5/bin/php artisan about
-/opt/plesk/php/8.5/bin/php artisan migrate:status
+$PHP_BIN artisan about
+$PHP_BIN artisan migrate:status
+$PHP_BIN artisan schedule:list
+$PHP_BIN artisan backup:verify
 curl -I https://lookdo.app
 curl https://lookdo.app/api/platform
 curl https://lookdo.app/sitemap.xml
 ```
 
-Также вручную проверить `/de`, `/en`, `/ru`, регистрацию, `/login`, tenant account и `/control/dashboard`.
+После этого проверить регистрацию, `/login`, кабинет tenant и `/control/dashboard`.
+
+## 7. Последующие обновления
+
+```bash
+cd /var/www/vhosts/lookdo.app/httpdocs
+
+PHP_BIN=/opt/plesk/php/8.5/bin/php
+NODE_DIR=/opt/plesk/node/22/bin
+COMPOSER_PHAR=/usr/lib/plesk-9.0/composer.phar
+export PATH="$NODE_DIR:$PATH"
+hash -r
+
+$PHP_BIN artisan backup:create
+$PHP_BIN artisan down
+git pull --ff-only
+$PHP_BIN $COMPOSER_PHAR install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+$NODE_DIR/npm ci --include=dev
+$NODE_DIR/npm run build
+$PHP_BIN artisan migrate --force
+$PHP_BIN artisan optimize
+$PHP_BIN artisan queue:restart
+$PHP_BIN artisan up
+```

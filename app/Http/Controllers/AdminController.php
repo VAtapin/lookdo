@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AiUsageRecord;
 use App\Models\AuditLog;
 use App\Models\BusinessCategory;
 use App\Models\BusinessClassification;
@@ -16,6 +17,7 @@ use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\BackupService;
 use App\Services\BusinessClassifier;
 use App\Services\DomainService;
 use App\Services\StripeService;
@@ -23,13 +25,16 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Password as PasswordBroker;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class AdminController extends Controller
 {
     public function dashboard(): JsonResponse
     {
-        return response()->json(['tenants' => Tenant::count(), 'active_tenants' => Tenant::where('status', 'active')->count(), 'trialing' => Subscription::where('status', 'trialing')->count(), 'paid' => Subscription::where('status', 'active')->where('complimentary', false)->count(), 'complimentary' => Subscription::where('complimentary', true)->count(), 'domains_attention' => TenantDomain::whereIn('status', ['failed', 'verifying', 'ssl_pending'])->count(), 'classifications_30d' => BusinessClassification::where('created_at', '>=', now()->subDays(30))->count(), 'mrr' => (float) Subscription::join('plans', 'plans.id', '=', 'subscriptions.plan_id')->where('subscriptions.status', 'active')->where('subscriptions.complimentary', false)->sum(DB::raw('plans.price_monthly * (100 - subscriptions.discount_percent) / 100'))]);
+        return response()->json(['tenants' => Tenant::count(), 'active_tenants' => Tenant::where('status', 'active')->count(), 'trialing' => Subscription::where('status', 'trialing')->count(), 'paid' => Subscription::where('status', 'active')->where('complimentary', false)->count(), 'complimentary' => Subscription::where('complimentary', true)->count(), 'domains_attention' => TenantDomain::whereIn('status', ['failed', 'verifying', 'ssl_pending'])->count(), 'classifications_30d' => BusinessClassification::where('created_at', '>=', now()->subDays(30))->count(), 'ai_spend_month' => (float) AiUsageRecord::where('created_at', '>=', now()->startOfMonth())->sum('cost'), 'mrr' => (float) Subscription::join('plans', 'plans.id', '=', 'subscriptions.plan_id')->where('subscriptions.status', 'active')->where('subscriptions.complimentary', false)->sum(DB::raw('plans.price_monthly * (100 - subscriptions.discount_percent) / 100'))]);
     }
 
     public function tenants(Request $request): JsonResponse
@@ -41,7 +46,39 @@ class AdminController extends Controller
             $q->where('status', $status);
         }
 
-return response()->json($q->latest()->paginate(25));
+        return response()->json($q->latest()->paginate(25));
+    }
+
+    public function createTenant(Request $request, AuditService $audit): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:160', 'slug' => 'nullable|string|max:63|unique:tenants,slug',
+            'owner_name' => 'required|string|max:120', 'owner_email' => 'required|email|max:255|unique:users,email',
+            'owner_password' => ['required', Password::min(10)->letters()->numbers()],
+            'country' => 'nullable|string|size:2', 'locale' => ['nullable', Rule::in(['de', 'en', 'ru'])],
+            'business_description' => 'nullable|string|max:1000', 'variation_id' => 'nullable|exists:business_variations,id',
+            'plan_id' => 'required|exists:plans,id', 'complimentary' => 'nullable|boolean',
+        ]);
+        $tenant = DB::transaction(function () use ($data) {
+            $slug = $this->uniqueTenantSlug($data['slug'] ?? $data['name']);
+            $user = User::create(['name' => $data['owner_name'], 'email' => $data['owner_email'], 'password' => $data['owner_password'], 'locale' => $data['locale'] ?? 'ru', 'is_active' => true]);
+            $tenant = Tenant::create(['name' => $data['name'], 'slug' => $slug, 'status' => 'active', 'country' => strtoupper($data['country'] ?? 'DE'), 'locale' => $data['locale'] ?? 'ru', 'business_description' => $data['business_description'] ?? null]);
+            $tenant->users()->attach($user, ['role' => 'owner']);
+            $tenant->profile()->create(['contact_name' => $user->name, 'email' => $user->email]);
+            $domain = $tenant->domains()->create(['domain' => $slug.'.'.config('tenancy.platform_domain'), 'type' => 'platform', 'is_primary' => true, 'status' => 'active', 'verified_at' => now(), 'ssl_status' => 'active', 'ssl_issued_at' => now()]);
+            $tenant->update(['primary_domain_id' => $domain->id]);
+            $tenant->subscriptions()->create(['plan_id' => $data['plan_id'], 'provider' => 'manual', 'status' => ($data['complimentary'] ?? false) ? 'complimentary' : 'active', 'complimentary' => $data['complimentary'] ?? false, 'started_at' => now()]);
+            if (! empty($data['variation_id'])) {
+                $variation = BusinessVariation::findOrFail($data['variation_id']);
+                $template = RequestTemplate::where('code', $variation->template_code)->first();
+                $tenant->businessProfile()->create(['category_id' => $variation->category_id, 'variation_id' => $variation->id, 'request_template_id' => $template?->id, 'original_description' => $data['business_description'] ?? null]);
+            }
+
+            return $tenant;
+        });
+        $audit->log('tenant.created_by_admin', $tenant, null, $tenant->toArray(), $tenant->id);
+
+        return response()->json($tenant->load(['users', 'currentSubscription.plan', 'businessProfile.variation']), 201);
     }
 
     public function tenant(Tenant $tenant): JsonResponse
@@ -80,17 +117,40 @@ return response()->json($q->latest()->paginate(25));
             $q->where(fn ($x) => $x->where('name', 'like', "%$s%")->orWhere('email', 'like', "%$s%"));
         }
 
-return response()->json($q->latest()->paginate(25));
+        return response()->json($q->latest()->paginate(25));
     }
 
     public function updateUser(Request $request, User $user, AuditService $audit): JsonResponse
     {
-        $data = $request->validate(['is_active' => 'required|boolean']);
+        $data = $request->validate(['is_active' => 'sometimes|boolean', 'is_super_admin' => 'sometimes|boolean']);
+        abort_if($data === [], 422, 'No changes supplied.');
+        if (array_key_exists('is_super_admin', $data) && ! $data['is_super_admin'] && $user->is_super_admin) {
+            abort_if($user->is($request->user()), 422, 'You cannot revoke your own super administrator access.');
+            abort_if(User::where('is_super_admin', true)->count() <= 1, 422, 'At least one super administrator is required.');
+        }
         $before = $user->toArray();
         $user->update($data);
         $audit->log('user.status.updated', $user, $before, $user->toArray());
 
         return response()->json($user);
+    }
+
+    public function sendPasswordReset(User $user, AuditService $audit): JsonResponse
+    {
+        $status = PasswordBroker::sendResetLink(['email' => $user->email]);
+        $audit->log('user.password_reset.requested', $user);
+
+        return response()->json(['status' => $status]);
+    }
+
+    public function subscriptions(Request $request): JsonResponse
+    {
+        $query = Subscription::with(['tenant:id,name,slug', 'plan:id,code,name']);
+        if ($status = $request->string('status')->toString()) {
+            $query->where('status', $status);
+        }
+
+        return response()->json($query->latest()->paginate(50));
     }
 
     public function plans(): JsonResponse
@@ -130,7 +190,7 @@ return response()->json($q->latest()->paginate(25));
             $q->where('status', $status);
         }
 
-return response()->json($q->latest()->paginate(30));
+        return response()->json($q->latest()->paginate(30));
     }
 
     public function verifyDomain(TenantDomain $domain, DomainService $service, AuditService $audit): JsonResponse
@@ -154,6 +214,32 @@ return response()->json($q->latest()->paginate(30));
         $audit->log('domain.activated', $domain, $before, $domain->toArray(), $domain->tenant_id);
 
         return response()->json($domain->fresh());
+    }
+
+    public function disableDomain(TenantDomain $domain, AuditService $audit): JsonResponse
+    {
+        abort_if($domain->type === 'platform', 422, 'A platform domain cannot be disabled.');
+        $before = $domain->toArray();
+        $domain->update(['status' => 'disabled', 'is_primary' => false, 'ssl_status' => 'disabled']);
+        if ($domain->tenant->primary_domain_id === $domain->id) {
+            $platform = $domain->tenant->domains()->where('type', 'platform')->first();
+            $domain->tenant->update(['primary_domain_id' => $platform?->id]);
+            $platform?->update(['is_primary' => true]);
+        }
+        $audit->log('domain.disabled', $domain, $before, $domain->toArray(), $domain->tenant_id);
+
+        return response()->json($domain->fresh());
+    }
+
+    public function deleteDomain(TenantDomain $domain, AuditService $audit): JsonResponse
+    {
+        abort_if($domain->type === 'platform' || $domain->status === 'active', 422, 'Disable the custom domain before deleting it.');
+        $before = $domain->toArray();
+        $tenantId = $domain->tenant_id;
+        $domain->delete();
+        $audit->log('domain.deleted_by_admin', null, $before, null, $tenantId);
+
+        return response()->json(['ok' => true]);
     }
 
     public function taxonomy(): JsonResponse
@@ -191,6 +277,21 @@ return response()->json($q->latest()->paginate(30));
         return response()->json($template);
     }
 
+    public function saveTemplate(Request $request, ?RequestTemplate $template = null, ?AuditService $audit = null): JsonResponse
+    {
+        $data = $request->validate([
+            'category_id' => 'nullable|exists:business_categories,id', 'variation_id' => 'nullable|exists:business_variations,id',
+            'code' => ['required', 'string', 'max:160', $template ? Rule::unique('request_templates')->ignore($template->id) : Rule::unique('request_templates')],
+            'parent_code' => 'nullable|string|max:160', 'name' => 'required|array', 'configuration' => 'required|array',
+            'enabled' => 'boolean', 'version' => 'integer|min:1', 'sort_order' => 'integer|min:0',
+        ]);
+        $before = $template?->toArray();
+        $template ? $template->update($data) : $template = RequestTemplate::create($data);
+        $audit?->log($before ? 'template.updated' : 'template.created', $template, $before, $template->toArray());
+
+        return response()->json($template, $before ? 200 : 201);
+    }
+
     public function phrases(Request $request): JsonResponse
     {
         $q = BusinessPhrase::with(['category', 'variation']);
@@ -200,7 +301,7 @@ return response()->json($q->latest()->paginate(30));
             $q->where('locale', $locale);
         }
 
-return response()->json($q->latest()->paginate(50));
+        return response()->json($q->latest()->paginate(50));
     }
 
     public function savePhrase(Request $request, ?BusinessPhrase $phrase = null, ?AuditService $audit = null, ?BusinessClassifier $classifier = null): JsonResponse
@@ -252,6 +353,45 @@ return response()->json($q->latest()->paginate(50));
         return response()->json(AuditLog::latest()->paginate(100));
     }
 
+    public function stripeStatus(StripeService $stripe): JsonResponse
+    {
+        return response()->json(['configured' => $stripe->configured(), 'webhook_configured' => filled(config('services.stripe.webhook_secret')), 'account' => $stripe->configured() ? $stripe->testConnection() : null, 'plans_pending' => Plan::whereNull('stripe_synced_at')->orWhereNotNull('stripe_sync_error')->count()]);
+    }
+
+    public function syncAllPlans(StripeService $stripe, AuditService $audit): JsonResponse
+    {
+        $count = $stripe->syncAllPlans();
+        $audit->log('stripe.plans.synced', null, null, ['count' => $count]);
+
+        return response()->json(['ok' => true, 'count' => $count]);
+    }
+
+    public function backups(BackupService $backups): JsonResponse
+    {
+        return response()->json(['path' => config('backup.path'), 'keep' => config('backup.keep'), 'backups' => $backups->list()]);
+    }
+
+    public function createBackup(BackupService $backups, AuditService $audit): JsonResponse
+    {
+        $manifest = $backups->create();
+        $audit->log('backup.created', null, null, ['name' => $manifest['name']]);
+
+        return response()->json($manifest, 201);
+    }
+
+    public function verifyBackup(string $name, BackupService $backups): JsonResponse
+    {
+        return response()->json($backups->verify($name));
+    }
+
+    public function deleteBackup(string $name, BackupService $backups, AuditService $audit): JsonResponse
+    {
+        $backups->delete($name);
+        $audit->log('backup.deleted', null, ['name' => $name], null);
+
+        return response()->json(['ok' => true]);
+    }
+
     public function impersonate(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
     {
         $owner = $tenant->users()->wherePivot('role', 'owner')->firstOrFail();
@@ -266,10 +406,25 @@ return response()->json($q->latest()->paginate(50));
     public function stopImpersonation(Request $request): JsonResponse
     {
         $id = $request->session()->pull('impersonator_id');
-        abort_unless($id,422);
+        abort_unless($id, 422);
         Auth::loginUsingId($id);
         $request->session()->regenerate();
 
         return response()->json(['ok' => true]);
+    }
+
+    private function uniqueTenantSlug(string $value): string
+    {
+        $base = substr(trim(Str::slug(Str::ascii($value)) ?: 'business', '-'), 0, 50);
+        if (in_array($base, config('tenancy.reserved_slugs'), true)) {
+            $base .= '-business';
+        }
+        $slug = $base;
+        $counter = 2;
+        while (Tenant::where('slug', $slug)->exists() || in_array($slug, config('tenancy.reserved_slugs'), true)) {
+            $slug = $base.'-'.$counter++;
+        }
+
+        return $slug;
     }
 }

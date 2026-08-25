@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BusinessClassification;
 use App\Models\BusinessVariation;
 use App\Models\Plan;
+use App\Models\PlatformPage;
 use App\Models\RequestTemplate;
 use App\Models\SystemSetting;
 use App\Models\Tenant;
@@ -41,7 +42,7 @@ class AuthController extends Controller
         $plan = Plan::where('is_active', true)->findOrFail($data['plan_id']);
         $variation = BusinessVariation::with('category')->findOrFail($data['variation_id']);
         $slug = $this->uniqueSlug($data['slug'] ?? $data['business_name']);
-        [$user,$tenant,$subscription] = DB::transaction(function () use ($data, $plan, $variation, $slug) {
+        [$user,$tenant,$subscription] = DB::transaction(function () use ($data, $plan, $variation, $slug, $request) {
             $user = User::create(['name' => $data['name'], 'email' => $data['email'], 'password' => $data['password'], 'locale' => $data['locale'], 'is_active' => true]);
             $tenant = Tenant::create(['name' => $data['business_name'], 'slug' => $slug, 'country' => strtoupper($data['country']), 'locale' => $data['locale'], 'business_description' => $data['business_description'], 'status' => 'active']);
             $tenant->users()->attach($user, ['role' => 'owner']);
@@ -53,6 +54,13 @@ class AuthController extends Controller
             BusinessClassification::whereKey($data['classification_id'])->update(['tenant_id' => $tenant->id, 'category_id' => $variation->category_id, 'variation_id' => $variation->id, 'confirmed_by_user_at' => now()]);
             $trial = $plan->trial_days > 0;
             $subscription = $tenant->subscriptions()->create(['plan_id' => $plan->id, 'provider' => $trial ? 'lookdo' : 'stripe', 'status' => $trial ? 'trialing' : 'incomplete', 'started_at' => now(), 'current_period_start' => now(), 'current_period_end' => $trial ? now()->addDays($plan->trial_days) : null]);
+            DB::table('legal_acceptances')->insert([
+                'user_id' => $user->id, 'tenant_id' => $tenant->id,
+                'terms_version_at' => PlatformPage::where('key', 'agb')->value('updated_at'),
+                'privacy_version_at' => PlatformPage::where('key', 'datenschutz')->value('updated_at'),
+                'accepted_at' => now(), 'ip_address' => $request->ip(), 'user_agent' => substr((string) $request->userAgent(), 0, 1000),
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
 
             return [$user, $tenant, $subscription];
         });
@@ -125,10 +133,10 @@ class AuthController extends Controller
             $base .= '-business';
         } $slug = $base;
         $i = 2;
-        while (Tenant::where('slug', $slug)->exists() || in_array($slug,config('tenancy.reserved_slugs'),true)) {
+        while (Tenant::where('slug', $slug)->exists() || in_array($slug, config('tenancy.reserved_slugs'), true)) {
             $slug = $base.'-'.$i++;
         }
 
-return $slug;
+        return $slug;
     }
 }

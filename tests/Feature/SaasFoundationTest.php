@@ -7,8 +7,11 @@ use App\Models\BusinessVariation;
 use App\Models\Plan;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\StripeService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class SaasFoundationTest extends TestCase
@@ -36,6 +39,21 @@ class SaasFoundationTest extends TestCase
         $this->assertDatabaseHas('business_variations', ['id' => $variationId, 'code' => 'automotive.steering-wheel-upholstery']);
     }
 
+    public function test_ai_can_only_choose_from_existing_classification_candidates(): void
+    {
+        config(['services.openai.key' => 'test-key', 'services.openai.text_model' => 'gpt-5.6-luna']);
+        Http::fake(['api.openai.com/*' => Http::response([
+            'model' => 'gpt-5.6-luna', 'output_text' => '{"choice":1,"confidence":0.91}',
+            'usage' => ['input_tokens' => 120, 'output_tokens' => 12],
+        ])]);
+
+        $response = $this->postJson('/api/classify', ['description' => 'делаю необычные изделия для салона машины', 'locale' => 'ru'])
+            ->assertOk()->assertJsonPath('source', 'ai')->assertJsonPath('ai_model', 'gpt-5.6-luna');
+
+        $this->assertDatabaseHas('business_variations', ['id' => $response->json('variation_id')]);
+        $this->assertDatabaseHas('ai_usage_records', ['business_classification_id' => $response->json('id'), 'operation' => 'business_classification']);
+    }
+
     public function test_registration_creates_isolated_tenant_platform_domain_and_subscription(): void
     {
         $variation = BusinessVariation::where('code', 'automotive.steering-wheel-upholstery')->firstOrFail();
@@ -51,6 +69,7 @@ class SaasFoundationTest extends TestCase
         $this->assertDatabaseHas('tenant_domains', ['tenant_id' => $tenant->id, 'domain' => 'leonid-deluxe.lookdo.app', 'type' => 'platform', 'status' => 'active']);
         $this->assertDatabaseHas('subscriptions', ['tenant_id' => $tenant->id, 'plan_id' => $plan->id, 'status' => 'incomplete']);
         $this->assertDatabaseHas('tenant_business_profiles', ['tenant_id' => $tenant->id, 'variation_id' => $variation->id]);
+        $this->assertDatabaseHas('legal_acceptances', ['tenant_id' => $tenant->id, 'user_id' => $tenant->users()->firstOrFail()->id]);
     }
 
     public function test_tenant_user_cannot_read_another_tenant(): void
@@ -104,5 +123,57 @@ class SaasFoundationTest extends TestCase
         $this->postJson('/api/classify', ['description' => 'устанавливаю входные двери', 'locale' => 'ru'])->assertOk();
         $this->actingAs($admin)->getJson('/api/control/classifications')
             ->assertOk()->assertJsonPath('data.0.variation.code', 'repair-finishing-installation.door-installation');
+    }
+
+    public function test_super_admin_can_create_a_complete_client_account(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $plan = Plan::where('code', 'start')->firstOrFail();
+        $variation = BusinessVariation::where('code', 'automotive.steering-wheel-upholstery')->firstOrFail();
+
+        $this->actingAs($admin)->postJson('/api/control/tenants', [
+            'name' => 'Golden Wheel', 'owner_name' => 'Leonid', 'owner_email' => 'owner@golden-wheel.test',
+            'owner_password' => 'SecureOwner123', 'country' => 'DE', 'locale' => 'ru',
+            'business_description' => 'Перетяжка рулей', 'variation_id' => $variation->id,
+            'plan_id' => $plan->id, 'complimentary' => true,
+        ])->assertCreated()->assertJsonPath('current_subscription.status', 'complimentary');
+
+        $tenant = Tenant::where('name', 'Golden Wheel')->firstOrFail();
+        $this->assertDatabaseHas('tenant_domains', ['tenant_id' => $tenant->id, 'domain' => 'golden-wheel.lookdo.app']);
+        $this->assertDatabaseHas('tenant_business_profiles', ['tenant_id' => $tenant->id, 'variation_id' => $variation->id]);
+    }
+
+    public function test_super_admin_can_open_backup_control_without_creating_a_dump(): void
+    {
+        config(['backup.path' => storage_path('framework/testing/lookdo-backups')]);
+        $admin = User::factory()->create(['is_super_admin' => true]);
+
+        $this->actingAs($admin)->getJson('/api/control/backups')
+            ->assertOk()->assertJsonPath('keep', 14)->assertJsonPath('backups', []);
+    }
+
+    public function test_stripe_plan_sync_replaces_a_price_when_amount_changes(): void
+    {
+        config(['services.stripe.secret' => 'sk_test']);
+        Http::fake(function (HttpRequest $request) {
+            if (str_ends_with($request->url(), '/v1/prices')) {
+                $amount = (int) $request['unit_amount'];
+                $interval = $request['recurring']['interval'] ?? null;
+
+                return Http::response(['id' => $interval === 'year' ? 'price_year' : ($amount === 2500 ? 'price_month_new' : 'price_month')]);
+            }
+
+            return Http::response(['id' => 'prod_lookdo']);
+        });
+        $plan = Plan::where('code', 'start')->firstOrFail();
+        app(StripeService::class)->syncPlan($plan);
+        $this->assertSame('price_month', $plan->refresh()->stripe_monthly_price_id);
+
+        $plan->update(['price_monthly' => 25]);
+        app(StripeService::class)->syncPlan($plan);
+
+        $this->assertSame('price_month_new', $plan->refresh()->stripe_monthly_price_id);
+        $this->assertSame(2500, $plan->stripe_monthly_amount);
+        Http::assertSent(fn (HttpRequest $request) => str_ends_with($request->url(), '/v1/prices/price_month') && $request['active'] === 'false');
     }
 }

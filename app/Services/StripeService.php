@@ -7,6 +7,7 @@ use App\Models\Tenant;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Throwable;
 
 class StripeService
 {
@@ -15,17 +16,21 @@ class StripeService
         return filled(config('services.stripe.secret'));
     }
 
+    public function testConnection(): array
+    {
+        $response = $this->get('/v1/account');
+
+        return ['id' => $response->json('id'), 'country' => $response->json('country'), 'livemode' => (bool) $response->json('livemode')];
+    }
+
     public function checkout(Tenant $tenant, Plan $plan, string $email, string $cycle = 'monthly'): string
     {
-        if (! $this->configured()) {
-            throw new RuntimeException('Stripe is not configured.');
-        }
         $price = $cycle === 'yearly' ? $plan->stripe_yearly_price_id : $plan->stripe_monthly_price_id;
         if (! $price) {
             throw new RuntimeException('The selected plan is not synchronized with Stripe.');
         }
         $subscription = $tenant->subscriptions()->latest()->firstOrFail();
-        $response = Http::asForm()->withToken(config('services.stripe.secret'))->withHeaders(['Idempotency-Key' => 'lookdo-subscription-'.$subscription->id.'-'.$cycle])->post('https://api.stripe.com/v1/checkout/sessions', [
+        $response = $this->post('/v1/checkout/sessions', [
             'mode' => 'subscription', 'customer_email' => $email, 'client_reference_id' => (string) $tenant->id,
             'success_url' => rtrim(config('app.url'), '/').'/app/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}',
             'cancel_url' => rtrim(config('app.url'), '/').'/app/billing?checkout=cancelled',
@@ -33,9 +38,9 @@ class StripeService
             'automatic_tax' => ['enabled' => (bool) config('services.stripe.automatic_tax')],
             'metadata' => ['tenant_id' => (string) $tenant->id, 'subscription_id' => (string) $subscription->id],
             'subscription_data' => ['metadata' => ['tenant_id' => (string) $tenant->id, 'subscription_id' => (string) $subscription->id]],
-        ]);
-        if ($response->failed() || ! $response->json('url')) {
-            throw new RuntimeException((string) ($response->json('error.message') ?: 'Stripe Checkout failed.'));
+        ], 'lookdo-subscription-'.$subscription->id.'-'.$cycle);
+        if (! $response->json('url')) {
+            throw new RuntimeException('Stripe Checkout returned no URL.');
         }
 
         return (string) $response->json('url');
@@ -43,50 +48,124 @@ class StripeService
 
     public function syncPlan(Plan $plan): Plan
     {
-        if (! $this->configured()) {
-            throw new RuntimeException('STRIPE_SECRET is not configured.');
-        }
-        $product = $plan->stripe_product_id ? $this->post('/v1/products/'.$plan->stripe_product_id, ['name' => 'LOOKDO — '.$plan->localized('name'), 'active' => $plan->is_active ? 'true' : 'false']) : $this->post('/v1/products', ['name' => 'LOOKDO — '.$plan->localized('name'), 'description' => $plan->localized('description'), 'metadata' => ['lookdo_plan_id' => (string) $plan->id]]);
-        $plan->stripe_product_id = (string) $product->json('id');
-        foreach (['monthly' => ['amount' => $plan->price_monthly, 'interval' => 'month'], 'yearly' => ['amount' => $plan->price_yearly, 'interval' => 'year']] as $key => $data) {
-            if ($data['amount'] === null) {
-                continue;
-            } $field = 'stripe_'.$key.'_price_id';
-            if (! $plan->$field) {
-                $price = $this->post('/v1/prices', ['product' => $plan->stripe_product_id, 'currency' => strtolower($plan->currency), 'unit_amount' => (int) round((float) $data['amount'] * 100), 'recurring' => ['interval' => $data['interval']], 'metadata' => ['lookdo_plan_id' => (string) $plan->id, 'billing_cycle' => $key]]);
-                $plan->$field = (string) $price->json('id');
-            }
-        }
-        $plan->save();
+        try {
+            $productData = ['name' => 'LOOKDO — '.$plan->localized('name'), 'active' => $plan->is_active ? 'true' : 'false'];
+            $product = $plan->stripe_product_id
+                ? $this->post('/v1/products/'.$plan->stripe_product_id, $productData)
+                : $this->post('/v1/products', $productData + ['description' => $plan->localized('description'), 'metadata' => ['lookdo_plan_id' => (string) $plan->id]]);
+            $plan->stripe_product_id = (string) $product->json('id');
+            $currency = strtolower($plan->currency);
 
-        return $plan->refresh();
+            foreach (['monthly' => ['amount' => $plan->price_monthly, 'interval' => 'month'], 'yearly' => ['amount' => $plan->price_yearly, 'interval' => 'year']] as $cycle => $data) {
+                $priceField = 'stripe_'.$cycle.'_price_id';
+                $amountField = 'stripe_'.$cycle.'_amount';
+                $amount = $data['amount'] === null ? null : (int) round((float) $data['amount'] * 100);
+                if ($amount === null) {
+                    if ($plan->$priceField) {
+                        $this->post('/v1/prices/'.$plan->$priceField, ['active' => 'false']);
+                    }
+                    $plan->$priceField = null;
+                    $plan->$amountField = null;
+
+                    continue;
+                }
+                $changed = ! $plan->$priceField || (int) $plan->$amountField !== $amount || strtolower((string) $plan->stripe_currency) !== $currency;
+                if ($changed) {
+                    $oldPrice = $plan->$priceField;
+                    $price = $this->post('/v1/prices', [
+                        'product' => $plan->stripe_product_id, 'currency' => $currency, 'unit_amount' => $amount,
+                        'recurring' => ['interval' => $data['interval']],
+                        'metadata' => ['lookdo_plan_id' => (string) $plan->id, 'billing_cycle' => $cycle],
+                    ]);
+                    $plan->$priceField = (string) $price->json('id');
+                    $plan->$amountField = $amount;
+                    if ($oldPrice) {
+                        $this->post('/v1/prices/'.$oldPrice, ['active' => 'false']);
+                    }
+                }
+            }
+            if ($plan->stripe_monthly_price_id) {
+                $this->post('/v1/products/'.$plan->stripe_product_id, ['default_price' => $plan->stripe_monthly_price_id]);
+            }
+            $plan->forceFill(['stripe_currency' => strtoupper($plan->currency), 'stripe_synced_at' => now(), 'stripe_sync_error' => null])->save();
+
+            return $plan->refresh();
+        } catch (Throwable $exception) {
+            $plan->forceFill(['stripe_sync_error' => $exception->getMessage()])->save();
+            throw $exception;
+        }
+    }
+
+    public function syncAllPlans(): int
+    {
+        $count = 0;
+        Plan::where('is_active', true)->orderBy('sort_order')->each(function (Plan $plan) use (&$count) {
+            $this->syncPlan($plan);
+            $count++;
+        });
+
+        return $count;
+    }
+
+    public function createWebhookEndpoint(string $url): string
+    {
+        $response = $this->post('/v1/webhook_endpoints', [
+            'url' => $url, 'description' => 'LOOKDO production webhook',
+            'enabled_events' => ['checkout.session.completed', 'checkout.session.async_payment_succeeded', 'invoice.paid', 'invoice.payment_failed', 'customer.subscription.deleted'],
+        ]);
+        $secret = $response->json('secret');
+        if (! is_string($secret) || ! str_starts_with($secret, 'whsec_')) {
+            throw new RuntimeException('Stripe did not return the webhook signing secret.');
+        }
+
+        return $secret;
     }
 
     public function validSignature(string $payload, string $header): bool
     {
         $secret = (string) config('services.stripe.webhook_secret');
-        if (! $secret || ! preg_match('/(?:^|,)t=(\d+)/', $header, $ts)) {
+        if (! $secret || ! preg_match('/(?:^|,)t=(\d+)/', $header, $timestamp) || abs(time() - (int) $timestamp[1]) > 300) {
             return false;
-        } if (abs(time() - (int) $ts[1]) > 300) {
-            return false;
-        } preg_match_all('/(?:^|,)v1=([a-f0-9]+)/', $header, $sigs);
-        $expected = hash_hmac('sha256', $ts[1].'.'.$payload, $secret);
-        foreach ($sigs[1] as $sig) {
-            if (hash_equals($expected, $sig)) {
-                return true;
-            }
         }
+        preg_match_all('/(?:^|,)v1=([a-f0-9]+)/', $header, $signatures);
+        $expected = hash_hmac('sha256', $timestamp[1].'.'.$payload, $secret);
 
-return false;
+        return collect($signatures[1])->contains(fn (string $signature) => hash_equals($expected, $signature));
     }
 
-    private function post(string $path, array $data): Response
+    private function get(string $path): Response
     {
-        $r = Http::asForm()->withToken(config('services.stripe.secret'))->post('https://api.stripe.com'.$path, $data);
-        if ($r->failed()) {
-            throw new RuntimeException((string) ($r->json('error.message') ?: 'Stripe API error'));
-        }
+        $this->ensureConfigured();
+        $response = Http::withToken(config('services.stripe.secret'))->get('https://api.stripe.com'.$path);
+        $this->ensureSuccessful($response);
 
-return $r;
+        return $response;
+    }
+
+    private function post(string $path, array $data, ?string $idempotencyKey = null): Response
+    {
+        $this->ensureConfigured();
+        $request = Http::asForm()->withToken(config('services.stripe.secret'));
+        if ($idempotencyKey) {
+            $request = $request->withHeaders(['Idempotency-Key' => $idempotencyKey]);
+        }
+        $response = $request->post('https://api.stripe.com'.$path, $data);
+        $this->ensureSuccessful($response);
+
+        return $response;
+    }
+
+    private function ensureConfigured(): void
+    {
+        if (! $this->configured()) {
+            throw new RuntimeException('STRIPE_SECRET is not configured.');
+        }
+    }
+
+    private function ensureSuccessful(Response $response): void
+    {
+        if ($response->failed()) {
+            throw new RuntimeException((string) ($response->json('error.message') ?: 'Stripe API error.'));
+        }
     }
 }

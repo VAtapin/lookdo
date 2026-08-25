@@ -60,7 +60,7 @@ class DatabaseSeeder extends Seeder
                 'impressum' => 'Выходные данные','datenschutz' => 'Конфиденциальность','agb' => 'Условия использования','widerruf' => 'Отказ от договора','kontakt' => 'Контакты'
             }], 'content' => ['de' => 'Dieser Inhalt wird vor dem Produktionsstart vom Betreiber vervollständigt.', 'en' => 'This content will be completed by the operator before production launch.', 'ru' => 'Содержимое заполняется владельцем платформы перед рабочим запуском.'], 'is_published' => true]);
         }
-        foreach (['registration_enabled' => true, 'enabled_locales' => ['de', 'en', 'ru'], 'support_email' => 'support@lookdo.app', 'maintenance' => false] as $key => $value) {
+        foreach (['platform_name' => 'LOOKDO', 'default_locale' => 'ru', 'registration_enabled' => true, 'enabled_locales' => ['de', 'en', 'ru'], 'support_email' => 'support@lookdo.app', 'trial_days_default' => 0, 'upload_base_limit_mb' => 100, 'integrations' => ['stripe' => true, 'openai' => true], 'maintenance' => false] as $key => $value) {
             SystemSetting::updateOrCreate(['key' => $key], ['value' => $value]);
         }
     }

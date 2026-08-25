@@ -34,10 +34,10 @@ class TenantController extends Controller
     public function updateProfile(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
-        $data = $request->validate(['name' => 'required|string|max:160', 'contact_name' => 'nullable|string|max:120', 'email' => 'nullable|email|max:255', 'phone' => 'nullable|string|max:50', 'street' => 'nullable|string|max:160', 'postal_code' => 'nullable|string|max:30', 'city' => 'nullable|string|max:100', 'primary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'secondary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/']]);
+        $data = $request->validate(['name' => 'required|string|max:160', 'locale' => ['nullable', Rule::in(['de', 'en', 'ru'])], 'contact_name' => 'nullable|string|max:120', 'email' => 'nullable|email|max:255', 'phone' => 'nullable|string|max:50', 'street' => 'nullable|string|max:160', 'postal_code' => 'nullable|string|max:30', 'city' => 'nullable|string|max:100', 'primary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'secondary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/']]);
         $before = $tenant->load('profile')->toArray();
-        $tenant->update(['name' => $data['name']]);
-        unset($data['name']);
+        $tenant->update(['name' => $data['name'], 'locale' => $data['locale'] ?? $tenant->locale]);
+        unset($data['name'], $data['locale']);
         $tenant->profile()->updateOrCreate([], $data);
         $audit->log('tenant.profile.updated', $tenant, $before, $tenant->fresh('profile')->toArray(), $tenant->id);
 
@@ -104,11 +104,11 @@ class TenantController extends Controller
         $plan = Plan::where('is_active', true)->findOrFail($data['plan_id']);
         $subscription = $tenant->subscriptions()->create(['plan_id' => $plan->id, 'provider' => 'stripe', 'status' => 'incomplete', 'started_at' => now()]);
         try {
-            $url = $stripe->checkout($tenant,$plan,$request->user()->email,$data['cycle']);
+            $url = $stripe->checkout($tenant, $plan, $request->user()->email, $data['cycle']);
         } catch (RuntimeException $e) {
-            return response()->json(['message' => $e->getMessage()],422);
+            return response()->json(['message' => $e->getMessage()], 422);
         }
 
-return response()->json(['checkout_url' => $url]);
+        return response()->json(['checkout_url' => $url]);
     }
 }

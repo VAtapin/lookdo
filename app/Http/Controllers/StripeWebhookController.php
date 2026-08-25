@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\StripeWebhookEvent;
 use App\Models\Subscription;
 use App\Services\StripeService;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +17,10 @@ class StripeWebhookController extends Controller
         $event = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
         $object = $event['data']['object'] ?? [];
         $type = $event['type'] ?? '';
+        $record = StripeWebhookEvent::firstOrCreate(['event_id' => (string) ($event['id'] ?? hash('sha256', $payload))], ['type' => $type]);
+        if (! $record->wasRecentlyCreated && $record->processed_at) {
+            return response()->json(['received' => true, 'duplicate' => true]);
+        }
         if (in_array($type, ['checkout.session.completed', 'checkout.session.async_payment_succeeded'], true)) {
             $subscription = Subscription::find($object['metadata']['subscription_id'] ?? null);
             if ($subscription) {
@@ -36,6 +41,7 @@ class StripeWebhookController extends Controller
         if ($type === 'customer.subscription.deleted') {
             Subscription::where('provider_subscription_id', $object['id'] ?? null)->update(['status' => 'canceled']);
         }
+        $record->update(['processed_at' => now()]);
 
         return response()->json(['received' => true]);
     }
