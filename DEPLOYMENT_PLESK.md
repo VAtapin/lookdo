@@ -73,7 +73,11 @@ $PHP_BIN artisan storage:link
 $PHP_BIN artisan optimize
 ```
 
-До `migrate --seed` заполнить `.env`: `APP_URL`, базу, SMTP и пару `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD`. Суперадминистратор создаётся только когда заданы оба значения; известного пароля по умолчанию нет. После первой установки `SUPER_ADMIN_PASSWORD` лучше удалить из `.env`, оставив учётную запись в базе.
+До `migrate --seed` заполнить `.env`: `APP_URL`, базу и SMTP. После миграций создать Super Admin интерактивно; пароль вводится скрыто и в `.env` не хранится:
+
+```bash
+$PHP_BIN artisan lookdo:make-super-admin
+```
 
 Каталоги `storage` и `bootstrap/cache` должны быть доступны на запись системному пользователю домена Plesk.
 

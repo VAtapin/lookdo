@@ -9,10 +9,8 @@ use App\Models\Plan;
 use App\Models\PlatformPage;
 use App\Models\RequestTemplate;
 use App\Models\SystemSetting;
-use App\Models\User;
 use App\Services\BusinessClassifier;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -64,10 +62,6 @@ class DatabaseSeeder extends Seeder
         }
         foreach (['registration_enabled' => true, 'enabled_locales' => ['de', 'en', 'ru'], 'support_email' => 'support@lookdo.app', 'maintenance' => false] as $key => $value) {
             SystemSetting::updateOrCreate(['key' => $key], ['value' => $value]);
-        }
-
-        if (($email = env('SUPER_ADMIN_EMAIL')) && ($password = env('SUPER_ADMIN_PASSWORD'))) {
-            User::updateOrCreate(['email' => $email], ['name' => env('SUPER_ADMIN_NAME', 'LOOKDO Admin'), 'password' => Hash::make($password), 'locale' => 'de', 'is_active' => true, 'is_super_admin' => true, 'email_verified_at' => now()]);
         }
     }
 

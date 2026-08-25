@@ -72,6 +72,22 @@ class SaasFoundationTest extends TestCase
         $this->actingAs($admin)->getJson('/api/control/dashboard')->assertOk()->assertJsonStructure(['tenants', 'mrr']);
     }
 
+    public function test_super_admin_is_created_by_console_command_not_seeder_secrets(): void
+    {
+        $this->artisan('lookdo:make-super-admin', [
+            'email' => 'owner@lookdo.test',
+            '--name' => 'Platform Owner',
+            '--password' => 'SecureAdmin123',
+        ])->assertSuccessful();
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'owner@lookdo.test',
+            'name' => 'Platform Owner',
+            'is_active' => true,
+            'is_super_admin' => true,
+        ]);
+    }
+
     public function test_super_admin_can_manage_plans_and_read_ai_decisions(): void
     {
         $admin = User::factory()->create(['is_super_admin' => true]);
@@ -87,6 +103,6 @@ class SaasFoundationTest extends TestCase
 
         $this->postJson('/api/classify', ['description' => 'устанавливаю входные двери', 'locale' => 'ru'])->assertOk();
         $this->actingAs($admin)->getJson('/api/control/classifications')
-            ->assertOk()->assertJsonPath('data.0.variation.code','repair-finishing-installation.door-installation');
+            ->assertOk()->assertJsonPath('data.0.variation.code', 'repair-finishing-installation.door-installation');
     }
 }
