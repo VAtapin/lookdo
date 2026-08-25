@@ -1,13 +1,11 @@
-# UI reference — beauty.brows
+# LOOKDO Brow Master — UI reference
 
-Эта папка содержит визуальный reference специализированного Brow-сценария. Глобальный `/UI` остаётся источником общего app shell, навигации, компонентов, camera/messages и поведения.
+This specialized template uses the shared LOOKDO component system but a beauty-oriented composition: strong Before/After presentation, visible services, direct booking CTA, calendar/time selection and a compact Today view for the master.
 
-Обязательные reference-экраны:
+Required reference: `mobile-reference.svg` (4 key states: home, services, booking/calendar, master Today). Global navigation and reusable booking/messages/customer components remain shared.
 
-1. `01-home` — клиентская Главная: персональный beauty-бренд, мастер, крупный визуальный результат, ближайшее свободное время, CTA `Записаться`, компактные Before/After, услуги.
-2. `02-booking` — клиентская запись: выбранная услуга, календарь, доступные time slots, имя/телефон, без регистрации.
-3. `03-master-today` — рабочий экран мастера: Termin сегодня, свободные окна, повторные клиенты, неподтверждённые записи, готовые Before/After и быстрые AI-действия.
+## Color
 
-Визуальный характер: premium beauty, чисто, тепло, много воздуха, крупные реальные фото, минимум dashboard-элементов. Не использовать визуальный язык автосервиса/ремонта. Не делать отдельный frontend: композиция собирается из общих LOOKDO компонентов.
+The pink shown in the reference is only an example/default preview. The tenant chooses the primary app color during template setup and may change it later. Apply `/TEMPLATE_COLOR_SYSTEM.md`; do not hardcode pink in Vue components.
 
-Для первого tenant локализации reference: украинский как основной демонстрационный язык; runtime также RU/DE.
+The UI should feel clean and visual, with larger work imagery and less technical density than repair/service templates.
