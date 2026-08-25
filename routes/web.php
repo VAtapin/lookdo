@@ -71,6 +71,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::get('/settings', [AdminController::class, 'settings']);
             Route::put('/settings', [AdminController::class, 'saveSetting']);
             Route::put('/pages/{page}', [AdminController::class, 'savePage']);
+            Route::post('/content-media', [AdminController::class, 'uploadContentMedia']);
             Route::get('/audits', [AdminController::class, 'audits']);
         });
     });

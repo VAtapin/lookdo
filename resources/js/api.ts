@@ -1,12 +1,13 @@
 const token = () => document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content || '';
 
 export async function api<T = any>(path: string, options: RequestInit = {}): Promise<T> {
+    const isFormData = options.body instanceof FormData;
     const response = await fetch(`/api${path}`, {
         credentials: 'same-origin',
         ...options,
         headers: {
             Accept: 'application/json',
-            'Content-Type': 'application/json',
+            ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
             'X-CSRF-TOKEN': token(),
             'X-Locale': localStorage.getItem('lookdo-locale') || 'de',
             ...(options.headers || {}),

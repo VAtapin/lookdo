@@ -15,9 +15,11 @@ use App\Services\StripeService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use ReflectionMethod;
 use Tests\TestCase;
 
@@ -221,6 +223,29 @@ class SaasFoundationTest extends TestCase
 
         $this->actingAs($admin)->getJson('/api/control/backups')
             ->assertOk()->assertJsonPath('keep', 14)->assertJsonPath('backups', []);
+    }
+
+    public function test_super_admin_registries_support_search_sort_pagination_and_content_uploads(): void
+    {
+        Storage::fake('public');
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        Tenant::create(['name' => 'Zeta Werkstatt', 'slug' => 'zeta-werkstatt', 'country' => 'DE', 'locale' => 'de']);
+        Tenant::create(['name' => 'Alpha Werkstatt', 'slug' => 'alpha-werkstatt', 'country' => 'DE', 'locale' => 'de']);
+
+        $this->actingAs($admin)->getJson('/api/control/tenants?search=werkstatt&sort=name&direction=asc&per_page=10')
+            ->assertOk()
+            ->assertJsonPath('total', 2)
+            ->assertJsonPath('per_page', 10)
+            ->assertJsonPath('data.0.name', 'Alpha Werkstatt');
+
+        $upload = $this->actingAs($admin)->post('/api/control/content-media', [
+            'file' => UploadedFile::fake()->image('hero.jpg', 1200, 800),
+        ], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonPath('name', 'hero.jpg')
+            ->assertJsonStructure(['url', 'path', 'mime', 'size']);
+
+        Storage::disk('public')->assertExists($upload->json('path'));
     }
 
     public function test_storage_backup_is_finalized_even_when_storage_has_no_user_files(): void

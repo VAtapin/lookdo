@@ -26,6 +26,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password as PasswordBroker;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -46,7 +47,9 @@ class AdminController extends Controller
             $q->where('status', $status);
         }
 
-        return response()->json($q->latest()->paginate(25));
+        $sort = $this->sortColumn($request, ['name', 'slug', 'status', 'created_at', 'last_activity_at']);
+
+        return response()->json($q->orderBy($sort, $this->sortDirection($request))->paginate($this->perPage($request)));
     }
 
     public function createTenant(Request $request, AuditService $audit): JsonResponse
@@ -114,10 +117,18 @@ class AdminController extends Controller
     {
         $q = User::with('tenants:id,name,slug');
         if ($s = $request->string('search')->trim()->toString()) {
-            $q->where(fn ($x) => $x->where('name', 'like', "%$s%")->orWhere('email', 'like', "%$s%"));
+            $q->where(fn ($x) => $x->where('name', 'like', "%$s%")->orWhere('email', 'like', "%$s%")->orWhereHas('tenants', fn ($tenant) => $tenant->where('name', 'like', "%$s%")));
+        }
+        if ($status = $request->string('status')->toString()) {
+            $q->where('is_active', $status === 'active');
+        }
+        if ($role = $request->string('role')->toString()) {
+            $role === 'super_admin' ? $q->where('is_super_admin', true) : $q->where('is_super_admin', false);
         }
 
-        return response()->json($q->latest()->paginate(25));
+        $sort = $this->sortColumn($request, ['name', 'email', 'is_active', 'created_at', 'last_login_at']);
+
+        return response()->json($q->orderBy($sort, $this->sortDirection($request))->paginate($this->perPage($request)));
     }
 
     public function updateUser(Request $request, User $user, AuditService $audit): JsonResponse
@@ -149,8 +160,18 @@ class AdminController extends Controller
         if ($status = $request->string('status')->toString()) {
             $query->where('status', $status);
         }
+        if ($provider = $request->string('provider')->toString()) {
+            $query->where('provider', $provider);
+        }
+        if ($s = $request->string('search')->trim()->toString()) {
+            $query->where(fn ($q) => $q->where('provider_customer_id', 'like', "%$s%")
+                ->orWhere('provider_subscription_id', 'like', "%$s%")
+                ->orWhereHas('tenant', fn ($tenant) => $tenant->where('name', 'like', "%$s%")->orWhere('slug', 'like', "%$s%")));
+        }
 
-        return response()->json($query->latest()->paginate(50));
+        $sort = $this->sortColumn($request, ['status', 'provider', 'current_period_end', 'created_at']);
+
+        return response()->json($query->orderBy($sort, $this->sortDirection($request))->paginate($this->perPage($request)));
     }
 
     public function plans(): JsonResponse
@@ -189,8 +210,17 @@ class AdminController extends Controller
         if ($status = $request->string('status')->toString()) {
             $q->where('status', $status);
         }
+        if ($type = $request->string('type')->toString()) {
+            $q->where('type', $type);
+        }
+        if ($s = $request->string('search')->trim()->toString()) {
+            $q->where(fn ($query) => $query->where('domain', 'like', "%$s%")
+                ->orWhereHas('tenant', fn ($tenant) => $tenant->where('name', 'like', "%$s%")));
+        }
 
-        return response()->json($q->latest()->paginate(30));
+        $sort = $this->sortColumn($request, ['domain', 'type', 'status', 'last_checked_at', 'created_at']);
+
+        return response()->json($q->orderBy($sort, $this->sortDirection($request))->paginate($this->perPage($request)));
     }
 
     public function verifyDomain(TenantDomain $domain, DomainService $service, AuditService $audit): JsonResponse
@@ -300,8 +330,16 @@ class AdminController extends Controller
         }if ($locale = $request->string('locale')->toString()) {
             $q->where('locale', $locale);
         }
+        if ($status = $request->string('status')->toString()) {
+            $q->where('enabled', $status === 'active');
+        }
+        if ($variation = $request->integer('variation_id')) {
+            $q->where('variation_id', $variation);
+        }
 
-        return response()->json($q->latest()->paginate(50));
+        $sort = $this->sortColumn($request, ['phrase', 'locale', 'weight', 'enabled', 'created_at']);
+
+        return response()->json($q->orderBy($sort, $this->sortDirection($request))->paginate($this->perPage($request)));
     }
 
     public function savePhrase(Request $request, ?BusinessPhrase $phrase = null, ?AuditService $audit = null, ?BusinessClassifier $classifier = null): JsonResponse
@@ -315,9 +353,20 @@ class AdminController extends Controller
         return response()->json($phrase, $before ? 200 : 201);
     }
 
-    public function classifications(): JsonResponse
+    public function classifications(Request $request): JsonResponse
     {
-        return response()->json(BusinessClassification::with(['category:id,code,name', 'variation:id,code,name', 'tenant:id,name,slug'])->latest()->paginate(50));
+        $q = BusinessClassification::with(['category:id,code,name', 'variation:id,code,name', 'tenant:id,name,slug']);
+        if ($s = $request->string('search')->trim()->toString()) {
+            $q->where(fn ($query) => $query->where('original_text', 'like', "%$s%")
+                ->orWhere('normalized_text', 'like', "%$s%")
+                ->orWhereHas('tenant', fn ($tenant) => $tenant->where('name', 'like', "%$s%")));
+        }
+        if ($source = $request->string('source')->toString()) {
+            $q->where('source', $source);
+        }
+        $sort = $this->sortColumn($request, ['confidence', 'source', 'confirmed_by_user_at', 'created_at']);
+
+        return response()->json($q->orderBy($sort, $this->sortDirection($request))->paginate($this->perPage($request)));
     }
 
     public function settings(): JsonResponse
@@ -348,9 +397,31 @@ class AdminController extends Controller
         return response()->json($page);
     }
 
-    public function audits(): JsonResponse
+    public function uploadContentMedia(Request $request, AuditService $audit): JsonResponse
     {
-        return response()->json(AuditLog::latest()->paginate(100));
+        $data = $request->validate(['file' => 'required|file|mimes:jpg,jpeg,png,webp,gif,svg,mp4,webm,mov|max:102400']);
+        $file = $data['file'];
+        $path = $file->store('platform-content', 'public');
+        $payload = ['url' => Storage::disk('public')->url($path), 'path' => $path, 'name' => $file->getClientOriginalName(), 'mime' => $file->getMimeType(), 'size' => $file->getSize()];
+        $audit->log('content.media.uploaded', null, null, $payload);
+
+        return response()->json($payload, 201);
+    }
+
+    public function audits(Request $request): JsonResponse
+    {
+        $q = AuditLog::query();
+        if ($s = $request->string('search')->trim()->toString()) {
+            $q->where(fn ($query) => $query->where('action', 'like', "%$s%")
+                ->orWhere('subject_type', 'like', "%$s%")
+                ->orWhere('ip_address', 'like', "%$s%"));
+        }
+        if ($action = $request->string('action')->toString()) {
+            $q->where('action', 'like', $action.'%');
+        }
+        $sort = $this->sortColumn($request, ['action', 'actor_id', 'tenant_id', 'subject_type', 'created_at']);
+
+        return response()->json($q->orderBy($sort, $this->sortDirection($request))->paginate($this->perPage($request)));
     }
 
     public function stripeStatus(StripeService $stripe): JsonResponse
@@ -426,5 +497,22 @@ class AdminController extends Controller
         }
 
         return $slug;
+    }
+
+    private function perPage(Request $request): int
+    {
+        return max(10, min(100, $request->integer('per_page', 25)));
+    }
+
+    private function sortDirection(Request $request): string
+    {
+        return $request->string('direction')->lower()->toString() === 'asc' ? 'asc' : 'desc';
+    }
+
+    private function sortColumn(Request $request, array $allowed): string
+    {
+        $requested = $request->string('sort')->toString();
+
+        return in_array($requested, $allowed, true) ? $requested : 'created_at';
     }
 }
