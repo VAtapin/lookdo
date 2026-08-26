@@ -75,6 +75,19 @@ messages.de.whyTitle = 'Anfragen erhalten, Termine verwalten und mit Kunden komm
 messages.en.whyTitle = 'Receive requests, manage bookings and talk to customers — all in one app';
 messages.uk.whyTitle = 'Отримуйте заявки, ведіть запис і спілкуйтеся з клієнтами — в одному застосунку';
 
+Object.assign(messages.de, {
+    socialImageStep:'Vorschaubild ergänzen', socialImageEyebrow:'LINK-VORSCHAU', socialImageTitle:'Bild für WhatsApp und soziale Netzwerke', socialImageText:'Dieses Bild erscheint, wenn Sie Ihre App als Link teilen. Es ist ein Pflichtschritt vor der Veröffentlichung.', socialImageFormat:'Empfohlen: Querformat 1200 × 630 Pixel, JPG, PNG oder WebP.', socialImageMissing:'Noch kein Vorschaubild', uploadImage:'Eigenes Bild hochladen', generateImage:'Mit KI erstellen', pleaseWait:'Bitte warten…', socialImageUploaded:'Das Vorschaubild wurde gespeichert.', socialImageGenerated:'Das Vorschaubild wurde mit KI erstellt.'
+});
+Object.assign(messages.en, {
+    socialImageStep:'Add sharing image', socialImageEyebrow:'LINK PREVIEW', socialImageTitle:'Image for WhatsApp and social networks', socialImageText:'This image appears when you share your app link. It is required before publishing.', socialImageFormat:'Recommended: landscape 1200 × 630 pixels, JPG, PNG or WebP.', socialImageMissing:'No preview image yet', uploadImage:'Upload my image', generateImage:'Create with AI', pleaseWait:'Please wait…', socialImageUploaded:'The preview image was saved.', socialImageGenerated:'The preview image was created with AI.'
+});
+Object.assign(messages.ru, {
+    socialImageStep:'Добавить картинку ссылки', socialImageEyebrow:'ПРЕДПРОСМОТР ССЫЛКИ', socialImageTitle:'Картинка для WhatsApp и социальных сетей', socialImageText:'Эта картинка показывается, когда вы делитесь ссылкой на приложение. Перед публикацией её нужно обязательно добавить.', socialImageFormat:'Рекомендуется: горизонтальная 1200 × 630 пикселей, JPG, PNG или WebP.', socialImageMissing:'Картинка ещё не добавлена', uploadImage:'Загрузить свою', generateImage:'Создать с помощью ИИ', pleaseWait:'Подождите…', socialImageUploaded:'Картинка ссылки сохранена.', socialImageGenerated:'Картинка ссылки создана с помощью ИИ.'
+});
+Object.assign(messages.uk, {
+    socialImageStep:'Додати картинку посилання', socialImageEyebrow:'ПЕРЕГЛЯД ПОСИЛАННЯ', socialImageTitle:'Картинка для WhatsApp і соціальних мереж', socialImageText:'Ця картинка показується, коли ви ділитеся посиланням на застосунок. Перед публікацією її потрібно обов’язково додати.', socialImageFormat:'Рекомендовано: горизонтальна 1200 × 630 пікселів, JPG, PNG або WebP.', socialImageMissing:'Картинку ще не додано', uploadImage:'Завантажити свою', generateImage:'Створити за допомогою ШІ', pleaseWait:'Зачекайте…', socialImageUploaded:'Картинку посилання збережено.', socialImageGenerated:'Картинку посилання створено за допомогою ШІ.'
+});
+
 export const t = (key: string) => computed(() => messages[locale.value][key] || key);
 export function tr(key: string): string { return messages[locale.value][key] || key; }
 export function setLocale(value: Locale) { locale.value=value;localStorage.setItem('lookdo-locale',value);document.documentElement.lang=value; }

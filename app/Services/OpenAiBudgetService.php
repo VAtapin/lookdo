@@ -35,4 +35,19 @@ class OpenAiBudgetService
             'usage_date' => today(),
         ]);
     }
+
+    public function recordImage(string $operation, string $model, string $quality = 'medium', ?int $userId = null): AiUsageRecord
+    {
+        $cost = (float) config('services.openai.image_cost_'.$quality, config('services.openai.image_cost_medium'));
+
+        return AiUsageRecord::create([
+            'user_id' => $userId,
+            'operation' => $operation,
+            'model' => $model,
+            'input_tokens' => 0,
+            'output_tokens' => 0,
+            'cost' => $cost,
+            'usage_date' => today(),
+        ]);
+    }
 }

@@ -672,4 +672,56 @@ class SaasFoundationTest extends TestCase
         $this->assertSame('DELIVERED', $sms->fresh()->provider_status);
         $this->assertNotNull($sms->fresh()->delivered_at);
     }
+
+    public function test_public_and_tenant_pages_render_server_side_social_metadata(): void
+    {
+        SystemSetting::updateOrCreate(['key' => 'social_share_image_url'], ['value' => '/brand/lookdo-service-workspace.png']);
+        $this->get('/de')->assertOk()
+            ->assertSee('property="og:image"', false)
+            ->assertSee('/brand/lookdo-service-workspace.png', false)
+            ->assertSee('name="twitter:card" content="summary_large_image"', false);
+
+        $tenant = Tenant::create(['name' => 'Golden Wheel', 'slug' => 'golden-wheel', 'country' => 'DE', 'locale' => 'de', 'status' => 'active', 'business_description' => 'Lenkräder neu beziehen']);
+        $tenant->profile()->create(['social_image_path' => 'tenant-social/'.$tenant->id.'/share.webp', 'social_image_source' => 'upload']);
+
+        $this->get('https://golden-wheel.lookdo.app/de')->assertOk()
+            ->assertSee('Golden Wheel — LOOKDO', false)
+            ->assertSee('https://golden-wheel.lookdo.app/storage/tenant-social/'.$tenant->id.'/share.webp', false);
+    }
+
+    public function test_tenant_can_upload_and_generate_its_social_image(): void
+    {
+        Storage::fake('public');
+        config(['services.openai.key' => 'test-key', 'services.openai.image_model' => 'gpt-image-2', 'services.openai.image_cost_medium' => .053]);
+        Http::fake(['api.openai.com/*' => Http::response(['data' => [['b64_json' => base64_encode('generated-webp')]]])]);
+        $owner = User::factory()->create();
+        $tenant = Tenant::create(['name' => 'Golden Wheel', 'slug' => 'golden-wheel', 'country' => 'DE', 'locale' => 'de', 'status' => 'active', 'business_description' => 'Lenkräder neu beziehen']);
+        $tenant->users()->attach($owner, ['role' => 'owner']);
+
+        $upload = $this->actingAs($owner)->post('/api/tenant/'.$tenant->id.'/social-image', [
+            'image' => UploadedFile::fake()->image('share.jpg', 1200, 630),
+        ], ['Accept' => 'application/json'])->assertCreated()->assertJsonPath('social_image_source', 'upload');
+        Storage::disk('public')->assertExists($upload->json('social_image_path'));
+
+        $generated = $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/social-image/generate')
+            ->assertCreated()->assertJsonPath('social_image_source', 'ai');
+        Storage::disk('public')->assertExists($generated->json('social_image_path'));
+        Storage::disk('public')->assertMissing($upload->json('social_image_path'));
+        $this->assertDatabaseHas('tenant_profiles', ['tenant_id' => $tenant->id, 'social_image_source' => 'ai']);
+        $this->assertDatabaseHas('ai_usage_records', ['user_id' => $owner->id, 'operation' => 'tenant_social_image_generation', 'model' => 'gpt-image-2', 'cost' => .053]);
+        Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://api.openai.com/v1/images/generations'
+            && $request['model'] === 'gpt-image-2'
+            && $request['size'] === '1536x1024'
+            && $request['output_format'] === 'webp');
+    }
+
+    public function test_platform_exposes_configured_demo_video(): void
+    {
+        SystemSetting::updateOrCreate(['key' => 'demo_video_source'], ['value' => 'youtube']);
+        SystemSetting::updateOrCreate(['key' => 'demo_video_url'], ['value' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ']);
+
+        $this->getJson('/api/platform')->assertOk()
+            ->assertJsonPath('demo_video.source', 'youtube')
+            ->assertJsonPath('demo_video.url', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    }
 }

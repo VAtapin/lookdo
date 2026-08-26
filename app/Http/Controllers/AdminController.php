@@ -569,6 +569,9 @@ class AdminController extends Controller
             'settings.default_request_template_code' => 'required|string|max:160|exists:request_templates,code',
             'settings.trial_days_default' => 'required|integer|min:0|max:365',
             'settings.upload_base_limit_mb' => 'required|integer|min:1|max:2048',
+            'settings.social_share_image_url' => 'nullable|string|max:2048',
+            'settings.demo_video_source' => ['required', Rule::in(['none', 'upload', 'youtube'])],
+            'settings.demo_video_url' => 'nullable|string|max:2048',
             'settings.registration_enabled' => 'required|boolean',
             'settings.maintenance' => 'required|boolean',
             'settings.enabled_locales' => 'required|array|min:1',
@@ -599,10 +602,17 @@ class AdminController extends Controller
 
         $allowed = [
             'platform_name', 'support_email', 'default_locale', 'default_request_template_code',
-            'trial_days_default', 'upload_base_limit_mb', 'registration_enabled', 'maintenance',
+            'trial_days_default', 'upload_base_limit_mb', 'social_share_image_url', 'demo_video_source', 'demo_video_url', 'registration_enabled', 'maintenance',
             'enabled_locales', 'integrations', 'sms_provider', 'sms_sender', 'sms_events', 'legal_operator_name', 'legal_operator_address',
             'legal_representative', 'legal_email', 'legal_phone', 'legal_register', 'legal_vat_id',
         ];
+        if (($data['settings']['demo_video_source'] ?? 'none') !== 'none' && blank($data['settings']['demo_video_url'] ?? null)) {
+            throw ValidationException::withMessages(['settings.demo_video_url' => 'Bitte laden Sie ein Video hoch oder tragen Sie eine YouTube-URL ein.']);
+        }
+        if (($data['settings']['demo_video_source'] ?? 'none') === 'youtube' && ! preg_match('~^(?:https?://)?(?:www\.)?(?:youtube\.com/watch\?v=|youtu\.be/)[A-Za-z0-9_-]{6,}~i', (string) $data['settings']['demo_video_url'])) {
+            throw ValidationException::withMessages(['settings.demo_video_url' => 'Bitte tragen Sie eine gültige YouTube-URL ein.']);
+        }
+
         DB::transaction(function () use ($data, $allowed, $audit): void {
             foreach ($allowed as $key) {
                 $setting = SystemSetting::firstOrNew(['key' => $key]);

@@ -8,13 +8,17 @@ use App\Models\TenantDomain;
 use App\Services\AuditService;
 use App\Services\DomainService;
 use App\Services\EntitlementService;
+use App\Services\OpenAiBudgetService;
+use App\Services\OpenAiService;
 use App\Services\StripeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use RuntimeException;
+use Throwable;
 
 class TenantController extends Controller
 {
@@ -27,6 +31,9 @@ class TenantController extends Controller
     {
         $this->authorizeTenant($request, $tenant);
         $tenant->load(['profile', 'domains', 'currentSubscription.plan.entitlements', 'currentSubscription.payments', 'businessProfile.category', 'businessProfile.variation', 'businessProfile.template']);
+        if ($tenant->profile?->social_image_path) {
+            $tenant->profile->setAttribute('social_image_url', Storage::disk('public')->url($tenant->profile->social_image_path));
+        }
 
         return response()->json(['tenant' => $tenant, 'entitlements' => $entitlements->all($tenant), 'platform_url' => 'https://'.$tenant->slug.'.'.config('tenancy.platform_domain')]);
     }
@@ -42,6 +49,65 @@ class TenantController extends Controller
         $audit->log('tenant.profile.updated', $tenant, $before, $tenant->fresh('profile')->toArray(), $tenant->id);
 
         return response()->json(['tenant' => $tenant->fresh('profile')]);
+    }
+
+    public function uploadSocialImage(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
+    {
+        $this->authorizeTenant($request, $tenant);
+        $data = $request->validate(['image' => 'required|image|mimes:jpg,jpeg,png,webp|max:10240']);
+        $profile = $tenant->profile()->firstOrCreate();
+        $before = $profile->only(['social_image_path', 'social_image_source']);
+        $path = $data['image']->store('tenant-social/'.$tenant->id, 'public');
+        $this->replaceSocialImage($profile->social_image_path, $path);
+        $profile->update(['social_image_path' => $path, 'social_image_source' => 'upload']);
+        $audit->log('tenant.social_image.uploaded', $profile, $before, ['social_image_path' => $path, 'social_image_source' => 'upload'], $tenant->id);
+
+        return response()->json(['social_image_path' => $path, 'social_image_url' => Storage::disk('public')->url($path), 'social_image_source' => 'upload'], 201);
+    }
+
+    public function generateSocialImage(Request $request, Tenant $tenant, OpenAiService $openAi, OpenAiBudgetService $budget, AuditService $audit): JsonResponse
+    {
+        $this->authorizeTenant($request, $tenant);
+        $tenant->load(['profile', 'businessProfile.category', 'businessProfile.variation']);
+        $profile = $tenant->profile()->firstOrCreate();
+        $business = collect([
+            $tenant->name,
+            $tenant->business_description,
+            $tenant->businessProfile?->category?->localized('name'),
+            $tenant->businessProfile?->variation?->localized('name'),
+            $profile->city,
+        ])->filter()->implode('; ');
+
+        try {
+            $budget->ensureAvailable($request->user()?->id);
+            $result = $openAi->image(
+                'Create a premium, realistic landscape social sharing image for this service business: '.$business.'. '
+                .'Show the work, tools, materials or welcoming business environment appropriate to this exact activity. '
+                .'Clean commercial photography, strong focal point, safe central composition for cropping, no people looking at camera. '
+                .'Do not include any text, letters, logos, UI, watermarks, prices, phone numbers or invented brand marks.',
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return response()->json(['message' => 'Das Bild konnte nicht erstellt werden: '.$exception->getMessage()], 422);
+        }
+
+        $path = 'tenant-social/'.$tenant->id.'/social-'.Str::uuid().'.'.$result['format'];
+        Storage::disk('public')->put($path, $result['contents']);
+        $before = $profile->only(['social_image_path', 'social_image_source']);
+        $this->replaceSocialImage($profile->social_image_path, $path);
+        $profile->update(['social_image_path' => $path, 'social_image_source' => 'ai']);
+        $budget->recordImage('tenant_social_image_generation', $result['model'], $result['quality'], $request->user()?->id);
+        $audit->log('tenant.social_image.generated', $profile, $before, ['social_image_path' => $path, 'social_image_source' => 'ai', 'model' => $result['model']], $tenant->id);
+
+        return response()->json(['social_image_path' => $path, 'social_image_url' => Storage::disk('public')->url($path), 'social_image_source' => 'ai'], 201);
+    }
+
+    private function replaceSocialImage(?string $oldPath, string $newPath): void
+    {
+        if ($oldPath && $oldPath !== $newPath && str_starts_with($oldPath, 'tenant-social/')) {
+            Storage::disk('public')->delete($oldPath);
+        }
     }
 
     public function updateSlug(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
@@ -102,7 +168,9 @@ class TenantController extends Controller
         $this->authorizeTenant($request, $tenant);
         $data = $request->validate(['plan_id' => 'required|exists:plans,id', 'cycle' => ['required', Rule::in(['monthly', 'yearly'])], 'currency' => ['nullable', Rule::in(['EUR', 'RUB', 'UAH'])]]);
         $plan = Plan::where('is_active', true)->findOrFail($data['plan_id']);
-        $currency = $data['currency'] ?? match ($tenant->locale) { 'ru' => 'RUB', 'uk' => 'UAH', default => 'EUR' };
+        $currency = $data['currency'] ?? match ($tenant->locale) {
+            'ru' => 'RUB', 'uk' => 'UAH', default => 'EUR'
+        };
         $amount = $plan->priceFor($currency, $data['cycle']);
         abort_if($amount === null, 422, 'The selected currency is not configured for this plan.');
         $subscription = $tenant->currentSubscription;

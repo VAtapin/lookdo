@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { api } from '../api';
 import LineIcon from '../components/LineIcon.vue';
 import { locale, tr } from '../i18n';
 
 defineProps<{ pricingOnly?: boolean }>();
 const plans = ref<any[]>([]);
+const demoVideo = ref<{ source: 'none' | 'upload' | 'youtube'; url: string }>({ source: 'none', url: '' });
+const demoOpen = ref(false);
 const pricingCurrency = ref('EUR');
 const pricingCycle = ref('monthly');
 const pricingCurrencyEdited = ref(false);
 let planRequest = 0;
-watch(locale, async () => { if (!pricingCurrencyEdited.value) pricingCurrency.value = locale.value === 'ru' ? 'RUB' : locale.value === 'uk' ? 'UAH' : 'EUR'; const request = ++planRequest; const response = await api<any>('/platform'); if (request === planRequest) plans.value = response.plans; }, { immediate: true });
+watch(locale, async () => { if (!pricingCurrencyEdited.value) pricingCurrency.value = locale.value === 'ru' ? 'RUB' : locale.value === 'uk' ? 'UAH' : 'EUR'; const request = ++planRequest; const response = await api<any>('/platform'); if (request === planRequest) { plans.value = response.plans; demoVideo.value = response.demo_video || { source: 'none', url: '' }; } }, { immediate: true });
 const workflow = [['photo', 'howShow'], ['phone', 'howPhone'], ['bell', 'howReceive'], ['chat', 'howReply']];
 const audiences = [['car', 'audienceAuto'], ['tools', 'audienceConstruction'], ['washer', 'audienceAppliance'], ['sofa', 'audienceFurniture'], ['leaf', 'audienceGarden'], ['service', 'audienceCleaning'], ['star', 'audienceBeauty']];
 const benefits = [['globe', 'benefitDomainTitle', 'linkDomain'], ['photo', 'benefitMediaTitle', 'photosVideos'], ['bell', 'benefitPushTitle', 'messagesPush'], ['star', 'benefitReviewTitle', 'reviews'], ['calendar', 'bookingTitle', 'bookingText'], ['chat', 'socialTitle', 'socialText']];
@@ -23,6 +25,20 @@ const faqs = {
 function planPrice(plan:any){return Number(plan.prices?.[pricingCurrency.value]?.[pricingCycle.value] ?? (pricingCurrency.value===plan.currency?(pricingCycle.value==='yearly'?plan.price_yearly:plan.price_monthly):0))}
 function formatPlanPrice(plan:any){const value=planPrice(plan);const numberLocale=locale.value==='uk'?'uk-UA':locale.value==='ru'?'ru-RU':locale.value==='de'?'de-DE':'en-GB';return new Intl.NumberFormat(numberLocale,{style:'currency',currency:pricingCurrency.value,maximumFractionDigits:value%1?2:0}).format(value)}
 function planSaving(plan:any){const monthly=Number(plan.prices?.[pricingCurrency.value]?.monthly||0);const yearly=Number(plan.prices?.[pricingCurrency.value]?.yearly||0);return monthly&&yearly?Math.max(0,Math.round((1-yearly/(monthly*12))*100)):0}
+function youtubeEmbedUrl(value:string){
+    if(!value)return '';
+    try{
+        const url=new URL(value.startsWith('http')?value:'https://'+value);
+        const host=url.hostname.replace(/^www\./,'');
+        const id=host==='youtu.be'?url.pathname.slice(1):['youtube.com','m.youtube.com'].includes(host)?url.searchParams.get('v'):'';
+        return id?'https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)+'?autoplay=1&rel=0':'';
+    }catch{return ''}
+}
+const demoEmbed=computed(()=>demoVideo.value.source==='youtube'?youtubeEmbedUrl(demoVideo.value.url):'');
+function showDemo(){
+    document.querySelector('#how')?.scrollIntoView({behavior:'smooth',block:'start'});
+    if(demoVideo.value.source!=='none'&&demoVideo.value.url)window.setTimeout(()=>demoOpen.value=true,360);
+}
 </script>
 
 <template>
@@ -33,7 +49,7 @@ function planSaving(plan:any){const monthly=Number(plan.prices?.[pricingCurrency
         <h2>{{ tr('heroTagline') }}</h2>
         <h3>{{ tr('heroProduct') }}</h3>
         <p>{{ tr('heroText') }}</p>
-        <div class="hero-actions"><RouterLink class="button" :to="`/${locale}/register`">{{ tr('create') }}</RouterLink><a class="button ghost" href="#demo"><span class="play-dot">▶</span>{{ tr('demo') }}</a></div>
+        <div class="hero-actions"><RouterLink class="button" :to="`/${locale}/register`">{{ tr('create') }}</RouterLink><button type="button" class="button ghost" @click="showDemo"><span class="play-dot">▶</span>{{ tr('demo') }}</button></div>
         <div class="hero-benefits"><span><LineIcon name="shield"/>{{ tr('heroBenefitBrand') }}</span><span><LineIcon name="bolt"/>{{ tr('heroBenefitFast') }}</span><span><LineIcon name="lock"/>{{ tr('heroBenefitSafe') }}</span></div>
       </div>
       <div id="demo" class="public-phone-stage">
@@ -64,5 +80,8 @@ function planSaving(plan:any){const monthly=Number(plan.prices?.[pricingCurrency
     <section id="pricing" class="compact-section public-pricing"><h2>{{ tr('pricing') }}</h2><div class="public-billing-controls"><select v-model="pricingCurrency" @change="pricingCurrencyEdited=true"><option value="EUR">EUR — €</option><option value="RUB">RUB — ₽</option><option value="UAH">UAH — ₴</option></select><div class="cycle"><button type="button" :class="{active:pricingCycle==='monthly'}" @click="pricingCycle='monthly'">{{tr('monthly')}}</button><button type="button" :class="{active:pricingCycle==='yearly'}" @click="pricingCycle='yearly'">{{tr('yearly')}}</button></div></div><div class="pricing-grid"><article v-for="plan in plans" :key="plan.id" class="price-card" :class="{ featured: plan.badge }"><span v-if="plan.badge" class="badge">{{ plan.badge }}</span><h3>{{ plan.name }}</h3><p>{{ plan.description }}</p><div class="price"><strong>{{ formatPlanPrice(plan) }}</strong><span>{{ pricingCycle==='yearly'?tr('perYear'):tr('perMonth') }}</span><em v-if="pricingCycle==='yearly'&&planSaving(plan)">{{tr('save')}} {{planSaving(plan)}}%</em></div><ul class="plan-feature-list"><li v-for="feature in plan.features" :key="feature.key" :class="{ disabled: !feature.included }"><span>{{ feature.included ? '✓' : '—' }}</span>{{ feature.label }}</li></ul><RouterLink class="button full" :to="`/${locale}/register?plan=${plan.id}`">{{ tr('choose') }}</RouterLink></article></div></section>
 
     <section v-if="!pricingOnly" class="compact-section public-faq"><h2>{{ tr('faqTitle') }}</h2><div><details v-for="item in faqs[locale]" :key="item[0]"><summary>{{ item[0] }}<span>＋</span></summary><p>{{ item[1] }}</p></details></div></section>
+    <div v-if="demoOpen" class="demo-video-backdrop" role="dialog" aria-modal="true" :aria-label="tr('demo')" @click.self="demoOpen=false">
+      <div class="demo-video-modal"><header><b>{{tr('demo')}}</b><button type="button" :aria-label="tr('close')" @click="demoOpen=false">×</button></header><video v-if="demoVideo.source==='upload'" :src="demoVideo.url" controls autoplay playsinline></video><iframe v-else-if="demoEmbed" :src="demoEmbed" :title="tr('demo')" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
+    </div>
   </div>
 </template>
