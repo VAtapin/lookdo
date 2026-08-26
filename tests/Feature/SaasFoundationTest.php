@@ -708,10 +708,18 @@ class SaasFoundationTest extends TestCase
     public function test_public_and_tenant_pages_render_server_side_social_metadata(): void
     {
         SystemSetting::updateOrCreate(['key' => 'social_share_image_url'], ['value' => '/brand/lookdo-service-workspace.png']);
-        $this->get('/de')->assertOk()
-            ->assertSee('property="og:image"', false)
-            ->assertSee('/brand/lookdo-service-workspace.png', false)
-            ->assertSee('name="twitter:card" content="summary_large_image"', false);
+        SystemSetting::updateOrCreate(['key' => 'social_share_images'], ['value' => [
+            'de' => '/brand/lookdo-social-de.png',
+            'en' => '/brand/lookdo-social-en.png',
+            'ru' => '/brand/lookdo-social-ru.png',
+            'uk' => '/brand/lookdo-social-uk.png',
+        ]]);
+        foreach (['de', 'en', 'ru', 'uk'] as $locale) {
+            $this->get('/'.$locale)->assertOk()
+                ->assertSee('property="og:image"', false)
+                ->assertSee('/brand/lookdo-social-'.$locale.'.png', false)
+                ->assertSee('name="twitter:card" content="summary_large_image"', false);
+        }
 
         $tenant = Tenant::create(['name' => 'Golden Wheel', 'slug' => 'golden-wheel', 'country' => 'DE', 'locale' => 'de', 'status' => 'active', 'business_description' => 'Lenkräder neu beziehen']);
         $tenant->profile()->create(['social_image_path' => 'tenant-social/'.$tenant->id.'/share.webp', 'social_image_source' => 'upload']);

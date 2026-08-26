@@ -6,9 +6,29 @@
         if ($socialTenant) {
             $socialTenant->loadMissing('profile');
         }
+        $socialLocaleCode = app()->getLocale();
         $socialTitle = $socialTenant ? $socialTenant->name.' — LOOKDO' : 'LOOKDO — LOOK. DO.';
-        $socialDescription = $socialTenant?->business_description ?: 'LOOKDO — Plattform für visuelle Kundenanfragen im Servicegeschäft.';
-        $platformSocialImage = \App\Models\SystemSetting::read('social_share_image_url', '/brand/lookdo-service-workspace.png');
+        $platformDescriptions = [
+            'de' => 'Der Helfer für Handwerker, die selbstständig arbeiten. Kunden senden Fotos oder Videos und Sie antworten direkt.',
+            'en' => 'The helper for tradespeople who work on their own. Customers send photos or videos and you reply right away.',
+            'ru' => 'Помощник для мастера, который работает сам на себя. Клиенты отправляют фото или видео, а вы сразу отвечаете.',
+            'uk' => 'Помічник для майстра, який працює сам на себе. Клієнти надсилають фото або відео, а ви одразу відповідаєте.',
+        ];
+        $socialDescription = $socialTenant?->business_description ?: ($platformDescriptions[$socialLocaleCode] ?? $platformDescriptions['de']);
+        $defaultSocialImages = [
+            'de' => '/brand/lookdo-social-de.png',
+            'en' => '/brand/lookdo-social-en.png',
+            'ru' => '/brand/lookdo-social-ru.png',
+            'uk' => '/brand/lookdo-social-uk.png',
+        ];
+        $platformSocialImages = \App\Models\SystemSetting::read('social_share_images', $defaultSocialImages);
+        $legacySocialImage = \App\Models\SystemSetting::read('social_share_image_url', '');
+        $platformSocialImage = is_array($platformSocialImages)
+            ? ($platformSocialImages[$socialLocaleCode] ?? $defaultSocialImages[$socialLocaleCode] ?? $defaultSocialImages['de'])
+            : ($defaultSocialImages[$socialLocaleCode] ?? $defaultSocialImages['de']);
+        if (filled($legacySocialImage) && $legacySocialImage !== '/brand/lookdo-service-workspace.png') {
+            $platformSocialImage = $legacySocialImage;
+        }
         $socialImageValue = $socialTenant?->profile?->social_image_path
             ? '/storage/'.ltrim($socialTenant->profile->social_image_path, '/')
             : $platformSocialImage;
@@ -17,7 +37,7 @@
             ? $socialImageValue
             : $socialOrigin.'/'.ltrim((string) $socialImageValue, '/');
         $socialUrl = request()->url();
-        $socialLocale = ['de' => 'de_DE', 'en' => 'en_GB', 'ru' => 'ru_RU', 'uk' => 'uk_UA'][app()->getLocale()] ?? 'de_DE';
+        $socialLocale = ['de' => 'de_DE', 'en' => 'en_GB', 'ru' => 'ru_RU', 'uk' => 'uk_UA'][$socialLocaleCode] ?? 'de_DE';
     @endphp
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">

@@ -10,7 +10,13 @@ class SetLocale
 {
     public function handle(Request $request, Closure $next, ?string $locale = null): Response
     {
-        $candidate = $locale ?: $request->header('X-Locale') ?: $request->route('locale') ?: $request->user()?->locale ?: session('locale', config('app.locale'));
+        $pathLocale = $request->segment(1);
+        $candidate = $locale
+            ?: $request->header('X-Locale')
+            ?: $request->route('locale')
+            ?: (in_array($pathLocale, ['de', 'en', 'ru', 'uk'], true) ? $pathLocale : null)
+            ?: $request->user()?->locale
+            ?: session('locale', config('app.locale'));
         if (! in_array($candidate, ['de', 'en', 'ru', 'uk'], true)) {
             $candidate = 'de';
         } app()->setLocale($candidate);

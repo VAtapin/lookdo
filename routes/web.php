@@ -95,5 +95,5 @@ Route::get('/sitemap.xml', function () {
     return response(view('sitemap', ['urls' => array_map(fn ($u) => $base.$u, $urls)]), 200, ['Content-Type' => 'application/xml']);
 });
 Route::get('/robots.txt', fn () => response("User-agent: *\nAllow: /\nDisallow: /app\nDisallow: /control\nDisallow: /api\nSitemap: ".rtrim(config('app.url'), '/')."/sitemap.xml\n", 200, ['Content-Type' => 'text/plain']));
-Route::get('/reset-password/{token}', fn () => view('app'))->name('password.reset');
-Route::view('/{path?}', 'app')->where('path', '^(?!api|up|sitemap\.xml|robots\.txt).*$');
+Route::get('/reset-password/{token}', fn () => view('app'))->middleware('locale')->name('password.reset');
+Route::view('/{path?}', 'app')->middleware('locale')->where('path', '^(?!api|up|sitemap\.xml|robots\.txt).*$');

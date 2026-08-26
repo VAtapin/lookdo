@@ -558,6 +558,11 @@ class AdminController extends Controller
             'settings.trial_days_default' => 'required|integer|min:0|max:365',
             'settings.upload_base_limit_mb' => 'required|integer|min:1|max:2048',
             'settings.social_share_image_url' => 'nullable|string|max:2048',
+            'settings.social_share_images' => 'required|array:de,en,ru,uk',
+            'settings.social_share_images.de' => 'required|string|max:2048',
+            'settings.social_share_images.en' => 'required|string|max:2048',
+            'settings.social_share_images.ru' => 'required|string|max:2048',
+            'settings.social_share_images.uk' => 'required|string|max:2048',
             'settings.demo_video_source' => ['required', Rule::in(['none', 'upload', 'youtube'])],
             'settings.demo_video_url' => 'nullable|string|max:2048',
             'settings.registration_enabled' => 'required|boolean',
@@ -590,7 +595,7 @@ class AdminController extends Controller
 
         $allowed = [
             'platform_name', 'support_email', 'default_locale', 'default_request_template_code',
-            'trial_days_default', 'upload_base_limit_mb', 'social_share_image_url', 'demo_video_source', 'demo_video_url', 'registration_enabled', 'maintenance',
+            'trial_days_default', 'upload_base_limit_mb', 'social_share_image_url', 'social_share_images', 'demo_video_source', 'demo_video_url', 'registration_enabled', 'maintenance',
             'enabled_locales', 'integrations', 'sms_provider', 'sms_sender', 'sms_events', 'legal_operator_name', 'legal_operator_address',
             'legal_representative', 'legal_email', 'legal_phone', 'legal_register', 'legal_vat_id',
         ];

@@ -15,6 +15,8 @@ let planRequest = 0;
 watch(locale, async () => { if (!pricingCurrencyEdited.value) pricingCurrency.value = locale.value === 'ru' ? 'RUB' : locale.value === 'uk' ? 'UAH' : 'EUR'; const request = ++planRequest; const response = await api<any>('/platform'); if (request === planRequest) { plans.value = response.plans; demoVideo.value = response.demo_video || { source: 'none', url: '' }; } }, { immediate: true });
 const workflow = [['photo', 'howShow'], ['phone', 'howPhone'], ['bell', 'howReceive'], ['chat', 'howReply']];
 const audiences = [['car', 'audienceAuto'], ['tools', 'audienceConstruction'], ['washer', 'audienceAppliance'], ['sofa', 'audienceFurniture'], ['leaf', 'audienceGarden'], ['service', 'audienceCleaning'], ['star', 'audienceBeauty']];
+const phoneServices = [['/brand/service-door.webp', 'audienceConstruction'], ['/brand/service-appliance.webp', 'audienceAppliance'], ['/brand/service-furniture.webp', 'audienceFurniture'], ['/brand/service-brows.webp', 'audienceBeauty']];
+const phoneRequests = [['/brand/service-door.webp', 'audienceConstruction'], ['/brand/service-appliance.webp', 'audienceAppliance'], ['/brand/service-furniture.webp', 'audienceFurniture']];
 const benefits = [['globe', 'benefitDomainTitle', 'linkDomain'], ['photo', 'benefitMediaTitle', 'photosVideos'], ['bell', 'benefitPushTitle', 'messagesPush'], ['star', 'benefitReviewTitle', 'reviews'], ['calendar', 'bookingTitle', 'bookingText'], ['chat', 'socialTitle', 'socialText']];
 const faqs = {
     de: [['Müssen Kunden etwas installieren?', 'Nein. Die App öffnet sich direkt über einen Link oder QR-Code im Browser. Ein Kundenkonto ist für eine Anfrage nicht nötig.'], ['Kann ich meine Domain nutzen?', 'Ja. Jede App erhält sofort eine LOOKDO Adresse; eine eigene Domain kann zusätzlich verbunden werden.'], ['Wie schnell ist meine App erreichbar?', 'Die Plattformadresse wird direkt bei der Registrierung reserviert. Logo, Farben, Kontaktdaten und Inhalte können Sie anschließend in Ruhe ergänzen.'], ['Was passiert, wenn meine Tätigkeit nicht exakt erkannt wird?', 'Die Registrierung stoppt nicht. LOOKDO verwendet eine universelle Vorlage, die später durch eine passendere Vorlage ersetzt werden kann.'], ['Kann ich Tarif oder Funktionen später ändern?', 'Ja. Tarif, Domain und aktivierte Funktionen werden zentral verwaltet und können mit dem Betrieb wachsen.'], ['Wem gehören meine Inhalte und Kundendaten?', 'Ihre Betriebsinhalte bleiben Ihrem Betrieb zugeordnet. LOOKDO verarbeitet Daten nur für den Betrieb der gebuchten Funktionen und nach den Angaben der Datenschutzerklärung.']],
@@ -56,21 +58,30 @@ function showDemo(){
         <div class="phone-photo-backdrop" aria-hidden="true"></div>
         <div class="app-phone request-phone">
           <div class="phone-island"></div><div class="phone-status">9:41 <span>● ◒</span></div>
-          <div class="phone-screen"><strong>{{ tr('howShow') }}</strong><small>{{ tr('describeWork') }}</small>
-            <div class="photo-tiles"><span><LineIcon name="door"/></span><span><LineIcon name="service"/></span><span><LineIcon name="washer"/></span><span><LineIcon name="sofa"/></span></div>
-            <button class="upload-box"><LineIcon name="photo"/>{{ tr('photosVideos') }}</button><label>{{ tr('yourActivity') }}<i>{{ tr('activityPlaceholder') }}</i></label><label>{{ tr('phone') }}<i>+49 151 234 56 78</i></label><button class="phone-submit">{{ tr('howReceive') }}</button>
+          <div class="phone-screen customer-app-screen">
+            <header class="phone-app-header"><span class="phone-mini-logo">LD</span><b>LOOK.<em>DO.</em></b><span>♧</span></header>
+            <section class="customer-phone-intro"><strong>{{ tr('customerAppTitle') }}</strong><small>{{ tr('customerAppText') }}</small></section>
+            <div class="customer-service-grid"><div v-for="item in phoneServices" :key="item[1]" class="customer-service-card"><img :src="item[0]" alt=""><b>{{ tr(item[1]) }}</b></div></div>
+            <div class="customer-how"><b>{{ tr('how') }}</b><div><span><LineIcon name="photo"/><small>1</small></span><i>→</i><span><LineIcon name="phone"/><small>2</small></span><i>→</i><span><LineIcon name="shield"/><small>3</small></span></div></div>
+            <button class="phone-camera-cta"><LineIcon name="photo"/><span><b>{{ tr('sendPhotoVideo') }}</b><small>{{ tr('describeWork') }}</small></span></button>
+            <nav class="phone-app-nav"><span>⌂<small>{{ tr('phoneHome') }}</small></span><span>▣<small>{{ tr('activity') }}</small></span><span class="camera-main"><LineIcon name="photo"/></span><span>□<small>{{ tr('phoneMessages') }}</small></span><span>♙<small>{{ tr('account') }}</small></span></nav>
           </div>
         </div>
         <div class="app-phone list-phone">
           <div class="phone-island"></div><div class="phone-status">9:41 <span>● ◒</span></div>
-          <div class="phone-screen"><strong>{{ tr('messagesPush') }}</strong><div class="phone-tabs"><b>12</b><span>3</span><span>5</span></div>
-            <article v-for="(icon, index) in ['door','washer','sofa']" :key="icon"><div><b>#12{{ 7-index }}</b><em>{{ index ? tr('howReply') : tr('howReceive') }}</em></div><p>{{ [tr('audienceDoors'),tr('audienceAppliance'),tr('audienceFurniture')][index] }}</p><span><LineIcon :name="icon"/></span></article>
-            <nav><span>▣<small>{{ tr('activity') }}</small></span><span>□<small>{{ tr('messagesPush') }}</small></span><span>♙<small>{{ tr('account') }}</small></span></nav>
+          <div class="phone-screen master-app-screen">
+            <header class="master-phone-head"><strong>{{ tr('masterWorkspace') }}</strong><span>♧</span></header>
+            <div class="master-stats"><span><b>12</b><small>{{ tr('newRequests') }}</small></span><span><b>7</b><small>{{ tr('inProgress') }}</small></span><span><b>24</b><small>{{ tr('completed') }}</small></span></div>
+            <div class="phone-section-title"><b>{{ tr('incomingRequests') }}</b><em>{{ tr('viewAll') }}</em></div>
+            <div class="master-request-list"><div v-for="(item,index) in phoneRequests" :key="item[1]" class="master-request-card"><img :src="item[0]" alt=""><span><b>#12{{ 7-index }}</b><small>{{ tr(item[1]) }}</small></span><em>{{ tr('newRequests') }}</em></div></div>
+            <div class="phone-section-title"><b>{{ tr('phoneMessages') }}</b><em>{{ tr('viewAll') }}</em></div>
+            <div class="master-message"><i>L</i><span><b>Leonid</b><small>{{ tr('howReply') }}</small></span><time>10:32</time></div>
+            <div class="master-message"><i>M</i><span><b>Maria</b><small>{{ tr('howReceive') }}</small></span><time>09:48</time></div>
+            <nav class="phone-app-nav master-nav"><span>⌂<small>{{ tr('phoneHome') }}</small></span><span>▣<small>{{ tr('activity') }}</small></span><span>□<small>{{ tr('phoneMessages') }}</small></span><span>♙<small>{{ tr('account') }}</small></span></nav>
           </div>
         </div>
       </div>
     </section>
-
     <section v-if="!pricingOnly" id="how" class="compact-section how-section"><h2>{{ tr('how') }}</h2><div class="how-grid"><article v-for="(item, index) in workflow" :key="item[1]"><b>{{ index + 1 }}</b><span><LineIcon :name="item[0]"/></span><h3>{{ tr(item[1]) }}</h3></article></div></section>
 
     <section v-if="!pricingOnly" id="audience" class="compact-section audience-section"><h2>{{ tr('forWhom') }}</h2><div class="audience-grid"><article v-for="item in audiences" :key="item[1]"><LineIcon :name="item[0]"/><b>{{ tr(item[1]) }}</b></article></div></section>
