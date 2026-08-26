@@ -41,6 +41,12 @@ return [
         'automatic_tax' => env('STRIPE_AUTOMATIC_TAX', true),
     ],
 
+    'webpush' => [
+        'vapid_public_key' => env('VAPID_PUBLIC_KEY'),
+        'vapid_private_key' => env('VAPID_PRIVATE_KEY'),
+        'subject' => env('VAPID_SUBJECT', 'mailto:support@lookdo.app'),
+    ],
+
     'openai' => [
         'key' => env('OPENAI_API_KEY'),
         'text_model' => env('OPENAI_TEXT_MODEL', 'gpt-5.6-luna'),

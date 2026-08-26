@@ -1,6 +1,7 @@
 import { createApp } from 'vue';
+import '../css/tenant-app.css';
 import { createRouter, createWebHistory } from 'vue-router';
-import { registerSW } from 'virtual:pwa-register';
+
 import App from './App.vue';
 import HomeView from './views/HomeView.vue';
 import LoginView from './views/LoginView.vue';
@@ -12,8 +13,8 @@ import ControlView from './views/ControlView.vue';
 
 export const isTenantHost = document.documentElement.dataset.tenantHost === 'true';
 
-const routes = [
-    { path: '/', component: isTenantHost ? TenantPublicView : HomeView }, { path: '/:locale(de|en|ru|uk)', component: isTenantHost ? TenantPublicView : HomeView },
+const platformRoutes = [
+    { path: '/', component: HomeView }, { path: '/:locale(de|en|ru|uk)', component: HomeView },
     { path: '/pricing', component: HomeView, props:{pricingOnly:true} }, { path: '/:locale(de|en|ru|uk)/pricing', component: HomeView, props:{pricingOnly:true} },
     { path: '/login', component: LoginView }, { path: '/:locale(de|en|ru|uk)/login', component: LoginView },
     { path: '/register', component: RegisterView }, { path: '/:locale(de|en|ru|uk)/register', component: RegisterView },
@@ -23,6 +24,11 @@ const routes = [
     { path: '/:key(impressum|datenschutz|agb|kontakt)', component: LegalView },
     { path: '/:locale(de|en|ru|uk)/:key(impressum|datenschutz|agb|kontakt)', component: LegalView },
 ];
-const router=createRouter({history:createWebHistory(),routes,scrollBehavior:(to)=>to.hash?({el:to.hash,top:78,behavior:'smooth'}):({top:0})});
-registerSW({immediate:true});
+const tenantRoutes = [{ path: '/:pathMatch(.*)*', component: TenantPublicView }];
+const routes = isTenantHost ? tenantRoutes : platformRoutes;const router=createRouter({history:createWebHistory(),routes,scrollBehavior:(to)=>to.hash?({el:to.hash,top:78,behavior:'smooth'}):({top:0})});
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => undefined);
+    });
+}
 createApp(App).use(router).mount('#app');

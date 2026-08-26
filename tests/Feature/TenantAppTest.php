@@ -1,0 +1,132 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Plan;
+use App\Models\RequestTemplate;
+use App\Models\Tenant;
+use Carbon\CarbonImmutable;
+use Database\Seeders\DatabaseSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+class TenantAppTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(DatabaseSeeder::class);
+    }
+
+    public function test_unpaid_tenant_app_is_not_publicly_usable(): void
+    {
+        $tenant = $this->tenant('unpaid-app', 'automotive.steering-wheel-upholstery', false);
+
+        $this->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
+            ->assertStatus(402)
+            ->assertJsonPath('message', 'This application is not active yet.');
+    }
+
+    public function test_active_steering_template_bootstraps_as_localized_full_app(): void
+    {
+        $tenant = $this->tenant('golden-wheel', 'automotive.steering-wheel-upholstery');
+
+        $this->withHeader('X-Locale', 'ru')->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('tenant.name', 'Golden Wheel')
+            ->assertJsonPath('template.engine', 'request')
+            ->assertJsonPath('template.layout', 'steering')
+            ->assertJsonPath('template.hero.action', 'Оценить мой руль')
+            ->assertJsonPath('entitlements.video', false)
+            ->assertJsonCount(5, 'template.navigation')
+            ->assertJsonCount(3, 'portfolio');
+
+        $this->assertDatabaseCount('tenant_portfolio_items', 3);
+
+        $this->getJson($this->url($tenant, '/manifest.webmanifest'))
+            ->assertOk()->assertHeader('Content-Type', 'application/manifest+json')
+            ->assertJsonPath('name', 'Golden Wheel')->assertJsonPath('scope', '/')->assertJsonPath('display', 'standalone');
+    }
+
+    public function test_anonymous_customer_can_send_media_request_and_continue_on_same_device(): void
+    {
+        Storage::fake('public');
+        $tenant = $this->tenant('wheel-request', 'automotive.steering-wheel-upholstery');
+
+        $response = $this->withHeaders(['X-Locale' => 'ru', 'Accept' => 'application/json'])->post($this->url($tenant, '/api/tenant-app/requests'), [
+            'name' => 'Иван', 'phone' => '+49 151 12345678', 'summary' => 'Потрескалась кожа сверху',
+            'fields' => json_encode(['vehicle_brand' => 'BMW', 'vehicle_model' => 'X5']),
+            'media_slots' => json_encode(['overall']),
+            'media' => [UploadedFile::fake()->image('wheel.jpg', 1200, 900)],
+        ])->assertCreated()->assertJsonPath('request.status', 'new');
+
+        $token = $response->json('token');
+        $requestId = $response->json('request.id');
+        $this->assertNotEmpty($token);
+        $this->assertDatabaseHas('tenant_requests', ['id' => $requestId, 'tenant_id' => $tenant->id, 'locale' => 'ru']);
+        $this->assertDatabaseHas('tenant_request_values', ['request_id' => $requestId, 'field_key' => 'vehicle_brand']);
+        $path = $response->json('request.media.0.url');
+        $this->assertStringContainsString('/storage/tenant-app/', $path);
+
+        $this->withHeader('X-Lookdo-Client-Token', $token)->getJson($this->url($tenant, '/api/tenant-app/activity'))
+            ->assertOk()->assertJsonPath('requests.0.id', $requestId)->assertJsonCount(1, 'requests.0.messages');
+
+        $this->withHeader('X-Lookdo-Client-Token', $token)->postJson($this->url($tenant, "/api/tenant-app/requests/$requestId/messages"), ['body' => 'Можно связаться в WhatsApp'])
+            ->assertCreated()->assertJsonPath('message.sender', 'customer');
+        $this->assertDatabaseHas('tenant_messages', ['request_id' => $requestId, 'sender_type' => 'customer']);
+
+        $endpoint = 'https://push.example.test/subscription/abc';
+        $this->withHeader('X-Lookdo-Client-Token', $token)->postJson($this->url($tenant, '/api/tenant-app/push-subscriptions'), [
+            'endpoint' => $endpoint, 'keys' => ['p256dh' => 'public-key', 'auth' => 'auth-key'],
+        ])->assertOk()->assertJsonPath('subscribed', true);
+        $this->assertDatabaseHas('tenant_push_subscriptions', ['tenant_id' => $tenant->id, 'endpoint_hash' => hash('sha256', $endpoint)]);
+    }
+
+    public function test_brow_template_seeds_services_and_books_only_free_slots(): void
+    {
+        $tenant = $this->tenant('ivanna-brows', 'beauty.brows');
+        $bootstrap = $this->withHeader('X-Locale', 'uk')->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
+            ->assertOk()->assertJsonPath('template.engine', 'booking')->assertJsonPath('template.hero.action', 'Записатися');
+        $serviceId = $bootstrap->json('services.0.id');
+        $this->assertNotNull($serviceId);
+
+        $date = CarbonImmutable::now('Europe/Berlin')->addDay();
+        while ($date->dayOfWeekIso === 7) {
+            $date = $date->addDay();
+        }
+        $availability = $this->getJson($this->url($tenant, '/api/tenant-app/availability?service_id='.$serviceId.'&date='.$date->format('Y-m-d')))
+            ->assertOk();
+        $startsAt = $availability->json('slots.0.starts_at');
+        $this->assertNotNull($startsAt);
+
+        $booking = $this->withHeader('X-Locale', 'uk')->postJson($this->url($tenant, '/api/tenant-app/appointments'), [
+            'service_id' => $serviceId, 'starts_at' => $startsAt, 'name' => 'Олена', 'phone' => '+380671234567', 'comment' => 'Перша процедура',
+        ])->assertCreated()->assertJsonPath('appointment.status', 'pending');
+        $this->assertNotEmpty($booking->json('token'));
+
+        $this->postJson($this->url($tenant, '/api/tenant-app/appointments'), [
+            'service_id' => $serviceId, 'starts_at' => $startsAt, 'name' => 'Марія', 'phone' => '+380671111111',
+        ])->assertUnprocessable()->assertJsonValidationErrors('starts_at');
+    }
+
+    private function tenant(string $slug, string $templateCode, bool $active = true): Tenant
+    {
+        $template = RequestTemplate::where('code', $templateCode)->firstOrFail();
+        $tenant = Tenant::create(['name' => $slug === 'golden-wheel' ? 'Golden Wheel' : ucfirst(str_replace('-', ' ', $slug)), 'slug' => $slug, 'status' => 'active', 'country' => 'DE', 'locale' => 'ru', 'business_description' => 'Индивидуальная работа мастера']);
+        $tenant->profile()->create(['contact_name' => 'Owner', 'phone' => '+4915112345678', 'city' => 'Berlin', 'primary_color' => '#d6a552', 'secondary_color' => '#111318']);
+        $tenant->businessProfile()->create(['category_id' => $template->category_id, 'variation_id' => $template->variation_id, 'request_template_id' => $template->id, 'original_description' => 'Индивидуальная работа мастера']);
+        $plan = Plan::where('code', 'start')->firstOrFail();
+        $tenant->subscriptions()->create(['plan_id' => $plan->id, 'provider' => 'manual', 'status' => $active ? 'active' : 'incomplete', 'started_at' => now()]);
+
+        return $tenant;
+    }
+
+    private function url(Tenant $tenant, string $path): string
+    {
+        return 'http://'.$tenant->slug.'.'.config('tenancy.platform_domain').$path;
+    }
+}

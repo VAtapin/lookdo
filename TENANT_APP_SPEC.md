@@ -147,3 +147,37 @@ Tenant выбирает primary color и optional secondary color при нас�
 ## 19. Главное продуктовое правило
 
 LOOKDO должен экономить мастеру время. Настройки могут быть широкими, но ежедневный интерфейс должен оставаться простым. Мастер занимается своей работой; приложение помогает получить клиента, договориться, записать, напомнить, показать результат и вернуть клиента снова.
+## 20. Реализованный фундамент публичного Tenant App
+
+Публичная клиентская часть Tenant App работает как единая конфигурируемая Vue/PWA-оболочка, а не как набор отдельных сайтов профессий.
+
+### Responsive и упаковка
+
+- на телефонах, планшетах и небольших ноутбуках показывается только приложение на весь доступный экран: без внешней шапки LOOKDO, фальшивого корпуса телефона и окружающего лендинга;
+- дополнительный контекст допускается только на действительно широком desktop (`>= 1500 px`) и не уменьшает приоритет приложения;
+- manifest формируется для конкретного tenant, service worker имеет корневой scope, предусмотрены safe-area, системная кнопка Back, standalone PWA и последующая упаковка в WebView/Capacitor;
+- камера вызывается через нативный file/capture flow; видео разрешается только entitlement тарифа.
+
+### Template runtime
+
+Канонические preset-конфигурации находятся в `config/tenant_apps.php` и объединяются с редактируемой конфигурацией `request_templates.configuration`. Template задаёт не только название, но и:
+
+- `engine` (`request` или `booking`), layout и порядок навигации;
+- hero, CTA, локализованные тексты и цвета tenant;
+- media slots, обязательность, подсказки и дополнительные поля;
+- portfolio, trust blocks, services, working hours и стартовую композицию;
+- логику центрального действия и доступные capabilities.
+
+Первый runtime-набор включает `automotive.steering-wheel-upholstery`, `repair-finishing-installation.door-installation`, `beauty.brows` и безопасный fallback `general-services.general`. Добавление следующей профессии не требует отдельного frontend, controller или таблиц.
+
+### Анонимный клиент и данные
+
+Конечный клиент не регистрируется. После первой заявки или записи устройство получает случайный долгоживущий токен; в БД хранится только SHA-256 hash. Токен ограничен конкретным tenant и открывает на этом устройстве только собственные заявки, записи и сообщения клиента.
+
+Общее ядро данных: services, portfolio, customers, client tokens, requests, dynamic request values, media, messages, appointments и push subscriptions. Double booking блокируется транзакционно. Публичный App полностью закрыт до активной оплаты tenant.
+
+### Публичный API
+
+Общий API расположен под `/api/tenant-app`: bootstrap, requests, activity, messages, availability, appointments и push subscriptions. Все операции tenant-scoped, rate-limited и проверяют активную подписку и entitlements тарифа.
+
+Рабочий интерфейс мастера, управление services/portfolio/calendar, отправка ответов мастером и расширенный communication engine развиваются поверх этого общего ядра на следующем проходе, без изменения публичной архитектуры.

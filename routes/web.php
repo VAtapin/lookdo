@@ -6,12 +6,22 @@ use App\Http\Controllers\PlatformController;
 use App\Http\Controllers\SevenSmsWebhookController;
 use App\Http\Controllers\SmsAdminController;
 use App\Http\Controllers\StripeWebhookController;
+use App\Http\Controllers\TenantAppController;
 use App\Http\Controllers\TenantController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('api')->middleware('locale')->group(function () {
     Route::get('/platform', [PlatformController::class, 'bootstrap']);
     Route::get('/tenant-site', [PlatformController::class, 'tenantSite']);
+    Route::prefix('tenant-app')->middleware('throttle:120,1')->group(function () {
+        Route::get('/bootstrap', [TenantAppController::class, 'bootstrap']);
+        Route::post('/requests', [TenantAppController::class, 'createRequest'])->middleware('throttle:12,1');
+        Route::get('/activity', [TenantAppController::class, 'activity']);
+        Route::post('/requests/{tenantRequest}/messages', [TenantAppController::class, 'postMessage'])->middleware('throttle:30,1');
+        Route::get('/availability', [TenantAppController::class, 'availability'])->middleware('throttle:60,1');
+        Route::post('/appointments', [TenantAppController::class, 'createAppointment'])->middleware('throttle:12,1');
+        Route::post('/push-subscriptions', [TenantAppController::class, 'subscribePush'])->middleware('throttle:10,1');
+    });
     Route::get('/platform/pages/{key}', [PlatformController::class, 'page'])->whereIn('key', ['impressum', 'datenschutz', 'agb', 'kontakt']);
     Route::post('/classify', [AuthController::class, 'classify'])->middleware('throttle:30,1');
     Route::post('/register/availability', [AuthController::class, 'availability'])->middleware('throttle:40,1');
@@ -90,6 +100,25 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::get('/audits', [AdminController::class, 'audits']);
         });
     });
+});
+
+Route::get('/manifest.webmanifest', [PlatformController::class, 'manifest']);
+Route::get('/sw.js', function () {
+    $path = public_path('build/sw.js');
+    abort_unless(is_file($path), 404);
+
+    $source = file_get_contents($path);
+    $source = preg_replace_callback(
+        '~importScripts\("(?!https?://|/)([^"]+)"\)~',
+        fn (array $match): string => 'importScripts("/build/'.ltrim($match[1], '/').'")',
+        $source,
+    ) ?? $source;
+
+    return response($source, 200, [
+        'Content-Type' => 'application/javascript; charset=utf-8',
+        'Cache-Control' => 'no-cache, no-store, must-revalidate',
+        'Service-Worker-Allowed' => '/',
+    ]);
 });
 
 Route::get('/sitemap.xml', function () {

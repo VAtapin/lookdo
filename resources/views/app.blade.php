@@ -42,7 +42,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#ff6a00">
+    <meta name="theme-color" content="{{ $socialTenant?->profile?->primary_color ?: '#ff6a00' }}">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="{{ $socialTenant?->name ?: 'LOOKDO' }}">
     <meta name="description" content="{{ $socialDescription }}">
     @if(request()->is('app*') || request()->is('control*') || request()->is('login') || request()->is('register') || request()->is('reset-password*'))
         <meta name="robots" content="noindex,nofollow">
@@ -69,7 +73,7 @@
     <link rel="alternate" hreflang="uk" href="{{ rtrim(config('app.url'), '/') }}/uk">
     <link rel="alternate" hreflang="x-default" href="{{ rtrim(config('app.url'), '/') }}/de">
     <link rel="icon" href="/favicon.png" type="image/png">
-    <link rel="manifest" href="/build/manifest.webmanifest">
+    <link rel="manifest" href="/manifest.webmanifest">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <title>{{ $socialTitle }}</title>
     <script type="application/ld+json">{!! json_encode([

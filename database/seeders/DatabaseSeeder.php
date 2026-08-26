@@ -191,6 +191,8 @@ class DatabaseSeeder extends Seeder
             'preview' => $raw['preview'] ?? ['image' => '/brand/service-renovation.webp', 'primary_color' => '#ff6b00', 'secondary_color' => '#25282e'],
             'source_definition' => str_replace(base_path().DIRECTORY_SEPARATOR, '', $path),
         ];
+        $presets = (array) config('tenant_apps.templates', []);
+        $configuration = array_replace_recursive($configuration, (array) ($presets[$variation->template_code] ?? []));
         if ($variation->code === 'beauty.brows') {
             $configuration['ui_reference'] = ['strict' => true, 'path' => 'templates/beauty/brows/UI/mobile-reference.svg'];
             $configuration['preview_palette'] = ['example' => 'pink', 'tenant_configurable' => true, 'semantic_tokens_required' => true];

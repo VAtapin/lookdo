@@ -62,6 +62,36 @@ class Tenant extends Model
         return $this->hasMany(ImageCreditPurchase::class);
     }
 
+    public function services(): HasMany
+    {
+        return $this->hasMany(TenantService::class);
+    }
+
+    public function portfolioItems(): HasMany
+    {
+        return $this->hasMany(TenantPortfolioItem::class);
+    }
+
+    public function customers(): HasMany
+    {
+        return $this->hasMany(TenantCustomer::class);
+    }
+
+    public function clientTokens(): HasMany
+    {
+        return $this->hasMany(TenantClientToken::class);
+    }
+
+    public function appRequests(): HasMany
+    {
+        return $this->hasMany(TenantRequest::class);
+    }
+
+    public function appointments(): HasMany
+    {
+        return $this->hasMany(TenantAppointment::class);
+    }
+
     public function hasActiveSubscription(): bool
     {
         $subscription = $this->currentSubscription;

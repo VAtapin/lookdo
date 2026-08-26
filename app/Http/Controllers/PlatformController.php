@@ -11,6 +11,7 @@ use App\Services\PlanFeaturePresenter;
 use App\Support\LegalContentSanitizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class PlatformController extends Controller
 {
@@ -19,6 +20,25 @@ class PlatformController extends Controller
         $plans = Plan::with('entitlements')->where('is_active', true)->where('is_public', true)->orderBy('sort_order')->get()->map(fn ($p) => ['id' => $p->id, 'code' => $p->code, 'name' => $p->localized('name'), 'description' => $p->localized('description'), 'image_url' => $p->image_url, 'price_monthly' => $p->price_monthly, 'price_yearly' => $p->price_yearly, 'currency' => $p->currency, 'prices' => $p->priceMatrix(), 'trial_days' => $p->trial_days, 'badge' => $p->localized('badge_text'), 'entitlements' => $p->entitlements->pluck('value', 'key'), 'features' => $features->forPlan($p, app()->getLocale())]);
 
         return response()->json(['locale' => app()->getLocale(), 'locales' => SystemSetting::read('enabled_locales', ['de', 'en', 'ru', 'uk']), 'registration_enabled' => SystemSetting::read('registration_enabled', true), 'default_template' => $classifier->defaultCandidate(), 'demo_video' => ['source' => SystemSetting::read('demo_video_source', 'none'), 'url' => SystemSetting::read('demo_video_url', '')], 'plans' => $plans, 'categories' => BusinessCategory::with(['variations' => fn ($q) => $q->where('enabled', true)->orderByDesc('priority')])->where('enabled', true)->orderBy('sort_order')->get()->map(fn ($c) => ['id' => $c->id, 'code' => $c->code, 'name' => $c->localized('name'), 'variations' => $c->variations->map(fn ($v) => ['id' => $v->id, 'code' => $v->code, 'name' => $v->localized('name')])])]);
+    }
+
+    public function manifest(Request $request): JsonResponse
+    {
+        $tenant = $request->attributes->get('tenant');
+        $tenant?->loadMissing('profile');
+        $name = $tenant?->name ?: 'LOOKDO';
+        $theme = $tenant?->profile?->primary_color ?: '#ff6a00';
+        $background = $tenant?->profile?->secondary_color ?: '#111318';
+
+        return response()->json([
+            'id' => '/', 'name' => $name, 'short_name' => Str::limit($name, 18, ''), 'description' => $tenant?->business_description ?: 'LOOKDO',
+            'start_url' => '/', 'scope' => '/', 'display' => 'standalone', 'display_override' => ['window-controls-overlay', 'standalone'],
+            'orientation' => 'portrait-primary', 'background_color' => $background, 'theme_color' => $theme,
+            'icons' => [
+                ['src' => '/icons/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any maskable'],
+                ['src' => '/icons/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any maskable'],
+            ],
+        ])->header('Content-Type', 'application/manifest+json');
     }
 
     public function page(string $key): JsonResponse
