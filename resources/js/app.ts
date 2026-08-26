@@ -18,6 +18,7 @@ const routes = [
     { path: '/login', component: LoginView }, { path: '/:locale(de|en|ru|uk)/login', component: LoginView },
     { path: '/register', component: RegisterView }, { path: '/:locale(de|en|ru|uk)/register', component: RegisterView },
     { path: '/app/:section?', component: TenantView, meta:{private:true} },
+    { path: '/control/settings/:settingsGroup?', component: ControlView, meta:{private:true,control:true} },
     { path: '/control/:section?', component: ControlView, meta:{private:true,control:true} },
     { path: '/:key(impressum|datenschutz|agb|kontakt)', component: LegalView },
     { path: '/:locale(de|en|ru|uk)/:key(impressum|datenschutz|agb|kontakt)', component: LegalView },

@@ -506,6 +506,29 @@ class SaasFoundationTest extends TestCase
         $this->assertDatabaseHas('ai_usage_records', ['user_id' => $admin->id, 'operation' => 'page_translation']);
     }
 
+    public function test_maintenance_mode_blocks_public_platform_but_keeps_super_admin_and_webhooks_available(): void
+    {
+        SystemSetting::updateOrCreate(['key' => 'maintenance'], ['value' => true]);
+        $admin = User::factory()->create(['is_super_admin' => true]);
+
+        $this->get('/de')->assertStatus(503)->assertSee('Wir sind gleich wieder da.');
+        $this->getJson('/api/platform')->assertStatus(503)->assertJsonPath('maintenance', true);
+        $this->get('/control/settings/operation')->assertOk();
+        $this->actingAs($admin)->getJson('/api/control/settings')->assertOk();
+        $this->postJson('/api/stripe/webhook')->assertStatus(400);
+    }
+
+    public function test_settings_sections_and_all_four_social_preview_slots_are_available(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $response = $this->actingAs($admin)->getJson('/api/control/settings')->assertOk();
+
+        $response->assertJsonPath('settings.social_share_images.de', '/brand/lookdo-social-de.png')
+            ->assertJsonPath('settings.social_share_images.en', '/brand/lookdo-social-en.png')
+            ->assertJsonPath('settings.social_share_images.ru', '/brand/lookdo-social-ru.png')
+            ->assertJsonPath('settings.social_share_images.uk', '/brand/lookdo-social-uk.png');
+        $this->actingAs($admin)->get('/control/settings/media')->assertOk();
+    }
     public function test_control_dashboard_returns_clickable_tasks_metrics_and_activity(): void
     {
         $admin = User::factory()->create(['is_super_admin' => true]);

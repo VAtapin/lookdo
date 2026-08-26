@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\EnforcePlatformMaintenance;
 use App\Http\Middleware\ResolveTenant;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
@@ -17,7 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->web(prepend: [SecurityHeaders::class, ResolveTenant::class]);
+        $middleware->web(prepend: [SecurityHeaders::class, ResolveTenant::class], append: [EnforcePlatformMaintenance::class]);
         $middleware->validateCsrfTokens(except: ['api/stripe/webhook', 'api/webhooks/seven/sms']);
         $middleware->alias([
             'active' => EnsureUserIsActive::class,
