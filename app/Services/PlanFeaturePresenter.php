@@ -16,6 +16,7 @@ class PlanFeaturePresenter
         $requestLimit = $number('requests_monthly');
         $storage = $number('storage_mb');
         $staff = max(1, $number('staff_users', 1));
+        $languages = max(1, min(4, $number('app_languages', 1)));
         $video = $enabled('video_enabled');
         $advancedRetention = $enabled('repeat_visit_enabled') || $enabled('segments_enabled') || $enabled('vacancy_fill_enabled');
         $retention = $advancedRetention || $enabled('reminders_enabled') || $enabled('before_after_enabled');
@@ -30,6 +31,7 @@ class PlanFeaturePresenter
             $this->row('booking', $enabled('booking_enabled'), $this->label('booking', $locale)),
             $this->row('storage', $storage > 0, $storage >= 1024 ? $this->label('storage_gb', $locale, ['value' => $this->formatNumber($storage / 1024)]) : $this->label('storage_mb', $locale, ['value' => $storage])),
             $this->row('staff', true, $this->label($staff === 1 ? 'staff_one' : 'staff_many', $locale, ['value' => $staff])),
+            $this->row('languages', true, $this->label($languages === 1 ? 'languages_one' : 'languages_many', $locale, ['value' => $languages])),
             $this->row('video', $video, $video ? $this->label('video', $locale, ['seconds' => $number('video_max_seconds'), 'size' => $number('video_max_mb')]) : $this->label('video_disabled', $locale)),
             $this->row('custom_domain', $enabled('custom_domain'), $this->label('custom_domain', $locale)),
             $this->row('retention', $retention, $this->label($advancedRetention ? 'retention_advanced' : ($retention ? 'retention' : 'retention_disabled'), $locale)),

@@ -39,7 +39,66 @@ class AdminController extends Controller
 {
     public function dashboard(): JsonResponse
     {
-        return response()->json(['tenants' => Tenant::count(), 'active_tenants' => Tenant::where('status', 'active')->count(), 'trialing' => Subscription::where('status', 'trialing')->count(), 'paid' => Subscription::where('status', 'active')->where('complimentary', false)->count(), 'complimentary' => Subscription::where('complimentary', true)->count(), 'domains_attention' => TenantDomain::whereIn('status', ['failed', 'verifying', 'ssl_pending'])->count(), 'classifications_30d' => BusinessClassification::where('created_at', '>=', now()->subDays(30))->count(), 'ai_spend_month' => (float) AiUsageRecord::where('created_at', '>=', now()->startOfMonth())->sum('cost'), 'mrr' => (float) Subscription::join('plans', 'plans.id', '=', 'subscriptions.plan_id')->where('subscriptions.status', 'active')->where('subscriptions.complimentary', false)->sum(DB::raw('plans.price_monthly * (100 - subscriptions.discount_percent) / 100'))]);
+        $metrics = [
+            'tenants' => Tenant::count(),
+            'active_tenants' => Tenant::where('status', 'active')->count(),
+            'trialing' => Subscription::where('status', 'trialing')->count(),
+            'paid' => Subscription::where('status', 'active')->where('complimentary', false)->count(),
+            'complimentary' => Subscription::where('complimentary', true)->count(),
+            'domains_attention' => TenantDomain::whereIn('status', ['failed', 'verifying', 'ssl_pending'])->count(),
+            'classifications_30d' => BusinessClassification::where('created_at', '>=', now()->subDays(30))->count(),
+            'ai_spend_month' => (float) AiUsageRecord::where('created_at', '>=', now()->startOfMonth())->sum('cost'),
+            'mrr' => (float) Subscription::join('plans', 'plans.id', '=', 'subscriptions.plan_id')->where('subscriptions.status', 'active')->where('subscriptions.complimentary', false)->sum(DB::raw('plans.price_monthly * (100 - subscriptions.discount_percent) / 100')),
+        ];
+
+        $billingAttention = Subscription::whereIn('status', ['incomplete', 'past_due'])->count();
+        $unpublishedPages = PlatformPage::where('is_published', false)->count();
+        $legalMissing = collect(['legal_operator_name', 'legal_operator_address', 'legal_representative', 'legal_email', 'legal_phone', 'legal_register', 'legal_vat_id'])
+            ->filter(function (string $key): bool {
+                $value = SystemSetting::read($key);
+
+                return blank($value) || (is_string($value) && str_starts_with(trim($value), '['));
+            })->count();
+        $stripeAttention = Plan::whereNull('stripe_synced_at')->orWhereNotNull('stripe_sync_error')->count();
+
+        $tasks = collect([
+            ['key' => 'billing', 'title' => 'Zahlungen prüfen', 'description' => 'Unvollständige oder überfällige Abonnements', 'count' => $billingAttention, 'to' => '/control/subscriptions', 'severity' => 'danger'],
+            ['key' => 'domains', 'title' => 'Domains prüfen', 'description' => 'DNS- oder SSL-Prüfung noch nicht abgeschlossen', 'count' => $metrics['domains_attention'], 'to' => '/control/domains', 'severity' => 'warning'],
+            ['key' => 'legal', 'title' => 'Rechtliche Angaben vervollständigen', 'description' => 'Fehlende Betreiber- oder Kontaktdaten', 'count' => $legalMissing, 'to' => '/control/settings', 'severity' => 'warning'],
+            ['key' => 'content', 'title' => 'Inhalte veröffentlichen', 'description' => 'Noch nicht veröffentlichte Seiten', 'count' => $unpublishedPages, 'to' => '/control/content', 'severity' => 'info'],
+            ['key' => 'stripe', 'title' => 'Stripe-Tarife synchronisieren', 'description' => 'Tarife ohne erfolgreiche Stripe-Synchronisierung', 'count' => $stripeAttention, 'to' => '/control/stripe', 'severity' => 'warning'],
+        ])->filter(fn (array $task): bool => $task['count'] > 0)->values();
+
+        $recentTenants = Tenant::latest()->limit(5)->get(['id', 'name', 'slug', 'status', 'created_at'])->map(fn (Tenant $tenant): array => [
+            'id' => 'tenant-'.$tenant->id,
+            'type' => 'tenant',
+            'title' => $tenant->name,
+            'description' => 'Neuer Kunde · '.$tenant->slug,
+            'created_at' => $tenant->created_at,
+            'to' => '/control/tenants',
+            'tenant_id' => $tenant->id,
+        ]);
+        $recentAudits = AuditLog::latest()->limit(5)->get(['id', 'action', 'tenant_id', 'created_at'])->map(fn (AuditLog $log): array => [
+            'id' => 'audit-'.$log->id,
+            'type' => 'audit',
+            'title' => $log->action,
+            'description' => $log->tenant_id ? 'Kunde #'.$log->tenant_id : 'Plattform',
+            'created_at' => $log->created_at,
+            'to' => '/control/audit',
+        ]);
+
+        return response()->json($metrics + [
+            'metrics' => [
+                ['key' => 'tenants', 'value' => $metrics['tenants'], 'to' => '/control/tenants'],
+                ['key' => 'active_tenants', 'value' => $metrics['active_tenants'], 'to' => '/control/tenants'],
+                ['key' => 'trialing', 'value' => $metrics['trialing'], 'to' => '/control/subscriptions'],
+                ['key' => 'paid', 'value' => $metrics['paid'], 'to' => '/control/subscriptions'],
+                ['key' => 'domains_attention', 'value' => $metrics['domains_attention'], 'to' => '/control/domains'],
+                ['key' => 'mrr', 'value' => $metrics['mrr'], 'to' => '/control/subscriptions'],
+            ],
+            'tasks' => $tasks,
+            'recent' => $recentTenants->concat($recentAudits)->sortByDesc('created_at')->take(8)->values(),
+        ]);
     }
 
     public function tenants(Request $request): JsonResponse
@@ -90,7 +149,7 @@ class AdminController extends Controller
 
     public function tenant(Tenant $tenant): JsonResponse
     {
-        return response()->json($tenant->load(['users', 'profile', 'domains', 'subscriptions.plan', 'subscriptions.payments', 'businessProfile.category', 'businessProfile.variation', 'businessProfile.template']));
+        return response()->json($tenant->load(['users', 'profile', 'domains', 'currentSubscription.plan', 'currentSubscription.payments', 'subscriptions.plan', 'subscriptions.payments', 'businessProfile.category', 'businessProfile.variation', 'businessProfile.template']));
     }
 
     public function updateTenant(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
@@ -119,30 +178,36 @@ class AdminController extends Controller
 
     public function users(Request $request): JsonResponse
     {
-        $q = User::with('tenants:id,name,slug');
+        $q = User::with('tenants:id,name,slug')->where('is_super_admin', false)->whereHas('tenants');
         if ($s = $request->string('search')->trim()->toString()) {
             $q->where(fn ($x) => $x->where('name', 'like', "%$s%")->orWhere('email', 'like', "%$s%")->orWhereHas('tenants', fn ($tenant) => $tenant->where('name', 'like', "%$s%")));
         }
         if ($status = $request->string('status')->toString()) {
             $q->where('is_active', $status === 'active');
         }
-        if ($role = $request->string('role')->toString()) {
-            $role === 'super_admin' ? $q->where('is_super_admin', true) : $q->where('is_super_admin', false);
-        }
-
         $sort = $this->sortColumn($request, ['name', 'email', 'is_active', 'created_at', 'last_login_at']);
 
         return response()->json($q->orderBy($sort, $this->sortDirection($request))->paginate($this->perPage($request)));
     }
 
+    public function administrators(Request $request): JsonResponse
+    {
+        $query = User::query()->where('is_super_admin', true);
+        if ($search = $request->string('search')->trim()->toString()) {
+            $query->where(fn ($item) => $item->where('name', 'like', "%$search%")->orWhere('email', 'like', "%$search%"));
+        }
+        if ($status = $request->string('status')->toString()) {
+            $query->where('is_active', $status === 'active');
+        }
+        $sort = $this->sortColumn($request, ['name', 'email', 'is_active', 'created_at', 'last_login_at']);
+
+        return response()->json($query->orderBy($sort, $this->sortDirection($request))->paginate($this->perPage($request)));
+    }
+
     public function updateUser(Request $request, User $user, AuditService $audit): JsonResponse
     {
-        $data = $request->validate(['is_active' => 'sometimes|boolean', 'is_super_admin' => 'sometimes|boolean']);
-        abort_if($data === [], 422, 'No changes supplied.');
-        if (array_key_exists('is_super_admin', $data) && ! $data['is_super_admin'] && $user->is_super_admin) {
-            abort_if($user->is($request->user()), 422, 'You cannot revoke your own super administrator access.');
-            abort_if(User::where('is_super_admin', true)->count() <= 1, 422, 'At least one super administrator is required.');
-        }
+        abort_if($user->is_super_admin || ! $user->tenants()->exists(), 404);
+        $data = $request->validate(['is_active' => 'required|boolean']);
         $before = $user->toArray();
         $user->update($data);
         $audit->log('user.status.updated', $user, $before, $user->toArray());
@@ -152,6 +217,7 @@ class AdminController extends Controller
 
     public function sendPasswordReset(User $user, AuditService $audit): JsonResponse
     {
+        abort_if($user->is_super_admin || ! $user->tenants()->exists(), 404);
         $status = PasswordBroker::sendResetLink(['email' => $user->email]);
         $audit->log('user.password_reset.requested', $user);
 
@@ -479,20 +545,60 @@ class AdminController extends Controller
 
     public function settings(): JsonResponse
     {
-        return response()->json(['settings' => SystemSetting::where('is_secret', false)->pluck('value', 'key'), 'pages' => PlatformPage::orderBy('key')->get()]);
+        return response()->json([
+            'settings' => SystemSetting::where('is_secret', false)->pluck('value', 'key'),
+            'pages' => PlatformPage::orderBy('key')->get(),
+            'templates' => RequestTemplate::where('enabled', true)->orderByDesc('sort_order')->get(['id', 'code', 'name']),
+        ]);
     }
 
-    public function saveSetting(Request $request, AuditService $audit): JsonResponse
+    public function saveSettings(Request $request, AuditService $audit): JsonResponse
     {
-        $data = $request->validate(['key' => 'required|string|max:100', 'value' => 'nullable']);
-        $setting = SystemSetting::firstOrNew(['key' => $data['key']]);
-        $before = $setting->exists ? $setting->toArray() : null;
-        $setting->value = $data['value'];
-        $setting->is_secret = false;
-        $setting->save();
-        $audit->log('setting.updated', $setting, $before, $setting->toArray());
+        $locales = ['de', 'en', 'ru', 'uk'];
+        $data = $request->validate([
+            'settings' => 'required|array',
+            'settings.platform_name' => 'required|string|max:120',
+            'settings.support_email' => 'nullable|email|max:255',
+            'settings.default_locale' => ['required', Rule::in($locales)],
+            'settings.default_request_template_code' => 'required|string|max:160|exists:request_templates,code',
+            'settings.trial_days_default' => 'required|integer|min:0|max:365',
+            'settings.upload_base_limit_mb' => 'required|integer|min:1|max:2048',
+            'settings.registration_enabled' => 'required|boolean',
+            'settings.maintenance' => 'required|boolean',
+            'settings.enabled_locales' => 'required|array|min:1',
+            'settings.enabled_locales.*' => Rule::in($locales),
+            'settings.integrations' => 'required|array:stripe,openai',
+            'settings.integrations.stripe' => 'required|boolean',
+            'settings.integrations.openai' => 'required|boolean',
+            'settings.legal_operator_name' => 'nullable|string|max:255',
+            'settings.legal_operator_address' => 'nullable|string|max:2000',
+            'settings.legal_representative' => 'nullable|string|max:255',
+            'settings.legal_email' => 'nullable|email|max:255',
+            'settings.legal_phone' => 'nullable|string|max:80',
+            'settings.legal_register' => 'nullable|string|max:255',
+            'settings.legal_vat_id' => 'nullable|string|max:120',
+            'settings.legal_dispute_statement' => 'nullable|string|max:2000',
+        ]);
 
-        return response()->json($setting);
+        $allowed = [
+            'platform_name', 'support_email', 'default_locale', 'default_request_template_code',
+            'trial_days_default', 'upload_base_limit_mb', 'registration_enabled', 'maintenance',
+            'enabled_locales', 'integrations', 'legal_operator_name', 'legal_operator_address',
+            'legal_representative', 'legal_email', 'legal_phone', 'legal_register', 'legal_vat_id',
+            'legal_dispute_statement',
+        ];
+        DB::transaction(function () use ($data, $allowed, $audit): void {
+            foreach ($allowed as $key) {
+                $setting = SystemSetting::firstOrNew(['key' => $key]);
+                $before = $setting->exists ? $setting->toArray() : null;
+                $setting->value = $data['settings'][$key] ?? null;
+                $setting->is_secret = false;
+                $setting->save();
+                $audit->log('setting.updated', $setting, $before, $setting->toArray());
+            }
+        });
+
+        return $this->settings();
     }
 
     public function savePage(Request $request, PlatformPage $page, AuditService $audit): JsonResponse
@@ -503,6 +609,53 @@ class AdminController extends Controller
         $audit->log('page.updated', $page, $before, $page->toArray());
 
         return response()->json($page);
+    }
+
+    public function translatePage(Request $request, OpenAiService $openAi, OpenAiBudgetService $budget, AuditService $audit): JsonResponse
+    {
+        $locales = ['de', 'en', 'ru', 'uk'];
+        $data = $request->validate([
+            'source_locale' => ['required', Rule::in($locales)],
+            'title' => 'required|string|max:255',
+            'content' => 'nullable|string|max:200000',
+        ]);
+        $localizedStrings = [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'properties' => array_fill_keys($locales, ['type' => 'string']),
+            'required' => $locales,
+        ];
+        $schema = [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'properties' => ['title' => $localizedStrings, 'content' => $localizedStrings],
+            'required' => ['title', 'content'],
+        ];
+
+        try {
+            $budget->ensureAvailable($request->user()?->id);
+            $result = $openAi->structured(
+                'Translate this website page from the supplied source language into German, English, Russian, and Ukrainian. Preserve every HTML tag, link, URL, and template token such as {{operator_name}} exactly. Do not add legal promises, facts, clauses, or product functions. Return valid HTML in content.',
+                json_encode($data, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                'lookdo_page_translation',
+                $schema,
+            );
+            $translations = json_decode($result['text'], true, flags: JSON_THROW_ON_ERROR);
+            if (! is_array($translations['title'] ?? null) || ! is_array($translations['content'] ?? null)) {
+                throw new \RuntimeException('OpenAI returned an incomplete translation.');
+            }
+        } catch (Throwable $exception) {
+            report($exception);
+            throw ValidationException::withMessages(['translation' => $exception->getMessage()]);
+        }
+
+        $source = $data['source_locale'];
+        $translations['title'][$source] = $data['title'];
+        $translations['content'][$source] = $data['content'] ?? '';
+        $budget->record('page_translation', $result['model'], $result['input_tokens'], $result['output_tokens'], $request->user()?->id);
+        $audit->log('page.translation.generated', null, null, ['source_locale' => $source, 'model' => $result['model']]);
+
+        return response()->json($translations);
     }
 
     public function uploadContentMedia(Request $request, AuditService $audit): JsonResponse

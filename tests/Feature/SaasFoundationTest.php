@@ -176,13 +176,23 @@ class SaasFoundationTest extends TestCase
 
     public function test_ai_can_only_choose_from_existing_classification_candidates(): void
     {
+        $variation = BusinessVariation::where('code', 'automotive.general')->firstOrFail();
+        BusinessPhrase::create([
+            'category_id' => $variation->category_id,
+            'variation_id' => $variation->id,
+            'locale' => 'ru',
+            'phrase' => 'уникальный кандидат',
+            'normalized_phrase' => 'уникальный кандидат',
+            'weight' => 1,
+            'enabled' => true,
+        ]);
         config(['services.openai.key' => 'test-key', 'services.openai.text_model' => 'gpt-5.6-luna']);
         Http::fake(['api.openai.com/*' => Http::response([
             'model' => 'gpt-5.6-luna', 'output_text' => '{"choice":1,"confidence":0.91}',
             'usage' => ['input_tokens' => 120, 'output_tokens' => 12],
         ])]);
 
-        $response = $this->postJson('/api/classify', ['description' => 'делаю необычные изделия для салона машины', 'locale' => 'ru'])
+        $response = $this->postJson('/api/classify', ['description' => 'уникальный заказ', 'locale' => 'ru'])
             ->assertOk()->assertJsonPath('source', 'ai')->assertJsonPath('ai_model', 'gpt-5.6-luna');
 
         $this->assertDatabaseHas('business_variations', ['id' => $response->json('variation_id')]);
@@ -376,6 +386,72 @@ class SaasFoundationTest extends TestCase
             ->assertJsonStructure(['url', 'path', 'mime', 'size']);
 
         Storage::disk('public')->assertExists($upload->json('path'));
+    }
+
+    public function test_control_separates_customer_users_from_administrators_and_loads_tenant_subscription(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $secondAdmin = User::factory()->create(['is_super_admin' => true]);
+        $customer = User::factory()->create(['is_super_admin' => false]);
+        $tenant = Tenant::create(['name' => 'Client', 'slug' => 'client', 'country' => 'DE', 'locale' => 'de', 'status' => 'active']);
+        $tenant->users()->attach($customer, ['role' => 'owner']);
+        $tenant->subscriptions()->create(['plan_id' => Plan::where('code', 'start')->value('id'), 'provider' => 'manual', 'status' => 'active', 'started_at' => now()]);
+
+        $this->actingAs($admin)->getJson('/api/control/users')->assertOk()
+            ->assertJsonPath('total', 1)->assertJsonPath('data.0.id', $customer->id);
+        $this->actingAs($admin)->getJson('/api/control/administrators')->assertOk()
+            ->assertJsonPath('total', 2);
+        $this->actingAs($admin)->putJson('/api/control/users/'.$customer->id, ['is_super_admin' => true])
+            ->assertUnprocessable();
+        $this->actingAs($admin)->putJson('/api/control/users/'.$secondAdmin->id, ['is_active' => false])
+            ->assertNotFound();
+        $this->actingAs($admin)->getJson('/api/control/tenants/'.$tenant->id)->assertOk()
+            ->assertJsonPath('current_subscription.plan.code', 'start');
+    }
+
+    public function test_super_admin_can_save_human_settings_and_translate_content(): void
+    {
+        config(['services.openai.key' => 'test-key', 'services.openai.text_model' => 'gpt-5.6-luna']);
+        Http::fake(['api.openai.com/*' => Http::response([
+            'model' => 'gpt-5.6-luna',
+            'output_text' => json_encode([
+                'title' => ['de' => 'Kontakt', 'en' => 'Contact', 'ru' => 'Контакты', 'uk' => 'Контакти'],
+                'content' => [
+                    'de' => '<p>{{operator_name}}</p>',
+                    'en' => '<p>{{operator_name}}</p>',
+                    'ru' => '<p>{{operator_name}}</p>',
+                    'uk' => '<p>{{operator_name}}</p>',
+                ],
+            ], JSON_UNESCAPED_UNICODE),
+            'usage' => ['input_tokens' => 100, 'output_tokens' => 60],
+        ])]);
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $settings = $this->actingAs($admin)->getJson('/api/control/settings')->assertOk()->json('settings');
+        $settings['legal_operator_name'] = 'LOOKDO GmbH';
+        $settings['legal_phone'] = '+49 30 123456';
+        $settings['default_request_template_code'] = RequestTemplate::where('enabled', true)->value('code');
+        $settings['integrations'] = ['stripe' => true, 'openai' => true];
+
+        $this->actingAs($admin)->putJson('/api/control/settings', ['settings' => $settings])->assertOk()
+            ->assertJsonPath('settings.legal_operator_name', 'LOOKDO GmbH');
+        $this->assertSame('+49 30 123456', SystemSetting::read('legal_phone'));
+
+        $this->actingAs($admin)->postJson('/api/control/pages/translate', [
+            'source_locale' => 'ru',
+            'title' => 'Контакты',
+            'content' => '<p>{{operator_name}}</p>',
+        ])->assertOk()->assertJsonPath('title.de', 'Kontakt')->assertJsonPath('content.en', '<p>{{operator_name}}</p>');
+        $this->assertDatabaseHas('ai_usage_records', ['user_id' => $admin->id, 'operation' => 'page_translation']);
+    }
+
+    public function test_control_dashboard_returns_clickable_tasks_metrics_and_activity(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        Tenant::create(['name' => 'Recent Client', 'slug' => 'recent-client', 'country' => 'DE', 'locale' => 'de', 'status' => 'active']);
+
+        $this->actingAs($admin)->getJson('/api/control/dashboard')->assertOk()
+            ->assertJsonStructure(['tenants', 'mrr', 'metrics' => [['key', 'value', 'to']], 'tasks', 'recent' => [['title', 'to']]])
+            ->assertJsonPath('metrics.0.to', '/control/tenants');
     }
 
     public function test_storage_backup_is_finalized_even_when_storage_has_no_user_files(): void

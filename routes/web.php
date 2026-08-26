@@ -40,6 +40,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::put('/tenants/{tenant}/entitlement', [AdminController::class, 'setOverride']);
             Route::post('/tenants/{tenant}/impersonate', [AdminController::class, 'impersonate']);
             Route::get('/users', [AdminController::class, 'users']);
+            Route::get('/administrators', [AdminController::class, 'administrators']);
             Route::put('/users/{user}', [AdminController::class, 'updateUser']);
             Route::post('/users/{user}/password-reset', [AdminController::class, 'sendPasswordReset']);
             Route::get('/subscriptions', [AdminController::class, 'subscriptions']);
@@ -73,8 +74,9 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::put('/phrases/{phrase}', [AdminController::class, 'savePhrase']);
             Route::get('/classifications', [AdminController::class, 'classifications']);
             Route::get('/settings', [AdminController::class, 'settings']);
-            Route::put('/settings', [AdminController::class, 'saveSetting']);
+            Route::put('/settings', [AdminController::class, 'saveSettings']);
             Route::put('/pages/{page}', [AdminController::class, 'savePage']);
+            Route::post('/pages/translate', [AdminController::class, 'translatePage'])->middleware('throttle:20,1');
             Route::post('/content-media', [AdminController::class, 'uploadContentMedia']);
             Route::get('/audits', [AdminController::class, 'audits']);
         });

@@ -12,6 +12,7 @@ return [
         'requests_monthly' => ['group' => 'limits', 'type' => 'number', 'default' => 100, 'min' => 0, 'max' => 1000000, 'label' => 'Anfragen pro Monat', 'help' => '0 bedeutet unbegrenzt.'],
         'storage_mb' => ['group' => 'limits', 'type' => 'number', 'default' => 2048, 'min' => 0, 'max' => 1048576, 'label' => 'Speicherplatz (MB)', 'help' => '1024 MB entsprechen 1 GB.'],
         'staff_users' => ['group' => 'limits', 'type' => 'number', 'default' => 1, 'min' => 1, 'max' => 10000, 'label' => 'Team-Benutzer', 'help' => 'Anzahl der Benutzer im Kundenkonto.'],
+        'app_languages' => ['group' => 'limits', 'type' => 'number', 'default' => 1, 'min' => 1, 'max' => 4, 'label' => 'App-Sprachen', 'help' => '1 = nur die bei der Registrierung gewählte Sprache; bis zu 4 = mehrsprachige Kunden-App.'],
         'video_max_mb' => ['group' => 'limits', 'type' => 'number', 'default' => 100, 'min' => 1, 'max' => 2048, 'label' => 'Maximale Videogröße (MB)', 'help' => 'Gilt nur, wenn Video aktiviert ist.'],
         'video_max_seconds' => ['group' => 'limits', 'type' => 'number', 'default' => 45, 'min' => 1, 'max' => 3600, 'label' => 'Maximale Videolänge (Sek.)', 'help' => 'Gilt nur, wenn Video aktiviert ist.'],
 
@@ -46,6 +47,8 @@ return [
         'storage_mb' => ['de' => ':value MB Speicher', 'en' => ':value MB storage', 'ru' => ':value МБ хранилища', 'uk' => ':value МБ сховища'],
         'staff_one' => ['de' => '1 Benutzer', 'en' => '1 user', 'ru' => '1 пользователь', 'uk' => '1 користувач'],
         'staff_many' => ['de' => ':value Benutzer', 'en' => ':value users', 'ru' => ':value пользователей', 'uk' => ':value користувачів'],
+        'languages_one' => ['de' => '1 App-Sprache', 'en' => '1 app language', 'ru' => '1 язык приложения', 'uk' => '1 мова застосунку'],
+        'languages_many' => ['de' => ':value App-Sprachen', 'en' => ':value app languages', 'ru' => ':value языка приложения', 'uk' => ':value мови застосунку'],
         'video' => ['de' => 'Video bis :seconds Sek. / :size MB', 'en' => 'Video up to :seconds sec / :size MB', 'ru' => 'Видео до :seconds сек. / :size МБ', 'uk' => 'Відео до :seconds сек. / :size МБ'],
         'video_disabled' => ['de' => 'Videoanfragen', 'en' => 'Video requests', 'ru' => 'Видео в заявках', 'uk' => 'Відео в заявках'],
         'custom_domain' => ['de' => 'Eigene Domain', 'en' => 'Custom domain', 'ru' => 'Собственный домен', 'uk' => 'Власний домен'],
