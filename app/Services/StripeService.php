@@ -20,7 +20,9 @@ class StripeService
     {
         $response = $this->get('/v1/account');
 
-        return ['id' => $response->json('id'), 'country' => $response->json('country'), 'livemode' => (bool) $response->json('livemode')];
+        $secret = (string) config('services.stripe.secret');
+
+        return ['id' => $response->json('id'), 'country' => $response->json('country'), 'livemode' => str_starts_with($secret, 'sk_live_') || str_starts_with($secret, 'rk_live_')];
     }
 
     public function checkout(Tenant $tenant, Plan $plan, string $email, string $cycle = 'monthly', string $currency = 'EUR'): string
@@ -115,20 +117,6 @@ class StripeService
         });
 
         return $count;
-    }
-
-    public function createWebhookEndpoint(string $url): string
-    {
-        $response = $this->post('/v1/webhook_endpoints', [
-            'url' => $url, 'description' => 'LOOKDO production webhook',
-            'enabled_events' => ['checkout.session.completed', 'checkout.session.async_payment_succeeded', 'invoice.paid', 'invoice.payment_failed', 'customer.subscription.deleted'],
-        ]);
-        $secret = $response->json('secret');
-        if (! is_string($secret) || ! str_starts_with($secret, 'whsec_')) {
-            throw new RuntimeException('Stripe did not return the webhook signing secret.');
-        }
-
-        return $secret;
     }
 
     public function validSignature(string $payload, string $header): bool

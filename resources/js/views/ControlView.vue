@@ -21,37 +21,38 @@ const entitlementCatalog = ref<any>({ groups: {}, definitions: {} });
 const planLocales = [['de', 'Deutsch'], ['en', 'English'], ['ru', 'Русский'], ['uk', 'Українська']];
 
 const nav = [
-    ['dashboard', '▦', 'Übersicht'], ['tenants', '◎', 'Kunden'], ['users', '♙', 'Benutzer'],
+    ['dashboard', '▦', 'Übersicht'], ['tenants', '◎', 'Kunden'],
     ['administrators', '♜', 'Administratoren'], ['subscriptions', '◉', 'Abrechnung'], ['plans', '€', 'Tarife'], ['stripe', 'S', 'Stripe'], ['sms', '✉', 'SMS-Protokoll'],
-    ['domains', '◇', 'Domains'], ['templates', '≡', 'Vorlagen'], ['ai', '✦', 'KI-Wörterbuch'],
+    ['templates', '≡', 'Vorlagen'], ['ai', '✦', 'KI-Wörterbuch'],
     ['classifications', '↯', 'KI-Entscheidungen'], ['content', '□', 'Inhalte'],
     ['settings', '⚙', 'Einstellungen'], ['backups', '↥', 'Backups'], ['audit', '⌁', 'Prüfprotokoll'],
 ];
 const endpoint: Record<string, string> = {
-    dashboard: '/control/dashboard', tenants: '/control/tenants', users: '/control/users', administrators: '/control/administrators', subscriptions: '/control/subscriptions',
-    plans: '/control/plans', stripe: '/control/stripe', sms: '/control/sms', domains: '/control/domains', templates: '/control/taxonomy', ai: '/control/phrases',
+    dashboard: '/control/dashboard', tenants: '/control/tenants', administrators: '/control/administrators', subscriptions: '/control/subscriptions',
+    plans: '/control/plans', stripe: '/control/stripe', sms: '/control/sms', templates: '/control/taxonomy', ai: '/control/phrases',
     classifications: '/control/classifications', content: '/control/settings', settings: '/control/settings', backups: '/control/backups', audit: '/control/audits',
 };
-const serverSections = new Set(['tenants', 'users', 'administrators', 'subscriptions', 'domains', 'ai', 'classifications', 'sms', 'audit']);
+const serverSections = new Set(['tenants', 'administrators', 'subscriptions', 'ai', 'classifications', 'sms', 'audit']);
 const addLabels: Record<string, string> = { tenants: 'Kunde', plans: 'Tarif', templates: 'Eintrag', ai: 'Begriff' };
 const metricLabels: Record<string, string> = { tenants: 'Kunden', active_tenants: 'Aktive Kunden', trialing: 'Testphase', paid: 'Bezahlt', complimentary: 'Kostenlos', domains_attention: 'Domains prüfen', classifications_30d: 'Klassifizierungen (30 Tage)', ai_spend_month: 'KI-Kosten im Monat', mrr: 'Monatlicher Umsatz' };
 const smsEventLabels: Record<string, string> = { request_received: 'Anfrage erhalten', master_replied: 'Meister hat geantwortet', work_ready: 'Arbeit fertig', agreement_reminder: 'Vereinbarung erinnern' };
 const smsStatusLabels: Record<string, string> = { queued: 'Warteschlange', sending: 'Wird gesendet', accepted: 'Angenommen', delivered: 'Zugestellt', failed: 'Fehlgeschlagen' };
 const sortOptions: Record<string, Array<[string, string]>> = {
-    tenants: [['created_at', 'Erstellt'], ['name', 'Name'], ['status', 'Status'], ['last_activity_at', 'Letzte Aktivität']], users: [['created_at', 'Erstellt'], ['name', 'Name'], ['email', 'E-Mail'], ['last_login_at', 'Letzte Anmeldung']],
+    tenants: [['created_at', 'Erstellt'], ['name', 'Name'], ['status', 'Status'], ['last_activity_at', 'Letzte Aktivität']],
     administrators: [['created_at', 'Erstellt'], ['name', 'Name'], ['email', 'E-Mail'], ['last_login_at', 'Letzte Anmeldung']], subscriptions: [['created_at', 'Erstellt'], ['status', 'Status'], ['provider', 'Anbieter'], ['current_period_end', 'Periodenende']], plans: [['sort_order', 'Reihenfolge'], ['code', 'Code'], ['price_monthly', 'Preis']],
-    domains: [['created_at', 'Erstellt'], ['domain', 'Domain'], ['status', 'Status'], ['last_checked_at', 'Zuletzt geprüft']], templates: [['kind', 'Typ'], ['code', 'Code'], ['sort_order', 'Reihenfolge'], ['enabled', 'Status']],
+    templates: [['kind', 'Typ'], ['code', 'Code'], ['sort_order', 'Reihenfolge'], ['enabled', 'Status']],
     ai: [['created_at', 'Erstellt'], ['phrase', 'Begriff'], ['locale', 'Sprache'], ['weight', 'Gewichtung']], classifications: [['created_at', 'Datum'], ['confidence', 'Sicherheit'], ['source', 'Quelle']],
     content: [['label', 'Name'], ['key', 'URL']], settings: [], sms: [['created_at', 'Datum'], ['status', 'Status'], ['event_type', 'Ereignis'], ['cost', 'Kosten']], backups: [['created_at', 'Erstellt'], ['name', 'Name']], audit: [['created_at', 'Datum'], ['action', 'Aktion'], ['actor_id', 'Benutzer']],
 };
 const statusOptions: Record<string, Array<[string, string]>> = {
-    tenants: [['active', 'Aktiv'], ['suspended', 'Gesperrt'], ['archived', 'Archiviert']], users: [['active', 'Aktiv'], ['inactive', 'Gesperrt']], administrators: [['active', 'Aktiv'], ['inactive', 'Gesperrt']],
+    tenants: [['active', 'Aktiv'], ['suspended', 'Gesperrt'], ['archived', 'Archiviert']], administrators: [['active', 'Aktiv'], ['inactive', 'Gesperrt']],
     subscriptions: [['active', 'Aktiv'], ['trialing', 'Testphase'], ['complimentary', 'Kostenlos'], ['incomplete', 'Unvollständig'], ['past_due', 'Überfällig'], ['canceled', 'Gekündigt']],
-    plans: [['active', 'Aktiv'], ['inactive', 'Archiviert']], domains: [['pending', 'Ausstehend'], ['verifying', 'Prüfung'], ['ssl_pending', 'SSL ausstehend'], ['active', 'Aktiv'], ['failed', 'Fehler'], ['disabled', 'Deaktiviert']],
+    plans: [['active', 'Aktiv'], ['inactive', 'Archiviert']],
     templates: [['active', 'Aktiv'], ['inactive', 'Inaktiv']], sms: [['queued', 'Warteschlange'], ['sending', 'Wird gesendet'], ['accepted', 'Angenommen'], ['delivered', 'Zugestellt'], ['failed', 'Fehlgeschlagen']], ai: [['active', 'Aktiv'], ['inactive', 'Inaktiv']], content: [['active', 'Veröffentlicht'], ['inactive', 'Entwurf']],
 };
 const filters = reactive({ search: '', status: '', secondary: '', sort: 'created_at', direction: 'desc', per_page: 25, page: 1 });
 const tenantForm = reactive<any>({ name: '', slug: '', owner_name: '', owner_email: '', owner_password: '', country: 'DE', locale: 'ru', business_description: '', variation_id: null, plan_id: null, complimentary: true });
+const customTenantDomain = ref('');
 const planForm = reactive<any>({ code: '', name: { de: '', en: '', ru: '', uk: '' }, description: { de: '', en: '', ru: '', uk: '' }, price_monthly: 19, price_yearly: 190, currency: 'EUR', prices: { EUR: { monthly: 19, yearly: 190 }, RUB: { monthly: 1990, yearly: 19900 }, UAH: { monthly: 890, yearly: 8900 } }, trial_days: 0, is_active: true, is_public: true, sort_order: 50, badge_text: { de: '', en: '', ru: '', uk: '' }, entitlements: {} });
 const phraseForm = reactive<any>({ category_id: null, variation_id: null, locale: 'ru', phrase: '', weight: 1, enabled: true });
 const categoryForm = reactive<any>({ code: '', name: { ru: '', de: '', en: '', uk: '' }, enabled: true, sort_order: 50 });
@@ -71,7 +72,7 @@ const settingForm = reactive<any>({
 function toast(message: string) { noticeText.value = message; window.setTimeout(() => noticeText.value = '', 3500); }
 function queryString() {
     const params = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => value !== '' && params.set(key, String(value)));
-    const secondaryKeys: Record<string, string> = { users: 'role', subscriptions: 'provider', domains: 'type', ai: 'locale', classifications: 'source' };
+    const secondaryKeys: Record<string, string> = { subscriptions: 'provider', ai: 'locale', classifications: 'source' };
     if (secondaryKeys[section.value] && filters.secondary) params.set(secondaryKeys[section.value], filters.secondary); return params.toString();
 }
 async function load() {
@@ -142,24 +143,26 @@ function choosePhraseVariation() { const variation = lookups.value.variations.fi
 async function savePhrase() { choosePhraseVariation(); await submit(() => api('/control/phrases', { method: 'POST', body: JSON.stringify(phraseForm) }), 'Begriff wurde hinzugefügt.'); }
 async function togglePhrase(item: any) { await api(`/control/phrases/${item.id}`, { method: 'PUT', body: JSON.stringify({ ...item, enabled: !item.enabled, category_id: item.category_id, variation_id: item.variation_id }) }); await load(); }
 async function toggleCatalog(item: any) { const path = item.kind === 'category' ? `categories/${item.id}` : item.kind === 'variation' ? `variations/${item.id}` : `templates/${item.id}/toggle`; const body = item.kind === 'template' ? { enabled: !item.enabled } : { ...item, enabled: !item.enabled }; await api(`/control/${path}`, { method: 'PUT', body: JSON.stringify(body) }); await load(); }
-async function openTenant(item: any) { try { selectedTenant.value = await api(`/control/tenants/${item.id}`); } catch (exception: any) { error.value = exception.message; selectedTenant.value = null; } }
+async function openTenant(item: any) { try { selectedTenant.value = await api(`/control/tenants/${item.id}`); customTenantDomain.value = ''; } catch (exception: any) { error.value = exception.message; selectedTenant.value = null; } }
+async function refreshSelectedTenant() { if (selectedTenant.value?.id) selectedTenant.value = await api(`/control/tenants/${selectedTenant.value.id}`); }
 async function updateTenant(payload: any) { busy.value = true; try { await api(`/control/tenants/${selectedTenant.value.id}`, { method: 'PUT', body: JSON.stringify(payload) }); selectedTenant.value = await api(`/control/tenants/${selectedTenant.value.id}`); await load(); toast('Kunde wurde aktualisiert.'); } finally { busy.value = false; } }
+async function saveTenantDetails() { const owner = selectedTenant.value.users?.[0]; await updateTenant({ name: selectedTenant.value.name, owner_name: owner?.name, owner_email: owner?.email }); }
 async function saveOverride() { await api(`/control/tenants/${selectedTenant.value.id}/entitlement`, { method: 'PUT', body: JSON.stringify(overrideForm) }); toast('Leistung wurde gespeichert.'); }
 async function impersonate() { await api(`/control/tenants/${selectedTenant.value.id}/impersonate`, { method: 'POST' }); location.href = '/app'; }
 function askConfirmation(config: any) { confirmAction.value = config; modal.value = 'confirm'; }
 async function executeConfirmed() {
     if (!confirmAction.value) return; busy.value = true; error.value = '';
-    try { await confirmAction.value.run(); modal.value = ''; confirmAction.value = null; await load(); }
+    try { await confirmAction.value.run(); modal.value = ''; confirmAction.value = null; await refreshSelectedTenant(); await load(); }
     catch (exception: any) { error.value = exception.message; }
     finally { busy.value = false; }
 }
 function toggleUser(user: any) {
     askConfirmation({
-        title: user.is_active ? 'Benutzer sperren?' : 'Benutzer aktivieren?',
+        title: user.is_active ? 'Inhaber sperren?' : 'Inhaber aktivieren?',
         message: user.is_active ? `${user.name} kann sich danach nicht mehr anmelden.` : `${user.name} erhält wieder Zugriff auf das Kundenkonto.`,
-        confirmLabel: user.is_active ? 'Benutzer sperren' : 'Benutzer aktivieren',
+        confirmLabel: user.is_active ? 'Inhaber sperren' : 'Inhaber aktivieren',
         danger: user.is_active,
-        run: async () => { await api(`/control/users/${user.id}`, { method: 'PUT', body: JSON.stringify({ is_active: !user.is_active }) }); toast(user.is_active ? 'Benutzer wurde gesperrt.' : 'Benutzer wurde aktiviert.'); },
+        run: async () => { await api(`/control/users/${user.id}`, { method: 'PUT', body: JSON.stringify({ is_active: !user.is_active }) }); toast(user.is_active ? 'Inhaber wurde gesperrt.' : 'Inhaber wurde aktiviert.'); },
     });
 }
 function resetPassword(user: any) {
@@ -170,9 +173,10 @@ function resetPassword(user: any) {
         run: async () => { await api(`/control/users/${user.id}/password-reset`, { method: 'POST' }); toast('Link zum Zurücksetzen wurde versendet.'); },
     });
 }
-async function domainAction(domain: any, action: string) { await api(`/control/domains/${domain.id}/${action}`, { method: 'POST' }); await load(); }
-async function deleteDomain(domain: any) { if (!confirm(`${domain.domain} wirklich löschen?`)) return; await api(`/control/domains/${domain.id}`, { method: 'DELETE' }); await load(); }
+async function domainAction(domain: any, action: string) { await api(`/control/domains/${domain.id}/${action}`, { method: 'POST' }); await refreshSelectedTenant(); await load(); }
+async function deleteDomain(domain: any) { if (!confirm(`${domain.domain} wirklich löschen?`)) return; await api(`/control/domains/${domain.id}`, { method: 'DELETE' }); await refreshSelectedTenant(); await load(); }
 async function syncPlan(plan: any) { await submit(() => api(`/control/plans/${plan.id}/stripe-sync`, { method: 'POST' }), 'Tarif wurde mit Stripe synchronisiert.'); }
+async function addTenantDomain() { if (!customTenantDomain.value.trim()) return; busy.value = true; error.value = ''; try { await api(`/tenant/${selectedTenant.value.id}/domains`, { method: 'POST', body: JSON.stringify({ domain: customTenantDomain.value }) }); customTenantDomain.value = ''; await refreshSelectedTenant(); await load(); toast('Domain wurde hinzugefügt.'); } catch (exception: any) { error.value = exception.message; } finally { busy.value = false; } }
 async function syncAllPlans() { await submit(() => api('/control/stripe/sync-plans', { method: 'POST' }), 'Alle Tarife wurden synchronisiert.'); }
 async function backupAction(action: string, name?: string) { if (action === 'delete' && !confirm(`${name} wirklich löschen?`)) return; await submit(() => api(name ? `/control/backups/${name}${action === 'verify' ? '/verify' : ''}` : '/control/backups', { method: action === 'delete' ? 'DELETE' : 'POST' }), action === 'create' ? 'Backup wurde erstellt.' : action === 'verify' ? 'Backup ist vollständig.' : 'Backup wurde gelöscht.'); }
 function applyPageTranslation(page: any, translated: any) {
@@ -273,14 +277,14 @@ function formatDate(value: string | null) { return value ? new Intl.DateTimeForm
 <section v-else-if="section === 'stripe'" class="stripe-status"><article><p class="eyebrow">VERBINDUNG</p><h2>{{ data.configured ? 'Stripe verbunden' : 'Stripe nicht konfiguriert' }}</h2><p v-if="data.account">{{ data.account.id }} · {{ data.account.livemode ? 'Live-Modus' : 'Testmodus' }} · {{ data.account.country }}</p></article><article><p class="eyebrow">WEBHOOK</p><h2>{{ data.webhook_configured ? 'Bereit' : 'Fehlt' }}</h2><p>{{ data.plans_pending }} Tarife warten auf Synchronisierung.</p></article><button class="button" :disabled="busy || !data.configured" @click="syncAllPlans">Tarife synchronisieren</button></section>
 <section v-else class="admin-section registry-page"><div v-if="section === 'sms'" class="sms-summary"><article><span>Versendet im Monat</span><strong>{{ data.summary?.sent || 0 }}</strong></article><article><span>Zugestellt</span><strong>{{ data.summary?.delivered || 0 }}</strong></article><article><span>Fehlgeschlagen</span><strong>{{ data.summary?.failed || 0 }}</strong></article><article><span>Kosten im Monat</span><strong>{{ Number(data.summary?.cost || 0).toFixed(2) }} {{ data.summary?.currency || 'EUR' }}</strong></article></div><RegistryToolbar v-model:search="filters.search" :total="pager.total" :add-label="addLabels[section]" :busy="busy" @add="openAdd" @refresh="load">
 <select v-if="section === 'templates'" v-model="filters.secondary"><option value="">Alle Typen</option><option value="category">Kategorien</option><option value="variation">Varianten</option><option value="template">Vorlagen</option></select>
-<select v-else-if="section === 'subscriptions'" v-model="filters.secondary"><option value="">Alle Anbieter</option><option value="stripe">Stripe</option><option value="manual">Manuell</option></select><select v-else-if="section === 'domains'" v-model="filters.secondary"><option value="">Alle Typen</option><option value="platform">Plattform</option><option value="custom">Eigene Domain</option></select><select v-else-if="section === 'ai'" v-model="filters.secondary"><option value="">Alle Sprachen</option><option value="de">Deutsch</option><option value="en">Englisch</option><option value="ru">Russisch</option><option value="uk">Ukrainisch</option></select><select v-else-if="section === 'classifications'" v-model="filters.secondary"><option value="">Alle Quellen</option><option value="dictionary">Wörterbuch</option><option value="fuzzy">Ähnlichkeit</option><option value="ai">KI</option><option value="fallback">Standard</option></select>
+<select v-else-if="section === 'subscriptions'" v-model="filters.secondary"><option value="">Alle Anbieter</option><option value="stripe">Stripe</option><option value="manual">Manuell</option></select><select v-else-if="section === 'ai'" v-model="filters.secondary"><option value="">Alle Sprachen</option><option value="de">Deutsch</option><option value="en">Englisch</option><option value="ru">Russisch</option><option value="uk">Ukrainisch</option></select><select v-else-if="section === 'classifications'" v-model="filters.secondary"><option value="">Alle Quellen</option><option value="dictionary">Wörterbuch</option><option value="fuzzy">Ähnlichkeit</option><option value="ai">KI</option><option value="fallback">Standard</option></select>
 <select v-if="statusOptions[section]" v-model="filters.status"><option value="">Alle Status</option><option v-for="option in statusOptions[section]" :key="option[0]" :value="option[0]">{{ option[1] }}</option></select><select v-model="filters.sort"><option v-for="option in sortOptions[section] || []" :key="option[0]" :value="option[0]">{{ option[1] }}</option></select><button type="button" class="sort-direction" @click="filters.direction = filters.direction === 'asc' ? 'desc' : 'asc'">{{ filters.direction === 'asc' ? '↑' : '↓' }}</button><select v-model.number="filters.per_page"><option :value="10">10</option><option :value="25">25</option><option :value="50">50</option><option :value="100">100</option></select></RegistryToolbar>
-<div class="admin-table-wrap"><table><thead v-if="section === 'tenants'"><tr><th>Kunde</th><th>Inhaber</th><th>Vorlage</th><th>Domain</th><th>Tarif</th><th>Status</th></tr></thead><tbody v-if="section === 'tenants'"><tr v-for="item in rows" :key="item.id" class="clickable" @click="openTenant(item)"><td><b>{{ item.name }}</b><small>{{ item.slug }}</small></td><td>{{ item.users?.[0]?.email || '—' }}</td><td>{{ item.business_profile?.variation?.name?.de || item.business_profile?.variation?.code || 'Standard' }}</td><td>{{ item.primary_domain?.domain || '—' }}</td><td>{{ item.current_subscription?.plan?.name?.de || item.current_subscription?.plan?.code || '—' }}</td><td><span class="table-status" :class="item.status">{{ item.status === 'active' ? 'aktiv' : item.status }}</span></td></tr></tbody>
-<thead v-if="section === 'users'"><tr><th>Benutzer</th><th>Kunde</th><th>Rolle</th><th>Letzte Anmeldung</th><th>Status</th><th>Aktionen</th></tr></thead><tbody v-if="section === 'users'"><tr v-for="item in rows" :key="item.id"><td><b>{{ item.name }}</b><small>{{ item.email }}</small></td><td>{{ item.tenants?.map((tenant:any) => tenant.name).join(', ') || '—' }}</td><td>{{ item.tenants?.[0]?.pivot?.role === 'owner' ? 'Inhaber' : 'Benutzer' }}</td><td>{{ formatDate(item.last_login_at) }}</td><td>{{ item.is_active ? 'aktiv' : 'gesperrt' }}</td><td class="table-actions"><button :class="{ danger: item.is_active }" @click="toggleUser(item)">{{ item.is_active ? 'Sperren' : 'Aktivieren' }}</button><button @click="resetPassword(item)">Zugang senden</button></td></tr></tbody>
+<div class="admin-table-wrap"><table><thead v-if="section === 'tenants'"><tr><th>Kunde</th><th>Inhaber</th><th>Vorlage</th><th>Domain</th><th>Tarif</th><th>Status</th></tr></thead><tbody v-if="section === 'tenants'"><tr v-for="item in rows" :key="item.id" class="clickable" @click="openTenant(item)"><td><b>{{ item.name }}</b><small>{{ item.slug }}</small></td><td><b>{{ item.users?.[0]?.name || '—' }}</b><small>{{ item.users?.[0]?.email || '—' }}</small></td><td>{{ item.business_profile?.variation?.name?.de || item.business_profile?.variation?.code || 'Standard' }}</td><td>{{ item.primary_domain?.domain || '—' }}</td><td>{{ item.current_subscription?.plan?.name?.de || item.current_subscription?.plan?.code || '—' }}</td><td><span class="table-status" :class="item.status">{{ item.status === 'active' ? 'aktiv' : item.status }}</span></td></tr></tbody>
+
 <thead v-if="section === 'administrators'"><tr><th>Administrator</th><th>Rolle</th><th>Letzte Anmeldung</th><th>Seit</th><th>Status</th></tr></thead><tbody v-if="section === 'administrators'"><tr v-for="item in rows" :key="item.id"><td><b>{{ item.name }}</b><small>{{ item.email }}</small></td><td>Super Administrator</td><td>{{ formatDate(item.last_login_at) }}</td><td>{{ formatDate(item.created_at) }}</td><td>{{ item.is_active ? 'aktiv' : 'gesperrt' }}</td></tr></tbody>
 <thead v-if="section === 'subscriptions'"><tr><th>Kunde</th><th>Tarif</th><th>Anbieter</th><th>Status</th><th>Periodenende</th><th>Rabatt</th><th>Provider-ID</th></tr></thead><tbody v-if="section === 'subscriptions'"><tr v-for="item in rows" :key="item.id"><td><b>{{ item.tenant?.name }}</b><small>{{ item.tenant?.slug }}</small></td><td>{{ item.plan?.name?.de || item.plan?.code }}</td><td>{{ item.provider === 'manual' ? 'Manuell' : item.provider }}</td><td>{{ item.complimentary ? 'kostenlos' : item.status }}</td><td>{{ formatDate(item.current_period_end) }}</td><td>{{ item.discount_percent }}%</td><td><small>{{ item.provider_subscription_id || '—' }}</small></td></tr></tbody>
 <thead v-if="section === 'plans'"><tr><th>Tarif</th><th>Monat</th><th>Jahr</th><th>Module</th><th>Kunden</th><th>Sichtbarkeit</th><th>Stripe</th><th>Aktionen</th></tr></thead><tbody v-if="section === 'plans'"><tr v-for="item in rows" :key="item.id"><td><b>{{ item.name?.de || item.code }}</b><small>{{ item.code }}</small></td><td>{{ item.price_monthly }} {{ item.currency }}</td><td>{{ item.price_yearly || '—' }} {{ item.currency }}</td><td>{{ activeEntitlements(item) }} aktiv</td><td>{{ item.subscriptions_count }}</td><td>{{ item.is_active ? (item.is_public ? 'öffentlich' : 'intern') : 'archiviert' }}</td><td>{{ item.stripe_synced_at ? 'synchron' : (item.stripe_sync_error || 'offen') }}</td><td class="table-actions"><button @click="editPlan(item)">Bearbeiten</button><button @click="syncPlan(item)">Stripe</button></td></tr></tbody>
-<thead v-if="section === 'domains'"><tr><th>Domain</th><th>Kunde</th><th>Typ</th><th>DNS</th><th>SSL</th><th>Geprüft</th><th>Aktionen</th></tr></thead><tbody v-if="section === 'domains'"><tr v-for="item in rows" :key="item.id"><td><b>{{ item.domain }}</b></td><td>{{ item.tenant?.name }}</td><td>{{ item.type === 'custom' ? 'Eigene Domain' : 'Plattform' }}</td><td>{{ item.status }}</td><td>{{ item.ssl_status || '—' }}</td><td>{{ formatDate(item.last_checked_at) }}</td><td class="table-actions"><button v-if="item.type === 'custom'" @click="domainAction(item, 'verify')">Prüfen</button><button v-if="item.status === 'ssl_pending'" @click="domainAction(item, 'activate')">Aktivieren</button><button v-if="item.type === 'custom' && item.status === 'active'" @click="domainAction(item, 'disable')">Deaktivieren</button><button v-if="item.type === 'custom' && item.status !== 'active'" class="danger" @click="deleteDomain(item)">Löschen</button></td></tr></tbody>
+
 <thead v-if="section === 'templates'"><tr><th>Typ</th><th>Name</th><th>Code</th><th>Kategorie / Eltern</th><th>Priorität / Version</th><th>Status</th><th>Aktion</th></tr></thead><tbody v-if="section === 'templates'"><tr v-for="item in rows" :key="`${item.kind}-${item.id}`"><td>{{ item.kind === 'category' ? 'Kategorie' : item.kind === 'variation' ? 'Variante' : 'Vorlage' }}</td><td><b>{{ item.label }}</b></td><td><code>{{ item.code }}</code></td><td>{{ item.categoryLabel || item.parent_code || '—' }}</td><td>{{ item.kind === 'template' ? `v${item.version}` : (item.priority ?? item.sort_order) }}</td><td>{{ item.enabled ? 'aktiv' : 'inaktiv' }}</td><td class="table-actions"><button @click="toggleCatalog(item)">{{ item.enabled ? 'Deaktivieren' : 'Aktivieren' }}</button></td></tr></tbody>
 <thead v-if="section === 'ai'"><tr><th>Begriff</th><th>Sprache</th><th>Kategorie</th><th>Variante</th><th>Gewichtung</th><th>Status</th><th>Aktion</th></tr></thead><tbody v-if="section === 'ai'"><tr v-for="item in rows" :key="item.id"><td><b>{{ item.phrase }}</b><small>{{ item.normalized_phrase }}</small></td><td>{{ item.locale.toUpperCase() }}</td><td>{{ item.category?.name?.de || item.category?.code }}</td><td>{{ item.variation?.name?.de || item.variation?.code || 'Standard' }}</td><td>{{ item.weight }}</td><td>{{ item.enabled ? 'aktiv' : 'inaktiv' }}</td><td class="table-actions"><button @click="togglePhrase(item)">{{ item.enabled ? 'Deaktivieren' : 'Aktivieren' }}</button></td></tr></tbody>
 <thead v-if="section === 'classifications'"><tr><th>Datum</th><th>Eingabe</th><th>Kunde</th><th>Ergebnis</th><th>Sicherheit</th><th>Quelle</th><th>Bestätigt</th></tr></thead><tbody v-if="section === 'classifications'"><tr v-for="item in rows" :key="item.id"><td>{{ formatDate(item.created_at) }}</td><td><b>{{ item.original_text }}</b><small>{{ item.normalized_text }}</small></td><td>{{ item.tenant?.name || 'Registrierung' }}</td><td>{{ item.category?.name?.de || item.category?.code || 'Standard' }}<small>{{ item.variation?.name?.de || item.variation?.code || 'allgemein' }}</small></td><td>{{ Math.round(Number(item.confidence) * 100) }}%</td><td>{{ item.source }}<small>{{ item.ai_model }}</small></td><td>{{ item.confirmed_by_user_at ? 'ja' : 'nein' }}</td></tr></tbody>
@@ -288,7 +292,67 @@ function formatDate(value: string | null) { return value ? new Intl.DateTimeForm
 <thead v-if="section === 'backups'"><tr><th>Backup</th><th>Erstellt</th><th>Dateien</th><th>Aktionen</th></tr></thead><tbody v-if="section === 'backups'"><tr v-for="item in rows" :key="item.name"><td><b>{{ item.name }}</b></td><td>{{ formatDate(item.created_at) }}</td><td>{{ Object.keys(item.files || {}).length }}</td><td class="table-actions"><button @click="backupAction('verify', item.name)">Prüfen</button><button class="danger" @click="backupAction('delete', item.name)">Löschen</button></td></tr></tbody>
 <thead v-if="section === 'sms'"><tr><th>Datum</th><th>Kunde</th><th>Ereignis</th><th>Empfänger</th><th>Status</th><th>Teile</th><th>Kosten</th><th>Provider-ID / Fehler</th></tr></thead><tbody v-if="section === 'sms'"><tr v-for="item in rows" :key="item.id"><td>{{ formatDate(item.created_at) }}</td><td><b>{{ item.tenant?.name || '—' }}</b><small>{{ item.tenant?.slug }}</small></td><td>{{ smsEventLabels[item.event_type] || item.event_type }}</td><td>{{ item.recipient_masked }}</td><td><span class="table-status" :class="item.status">{{ smsStatusLabels[item.status] || item.status }}</span><small>{{ item.provider_status }}</small></td><td>{{ item.parts }}</td><td>{{ Number(item.cost || 0).toFixed(4) }} {{ item.currency }}</td><td><small>{{ item.provider_message_id || item.error_message || '—' }}</small></td></tr></tbody><thead v-if="section === 'audit'"><tr><th>Datum</th><th>Aktion</th><th>Benutzer</th><th>Kunde</th><th>Objekt</th><th>IP-Adresse</th></tr></thead><tbody v-if="section === 'audit'"><tr v-for="item in rows" :key="item.id"><td>{{ formatDate(item.created_at) }}</td><td><b>{{ item.action }}</b></td><td>{{ item.actor_id || 'System' }}</td><td>{{ item.tenant_id || '—' }}</td><td>{{ item.subject_type ? `${item.subject_type.split('\\').pop()} #${item.subject_id}` : '—' }}</td><td>{{ item.ip_address || '—' }}</td></tr></tbody><tbody v-if="!rows.length"><tr><td colspan="9" class="empty-table">Keine passenden Einträge gefunden.</td></tr></tbody></table></div>
 <div v-if="section === 'administrators'" class="registry-context"><span>Super-Administratoren werden aus Sicherheitsgründen ausschließlich über den geschützten Serverbefehl angelegt. Kundenbenutzer können hier nicht zu Administratoren gemacht werden.</span></div><div v-if="section === 'backups'" class="registry-context"><span>Speicherort: {{ data.path }}</span><span>Aufbewahrung: {{ data.keep }}</span><button class="button" :disabled="busy" @click="backupAction('create')">＋ Backup erstellen</button></div><AdminPagination :current="pager.current" :last="pager.last" :from="pager.from" :to="pager.to" :total="pager.total" @change="changePage" /></section></template></main>
-<aside v-if="selectedTenant" class="drawer"><button class="drawer-close" @click="selectedTenant = null">×</button><p class="eyebrow">KUNDE #{{ selectedTenant.id }}</p><h2>{{ selectedTenant.name }}</h2><p>{{ selectedTenant.slug }}.lookdo.app</p><dl><div><dt>Inhaber</dt><dd>{{ selectedTenant.users?.[0]?.email }}</dd></div><div><dt>Tarif</dt><dd>{{ selectedTenant.current_subscription?.plan?.name?.de || '—' }}</dd></div><div><dt>Status</dt><dd>{{ selectedTenant.status }}</dd></div></dl><button class="button full" @click="impersonate">Kundenkonto öffnen</button><div class="drawer-actions"><button class="button ghost" @click="updateTenant({ status: selectedTenant.status === 'active' ? 'suspended' : 'active' })">{{ selectedTenant.status === 'active' ? 'Sperren' : 'Aktivieren' }}</button></div><template v-if="selectedTenant.current_subscription"><h3>Tarif ändern</h3><select v-model.number="selectedTenant.current_subscription.plan_id"><option v-for="plan in lookups.plans" :key="plan.id" :value="plan.id">{{ plan.name.de || plan.code }}</option></select><button class="button ghost small" @click="updateTenant({ plan_id: selectedTenant.current_subscription.plan_id, complimentary: selectedTenant.current_subscription.complimentary, discount_percent: selectedTenant.current_subscription.discount_percent })">Tarif speichern</button></template><p v-else class="alert">Für diesen Kunden ist noch kein Tarif hinterlegt.</p><h3>Leistung überschreiben</h3><input v-model="overrideForm.key" placeholder="Schlüssel"><input v-model="overrideForm.value" placeholder="Wert"><button class="button ghost small" @click="saveOverride">Speichern</button><h3>Domains</h3><p v-for="domain in selectedTenant.domains" :key="domain.id">{{ domain.domain }} · {{ domain.status }}</p></aside>
+<aside v-if="selectedTenant" class="drawer tenant-drawer">
+<button class="drawer-close" @click="selectedTenant = null">×</button>
+<p class="eyebrow">KUNDE #{{ selectedTenant.id }}</p>
+<h2>{{ selectedTenant.name }}</h2>
+<p>{{ selectedTenant.primary_domain?.domain || (selectedTenant.slug + '.lookdo.app') }}</p>
+
+<section class="tenant-drawer-section">
+<h3>Kunde und Inhaber</h3>
+<form class="tenant-drawer-form" @submit.prevent="saveTenantDetails">
+<label>Unternehmen<input v-model="selectedTenant.name" required></label>
+<label v-if="selectedTenant.users?.[0]">Name des Inhabers<input v-model="selectedTenant.users[0].name" required></label>
+<label v-if="selectedTenant.users?.[0]">E-Mail des Inhabers<input v-model="selectedTenant.users[0].email" type="email" required></label>
+<button class="button small" :disabled="busy">Stammdaten speichern</button>
+</form>
+<dl v-if="selectedTenant.users?.[0]">
+<div><dt>Zugang</dt><dd>{{ selectedTenant.users[0].is_active ? 'aktiv' : 'gesperrt' }}</dd></div>
+<div><dt>Letzte Anmeldung</dt><dd>{{ formatDate(selectedTenant.users[0].last_login_at) }}</dd></div>
+</dl>
+<div class="drawer-actions">
+<button class="button" @click="impersonate">Kundenkonto öffnen</button>
+<button class="button ghost" @click="toggleUser(selectedTenant.users[0])">{{ selectedTenant.users[0]?.is_active ? 'Inhaber sperren' : 'Inhaber aktivieren' }}</button>
+<button class="button ghost" @click="resetPassword(selectedTenant.users[0])">Zugangslink senden</button>
+</div>
+</section>
+
+<section class="tenant-drawer-section">
+<h3>Tarif und Status</h3>
+<template v-if="selectedTenant.current_subscription">
+<label>Tarif<select v-model.number="selectedTenant.current_subscription.plan_id"><option v-for="plan in lookups.plans" :key="plan.id" :value="plan.id">{{ plan.name.de || plan.code }}</option></select></label>
+<button class="button ghost small" @click="updateTenant({ plan_id: selectedTenant.current_subscription.plan_id, complimentary: selectedTenant.current_subscription.complimentary, discount_percent: selectedTenant.current_subscription.discount_percent })">Tarif speichern</button>
+</template>
+<p v-else class="alert">Für diesen Kunden ist noch kein Tarif hinterlegt.</p>
+<button class="button ghost small" @click="updateTenant({ status: selectedTenant.status === 'active' ? 'suspended' : 'active' })">{{ selectedTenant.status === 'active' ? 'Kunde sperren' : 'Kunde aktivieren' }}</button>
+</section>
+
+<section class="tenant-drawer-section">
+<h3>Domains</h3>
+<div class="tenant-domain-list">
+<article v-for="domain in selectedTenant.domains" :key="domain.id">
+<div><b>{{ domain.domain }}</b><small>{{ domain.type === 'custom' ? 'Eigene Domain' : 'LOOKDO-Adresse' }} · {{ domain.status }} · SSL {{ domain.ssl_status || '—' }}</small></div>
+<div v-if="domain.type === 'custom'" class="table-actions">
+<button @click="domainAction(domain, 'verify')">Prüfen</button>
+<button v-if="domain.status === 'ssl_pending'" @click="domainAction(domain, 'activate')">Aktivieren</button>
+<button v-if="domain.status === 'active'" @click="domainAction(domain, 'disable')">Deaktivieren</button>
+<button v-if="domain.status !== 'active'" class="danger" @click="deleteDomain(domain)">Löschen</button>
+</div>
+</article>
+</div>
+<form class="tenant-domain-add" @submit.prevent="addTenantDomain">
+<input v-model="customTenantDomain" placeholder="firma.de" required>
+<button class="button ghost small" :disabled="busy">Domain hinzufügen</button>
+</form>
+</section>
+
+<section class="tenant-drawer-section">
+<h3>Leistung überschreiben</h3>
+<input v-model="overrideForm.key" placeholder="Schlüssel">
+<input v-model="overrideForm.value" placeholder="Wert">
+<button class="button ghost small" @click="saveOverride">Speichern</button>
+</section>
+</aside>
 <AdminModal v-if="modal === 'tenant'" title="Kunden anlegen" wide @close="modal = ''"><form class="modal-form form-grid" @submit.prevent="createTenant"><label>Unternehmen<input v-model="tenantForm.name" required></label><label>Subdomain<input v-model="tenantForm.slug" placeholder="automatisch"></label><label>Name des Inhabers<input v-model="tenantForm.owner_name" required></label><label>E-Mail des Inhabers<input v-model="tenantForm.owner_email" type="email" required></label><label>Temporäres Passwort<input v-model="tenantForm.owner_password" type="password" minlength="10" required></label><label>Tarif<select v-model.number="tenantForm.plan_id" required><option :value="null">Bitte wählen</option><option v-for="plan in lookups.plans" :key="plan.id" :value="plan.id">{{ plan.name.de || plan.code }}</option></select></label><label>Geschäftsvorlage<select v-model.number="tenantForm.variation_id"><option :value="null">Standardvorlage</option><option v-for="variation in lookups.variations" :key="variation.id" :value="variation.id">{{ variation.name.de || variation.code }}</option></select></label><label class="check"><input v-model="tenantForm.complimentary" type="checkbox"> Kostenlos</label><label class="wide">Tätigkeitsbeschreibung<textarea v-model="tenantForm.business_description"></textarea></label><div class="modal-actions wide"><button type="button" class="button ghost" @click="modal = ''">Abbrechen</button><button class="button" :disabled="busy">Kunden anlegen</button></div></form></AdminModal>
 <AdminModal v-if="modal === 'plan'" :title="editingPlanId ? 'Tarif bearbeiten' : 'Tarif anlegen'" wide @close="modal = ''">
   <form class="modal-form form-grid plan-editor" @submit.prevent="savePlan">

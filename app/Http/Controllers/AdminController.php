@@ -63,7 +63,7 @@ class AdminController extends Controller
 
         $tasks = collect([
             ['key' => 'billing', 'title' => 'Zahlungen prüfen', 'description' => 'Unvollständige oder überfällige Abonnements', 'count' => $billingAttention, 'to' => '/control/subscriptions', 'severity' => 'danger'],
-            ['key' => 'domains', 'title' => 'Domains prüfen', 'description' => 'DNS- oder SSL-Prüfung noch nicht abgeschlossen', 'count' => $metrics['domains_attention'], 'to' => '/control/domains', 'severity' => 'warning'],
+            ['key' => 'domains', 'title' => 'Domains prüfen', 'description' => 'DNS- oder SSL-Prüfung noch nicht abgeschlossen', 'count' => $metrics['domains_attention'], 'to' => '/control/tenants', 'severity' => 'warning'],
             ['key' => 'legal', 'title' => 'Rechtliche Angaben vervollständigen', 'description' => 'Fehlende Betreiber- oder Kontaktdaten', 'count' => $legalMissing, 'to' => '/control/settings', 'severity' => 'warning'],
             ['key' => 'content', 'title' => 'Inhalte veröffentlichen', 'description' => 'Noch nicht veröffentlichte Seiten', 'count' => $unpublishedPages, 'to' => '/control/content', 'severity' => 'info'],
             ['key' => 'stripe', 'title' => 'Stripe-Tarife synchronisieren', 'description' => 'Tarife ohne erfolgreiche Stripe-Synchronisierung', 'count' => $stripeAttention, 'to' => '/control/stripe', 'severity' => 'warning'],
@@ -93,7 +93,7 @@ class AdminController extends Controller
                 ['key' => 'active_tenants', 'value' => $metrics['active_tenants'], 'to' => '/control/tenants'],
                 ['key' => 'trialing', 'value' => $metrics['trialing'], 'to' => '/control/subscriptions'],
                 ['key' => 'paid', 'value' => $metrics['paid'], 'to' => '/control/subscriptions'],
-                ['key' => 'domains_attention', 'value' => $metrics['domains_attention'], 'to' => '/control/domains'],
+                ['key' => 'domains_attention', 'value' => $metrics['domains_attention'], 'to' => '/control/tenants'],
                 ['key' => 'mrr', 'value' => $metrics['mrr'], 'to' => '/control/subscriptions'],
             ],
             'tasks' => $tasks,
@@ -103,9 +103,13 @@ class AdminController extends Controller
 
     public function tenants(Request $request): JsonResponse
     {
-        $q = Tenant::with(['users:id,name,email', 'primaryDomain', 'currentSubscription.plan', 'businessProfile.category', 'businessProfile.variation'])->withCount('users');
+        $owner = fn ($query) => $query->wherePivot('role', 'owner')->select('users.id', 'users.name', 'users.email', 'users.is_active', 'users.last_login_at');
+        $q = Tenant::with(['users' => $owner, 'primaryDomain', 'currentSubscription.plan', 'businessProfile.category', 'businessProfile.variation']);
         if ($s = $request->string('search')->trim()->toString()) {
-            $q->where(fn ($x) => $x->where('name', 'like', "%$s%")->orWhere('slug', 'like', "%$s%"));
+            $q->where(fn ($x) => $x->where('name', 'like', "%$s%")
+                ->orWhere('slug', 'like', "%$s%")
+                ->orWhereHas('users', fn ($user) => $user->where('tenant_users.role', 'owner')->where(fn ($owner) => $owner->where('users.name', 'like', "%$s%")->orWhere('users.email', 'like', "%$s%")))
+                ->orWhereHas('domains', fn ($domain) => $domain->where('domain', 'like', "%$s%")));
         } if ($status = $request->string('status')->toString()) {
             $q->where('status', $status);
         }
@@ -149,20 +153,37 @@ class AdminController extends Controller
 
     public function tenant(Tenant $tenant): JsonResponse
     {
-        return response()->json($tenant->load(['users', 'profile', 'domains', 'currentSubscription.plan', 'currentSubscription.payments', 'subscriptions.plan', 'subscriptions.payments', 'businessProfile.category', 'businessProfile.variation', 'businessProfile.template']));
+        return response()->json($tenant->load([
+            'users' => fn ($query) => $query->wherePivot('role', 'owner')->select('users.id', 'users.name', 'users.email', 'users.is_active', 'users.last_login_at'),
+            'profile', 'domains', 'currentSubscription.plan', 'currentSubscription.payments', 'subscriptions.plan', 'subscriptions.payments',
+            'businessProfile.category', 'businessProfile.variation', 'businessProfile.template',
+        ]));
     }
 
     public function updateTenant(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
     {
-        $data = $request->validate(['status' => ['nullable', Rule::in(['active', 'suspended', 'archived'])], 'plan_id' => 'nullable|exists:plans,id', 'complimentary' => 'nullable|boolean', 'discount_percent' => 'nullable|integer|min:0|max:100']);
-        $before = $tenant->load('currentSubscription')->toArray();
-        if (isset($data['status'])) {
-            $tenant->update(['status' => $data['status']]);
-        }if (isset($data['plan_id'])) {
-            $sub = $tenant->currentSubscription;
-            $payload = ['plan_id' => $data['plan_id'], 'complimentary' => $data['complimentary'] ?? false, 'discount_percent' => $data['discount_percent'] ?? 0, 'status' => ($data['complimentary'] ?? false) ? 'complimentary' : 'active', 'provider' => ($data['complimentary'] ?? false) ? 'manual' : ($sub?->provider ?? 'manual'), 'started_at' => $sub?->started_at ?? now()];
-            $sub ? $sub->update($payload) : $tenant->subscriptions()->create($payload);
-        } $audit->log('tenant.updated', $tenant, $before, $tenant->fresh('currentSubscription')->toArray(), $tenant->id);
+        $owner = $tenant->users()->wherePivot('role', 'owner')->firstOrFail();
+        $data = $request->validate([
+            'name' => 'nullable|string|max:160',
+            'owner_name' => 'nullable|string|max:120',
+            'owner_email' => ['nullable', 'email', 'max:255', Rule::unique('users', 'email')->ignore($owner->id)],
+            'status' => ['nullable', Rule::in(['active', 'suspended', 'archived'])],
+            'plan_id' => 'nullable|exists:plans,id', 'complimentary' => 'nullable|boolean', 'discount_percent' => 'nullable|integer|min:0|max:100',
+        ]);
+        $before = ['tenant' => $tenant->load('currentSubscription')->toArray(), 'owner' => $owner->toArray()];
+        DB::transaction(function () use ($tenant, $owner, $data) {
+            $tenant->update(array_filter(['name' => $data['name'] ?? null, 'status' => $data['status'] ?? null], fn ($value) => $value !== null));
+            $owner->update(array_filter(['name' => $data['owner_name'] ?? null, 'email' => $data['owner_email'] ?? null], fn ($value) => $value !== null));
+            if (isset($data['owner_name']) || isset($data['owner_email'])) {
+                $tenant->profile()->updateOrCreate([], ['contact_name' => $data['owner_name'] ?? $owner->name, 'email' => $data['owner_email'] ?? $owner->email]);
+            }
+            if (isset($data['plan_id'])) {
+                $sub = $tenant->currentSubscription;
+                $payload = ['plan_id' => $data['plan_id'], 'complimentary' => $data['complimentary'] ?? false, 'discount_percent' => $data['discount_percent'] ?? 0, 'status' => ($data['complimentary'] ?? false) ? 'complimentary' : 'active', 'provider' => ($data['complimentary'] ?? false) ? 'manual' : ($sub?->provider ?? 'manual'), 'started_at' => $sub?->started_at ?? now()];
+                $sub ? $sub->update($payload) : $tenant->subscriptions()->create($payload);
+            }
+        });
+        $audit->log('tenant.updated', $tenant, $before, ['tenant' => $tenant->fresh('currentSubscription')->toArray(), 'owner' => $owner->fresh()->toArray()], $tenant->id);
 
         return response()->json($tenant->fresh(['currentSubscription.plan']));
     }
@@ -174,20 +195,6 @@ class AdminController extends Controller
         $audit->log('tenant.entitlement.updated', $tenant, null, $data, $tenant->id);
 
         return response()->json(['ok' => true]);
-    }
-
-    public function users(Request $request): JsonResponse
-    {
-        $q = User::with('tenants:id,name,slug')->where('is_super_admin', false)->whereHas('tenants');
-        if ($s = $request->string('search')->trim()->toString()) {
-            $q->where(fn ($x) => $x->where('name', 'like', "%$s%")->orWhere('email', 'like', "%$s%")->orWhereHas('tenants', fn ($tenant) => $tenant->where('name', 'like', "%$s%")));
-        }
-        if ($status = $request->string('status')->toString()) {
-            $q->where('is_active', $status === 'active');
-        }
-        $sort = $this->sortColumn($request, ['name', 'email', 'is_active', 'created_at', 'last_login_at']);
-
-        return response()->json($q->orderBy($sort, $this->sortDirection($request))->paginate($this->perPage($request)));
     }
 
     public function administrators(Request $request): JsonResponse
@@ -206,7 +213,7 @@ class AdminController extends Controller
 
     public function updateUser(Request $request, User $user, AuditService $audit): JsonResponse
     {
-        abort_if($user->is_super_admin || ! $user->tenants()->exists(), 404);
+        abort_if($user->is_super_admin || ! $user->tenants()->wherePivot('role', 'owner')->exists(), 404);
         $data = $request->validate(['is_active' => 'required|boolean']);
         $before = $user->toArray();
         $user->update($data);
@@ -217,7 +224,7 @@ class AdminController extends Controller
 
     public function sendPasswordReset(User $user, AuditService $audit): JsonResponse
     {
-        abort_if($user->is_super_admin || ! $user->tenants()->exists(), 404);
+        abort_if($user->is_super_admin || ! $user->tenants()->wherePivot('role', 'owner')->exists(), 404);
         $status = PasswordBroker::sendResetLink(['email' => $user->email]);
         $audit->log('user.password_reset.requested', $user);
 
@@ -376,25 +383,6 @@ class AdminController extends Controller
         $audit->log('plan.stripe.synced', $plan, $before, $plan->toArray());
 
         return response()->json($plan);
-    }
-
-    public function domains(Request $request): JsonResponse
-    {
-        $q = TenantDomain::with('tenant:id,name,slug');
-        if ($status = $request->string('status')->toString()) {
-            $q->where('status', $status);
-        }
-        if ($type = $request->string('type')->toString()) {
-            $q->where('type', $type);
-        }
-        if ($s = $request->string('search')->trim()->toString()) {
-            $q->where(fn ($query) => $query->where('domain', 'like', "%$s%")
-                ->orWhereHas('tenant', fn ($tenant) => $tenant->where('name', 'like', "%$s%")));
-        }
-
-        $sort = $this->sortColumn($request, ['domain', 'type', 'status', 'last_checked_at', 'created_at']);
-
-        return response()->json($q->orderBy($sort, $this->sortDirection($request))->paginate($this->perPage($request)));
     }
 
     public function verifyDomain(TenantDomain $domain, DomainService $service, AuditService $audit): JsonResponse

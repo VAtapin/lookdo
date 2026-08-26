@@ -62,7 +62,7 @@ BACKUP_KEEP=14
 MYSQLDUMP_PATH=/usr/bin/mysqldump
 ```
 
-`STRIPE_WEBHOOK_SECRET` здесь оставляется пустым намеренно. Это не API-ключ: Stripe выдаёт секрет подписи вида `whsec_...` только при создании webhook endpoint. Команда установки ниже создаст endpoint и сама запишет полученный секрет в `.env`.
+`STRIPE_WEBHOOK_SECRET` заполняется владельцем проекта вручную секретом `whsec_...` из настроенного в Stripe webhook endpoint. Приложение и команды установки не создают webhook и не изменяют `.env`.
 
 ## 2. PHP, Node.js и сборка
 
@@ -104,7 +104,7 @@ $PHP_BIN artisan lookdo:make-super-admin
 $PHP_BIN artisan lookdo:stripe:setup
 ```
 
-`lookdo:stripe:setup` проверяет `STRIPE_SECRET`, создаёт/обновляет Products и Prices всех активных тарифов, создаёт endpoint `https://lookdo.app/api/stripe/webhook` и записывает полученный `STRIPE_WEBHOOK_SECRET` в `.env`, не печатая секрет в терминал.
+`lookdo:stripe:setup` только проверяет подключение Stripe и наличие webhook secret. Внешние объекты и `.env` команда не изменяет. Синхронизация тарифов выполняется исключительно вручную явной опцией `--sync-plans`.
 
 ## 4. Права, первая резервная копия и кеш
 

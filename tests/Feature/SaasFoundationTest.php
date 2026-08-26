@@ -443,25 +443,30 @@ class SaasFoundationTest extends TestCase
         Storage::disk('public')->assertExists($upload->json('path'));
     }
 
-    public function test_control_separates_customer_users_from_administrators_and_loads_tenant_subscription(): void
+    public function test_control_exposes_only_the_client_owner_and_keeps_administrators_separate(): void
     {
         $admin = User::factory()->create(['is_super_admin' => true]);
         $secondAdmin = User::factory()->create(['is_super_admin' => true]);
-        $customer = User::factory()->create(['is_super_admin' => false]);
+        $owner = User::factory()->create(['is_super_admin' => false]);
+        $staff = User::factory()->create(['is_super_admin' => false]);
         $tenant = Tenant::create(['name' => 'Client', 'slug' => 'client', 'country' => 'DE', 'locale' => 'de', 'status' => 'active']);
-        $tenant->users()->attach($customer, ['role' => 'owner']);
+        $tenant->users()->attach($owner, ['role' => 'owner']);
+        $tenant->users()->attach($staff, ['role' => 'staff']);
         $tenant->subscriptions()->create(['plan_id' => Plan::where('code', 'start')->value('id'), 'provider' => 'manual', 'status' => 'active', 'started_at' => now()]);
 
-        $this->actingAs($admin)->getJson('/api/control/users')->assertOk()
-            ->assertJsonPath('total', 1)->assertJsonPath('data.0.id', $customer->id);
-        $this->actingAs($admin)->getJson('/api/control/administrators')->assertOk()
-            ->assertJsonPath('total', 2);
-        $this->actingAs($admin)->putJson('/api/control/users/'.$customer->id, ['is_super_admin' => true])
-            ->assertUnprocessable();
-        $this->actingAs($admin)->putJson('/api/control/users/'.$secondAdmin->id, ['is_active' => false])
-            ->assertNotFound();
+        $this->actingAs($admin)->getJson('/api/control/users')->assertNotFound();
+        $this->actingAs($admin)->getJson('/api/control/administrators')->assertOk()->assertJsonPath('total', 2);
         $this->actingAs($admin)->getJson('/api/control/tenants/'.$tenant->id)->assertOk()
+            ->assertJsonCount(1, 'users')
+            ->assertJsonPath('users.0.id', $owner->id)
             ->assertJsonPath('current_subscription.plan.code', 'start');
+        $this->actingAs($admin)->putJson('/api/control/tenants/'.$tenant->id, [
+            'name' => 'Client GmbH', 'owner_name' => 'Main Owner', 'owner_email' => 'owner-updated@example.test',
+        ])->assertOk();
+        $this->assertDatabaseHas('tenants', ['id' => $tenant->id, 'name' => 'Client GmbH']);
+        $this->assertDatabaseHas('users', ['id' => $owner->id, 'name' => 'Main Owner', 'email' => 'owner-updated@example.test']);
+        $this->actingAs($admin)->putJson('/api/control/users/'.$staff->id, ['is_active' => false])->assertNotFound();
+        $this->actingAs($admin)->putJson('/api/control/users/'.$secondAdmin->id, ['is_active' => false])->assertNotFound();
     }
 
     public function test_super_admin_can_save_human_settings_and_translate_content(): void
@@ -573,6 +578,33 @@ class SaasFoundationTest extends TestCase
         Http::assertSent(fn (HttpRequest $request) => str_ends_with($request->url(), '/v1/prices/price_month') && $request['active'] === 'false');
     }
 
+
+    public function test_stripe_connection_mode_is_derived_from_the_configured_key(): void
+    {
+        Http::fake(['api.stripe.com/v1/account' => Http::response(['id' => 'acct_live', 'country' => 'DE'])]);
+
+        config(['services.stripe.secret' => 'sk_live_example']);
+        $this->assertTrue(app(StripeService::class)->testConnection()['livemode']);
+
+        config(['services.stripe.secret' => 'sk_test_example']);
+        $this->assertFalse(app(StripeService::class)->testConnection()['livemode']);
+    }
+
+    public function test_stripe_setup_only_checks_connection_without_remote_mutations(): void
+    {
+        config([
+            'services.stripe.secret' => 'sk_live_example',
+            'services.stripe.webhook_secret' => '',
+        ]);
+        Http::fake(['api.stripe.com/v1/account' => Http::response(['id' => 'acct_live', 'country' => 'DE'])]);
+
+        $this->artisan('lookdo:stripe:setup')
+            ->expectsOutputToContain('Stripe connected: acct_live (live).')
+            ->assertSuccessful();
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (HttpRequest $request) => $request->method() === 'GET' && str_ends_with($request->url(), '/v1/account'));
+    }
     public function test_sms_settings_are_encrypted_and_never_returned_to_the_admin_client(): void
     {
         $admin = User::factory()->create(['is_super_admin' => true]);

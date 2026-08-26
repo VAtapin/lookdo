@@ -44,7 +44,6 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::put('/tenants/{tenant}', [AdminController::class, 'updateTenant']);
             Route::put('/tenants/{tenant}/entitlement', [AdminController::class, 'setOverride']);
             Route::post('/tenants/{tenant}/impersonate', [AdminController::class, 'impersonate']);
-            Route::get('/users', [AdminController::class, 'users']);
             Route::get('/administrators', [AdminController::class, 'administrators']);
             Route::put('/users/{user}', [AdminController::class, 'updateUser']);
             Route::post('/users/{user}/password-reset', [AdminController::class, 'sendPasswordReset']);
@@ -63,7 +62,6 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::post('/backups', [AdminController::class, 'createBackup']);
             Route::post('/backups/{name}/verify', [AdminController::class, 'verifyBackup']);
             Route::delete('/backups/{name}', [AdminController::class, 'deleteBackup']);
-            Route::get('/domains', [AdminController::class, 'domains']);
             Route::post('/domains/{domain}/verify', [AdminController::class, 'verifyDomain']);
             Route::post('/domains/{domain}/activate', [AdminController::class, 'activateDomain']);
             Route::post('/domains/{domain}/disable', [AdminController::class, 'disableDomain']);
