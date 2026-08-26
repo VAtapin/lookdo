@@ -15,6 +15,7 @@ defineProps<{ name: string }>();
     <template v-else-if="name === 'star'"><path d="m12 2 3 6 7 .9-5 4.8 1.3 7-6.3-3.4-6.3 3.4 1.3-7-5-4.8L9 8l3-6Z"/></template>
     <template v-else-if="name === 'car'"><path d="m5 11 2-5h10l2 5M3 11h18v7H3zM6 18v2M18 18v2"/><circle cx="7" cy="14" r="1"/><circle cx="17" cy="14" r="1"/></template>
     <template v-else-if="name === 'door'"><path d="M5 22V3h13v19M5 22h15M9 6h6v16M12 14h.01"/></template>
+    <template v-else-if="name === 'tools'"><path d="m14.7 6.3 3-3a4 4 0 0 1-5 5L5 16l-2 5 5-2 7.7-7.7a4 4 0 0 1 5-5l-3 3-3-3Z"/><path d="m5 16 3 3"/></template>
     <template v-else-if="name === 'washer'"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M4 7h16"/><circle cx="12" cy="14" r="5"/><path d="M7 5h.01M10 5h.01"/></template>
     <template v-else-if="name === 'sofa'"><path d="M5 12V9a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v3M3 12a2 2 0 0 1 2 2v4h14v-4a2 2 0 1 1 2 0v6H3v-6a2 2 0 0 1 0-2Z"/></template>
     <template v-else-if="name === 'leaf'"><path d="M12 22V9M12 15C7 15 4 12 4 7c5 0 8 3 8 8ZM12 12c0-5 3-8 8-8 0 5-3 8-8 8Z"/></template>
