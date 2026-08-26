@@ -11,6 +11,7 @@ use App\Services\EntitlementService;
 use App\Services\OpenAiBudgetService;
 use App\Services\OpenAiService;
 use App\Services\StripeService;
+use App\Services\TenantImageGenerationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +28,7 @@ class TenantController extends Controller
         abort_unless($request->user()->is_super_admin || $request->user()->tenants()->whereKey($tenant->id)->exists(), 403);
     }
 
-    public function show(Request $request, Tenant $tenant, EntitlementService $entitlements): JsonResponse
+    public function show(Request $request, Tenant $tenant, EntitlementService $entitlements, TenantImageGenerationService $imageGenerations): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
         $tenant->load(['profile', 'domains', 'currentSubscription.plan.entitlements', 'currentSubscription.payments', 'businessProfile.category', 'businessProfile.variation', 'businessProfile.template']);
@@ -35,7 +36,7 @@ class TenantController extends Controller
             $tenant->profile->setAttribute('social_image_url', Storage::disk('public')->url($tenant->profile->social_image_path));
         }
 
-        return response()->json(['tenant' => $tenant, 'entitlements' => $entitlements->all($tenant), 'platform_url' => 'https://'.$tenant->slug.'.'.config('tenancy.platform_domain')]);
+        return response()->json(['tenant' => $tenant, 'entitlements' => $entitlements->all($tenant), 'image_generation' => $imageGenerations->status($tenant), 'platform_url' => 'https://'.$tenant->slug.'.'.config('tenancy.platform_domain')]);
     }
 
     public function updateProfile(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
@@ -65,31 +66,72 @@ class TenantController extends Controller
         return response()->json(['social_image_path' => $path, 'social_image_url' => Storage::disk('public')->url($path), 'social_image_source' => 'upload'], 201);
     }
 
-    public function generateSocialImage(Request $request, Tenant $tenant, OpenAiService $openAi, OpenAiBudgetService $budget, AuditService $audit): JsonResponse
+    public function prepareSocialImagePrompt(Request $request, Tenant $tenant, OpenAiService $openAi, OpenAiBudgetService $budget, TenantImageGenerationService $imageGenerations): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
-        $tenant->load(['profile', 'businessProfile.category', 'businessProfile.variation']);
+        $tenant->load(['profile', 'businessProfile.category', 'businessProfile.variation', 'businessProfile.template']);
         $profile = $tenant->profile()->firstOrCreate();
-        $business = collect([
-            $tenant->name,
-            $tenant->business_description,
-            $tenant->businessProfile?->category?->localized('name'),
-            $tenant->businessProfile?->variation?->localized('name'),
-            $profile->city,
-        ])->filter()->implode('; ');
+        $context = [
+            'business_name' => $tenant->name,
+            'business_description' => $tenant->business_description,
+            'selected_category' => $tenant->businessProfile?->category?->localized('name'),
+            'selected_variation' => $tenant->businessProfile?->variation?->localized('name'),
+            'selected_template' => $tenant->businessProfile?->template?->localized('name'),
+            'template_code' => $tenant->businessProfile?->template?->code,
+            'city' => $profile->city,
+            'language' => $tenant->locale,
+        ];
 
         try {
             $budget->ensureAvailable($request->user()?->id);
-            $result = $openAi->image(
-                'Create a premium, realistic landscape social sharing image for this service business: '.$business.'. '
-                .'Show the work, tools, materials or welcoming business environment appropriate to this exact activity. '
-                .'Clean commercial photography, strong focal point, safe central composition for cropping, no people looking at camera. '
-                .'Do not include any text, letters, logos, UI, watermarks, prices, phone numbers or invented brand marks.',
+            $result = $openAi->structured(
+                'Create one precise English prompt for a commercial social-sharing image. Combine the selected category and the exact business description into one coherent real-world service. The category defines the industry context and the description defines the action. For example, automotive plus installing doors means installing or repairing automobile doors in an auto workshop, never building doors. Do not invent unrelated services. Request realistic premium landscape photography with a clear central subject and useful tools or materials. Require no text, letters, logos, UI, watermarks, prices, phone numbers or invented brand marks. Return JSON only.',
+                json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'social_image_prompt',
+                [
+                    'type' => 'object',
+                    'properties' => ['prompt' => ['type' => 'string']],
+                    'required' => ['prompt'],
+                    'additionalProperties' => false,
+                ],
             );
+            $payload = json_decode($result['text'], true, 512, JSON_THROW_ON_ERROR);
+            $prompt = trim((string) ($payload['prompt'] ?? ''));
+            if ($prompt === '') {
+                throw new RuntimeException('OpenAI returned an empty image prompt.');
+            }
+            $budget->record('tenant_social_image_prompt', $result['model'], $result['input_tokens'], $result['output_tokens'], $request->user()?->id, null, $tenant->id);
         } catch (Throwable $exception) {
             report($exception);
 
-            return response()->json(['message' => 'Das Bild konnte nicht erstellt werden: '.$exception->getMessage()], 422);
+            return response()->json(['message' => 'Der Bild-Prompt konnte nicht vorbereitet werden: '.$exception->getMessage()], 422);
+        }
+
+        return response()->json(['prompt' => $prompt, 'context' => $context, 'image_generation' => $imageGenerations->status($tenant)]);
+    }
+
+    public function generateSocialImage(Request $request, Tenant $tenant, OpenAiService $openAi, OpenAiBudgetService $budget, AuditService $audit, TenantImageGenerationService $imageGenerations): JsonResponse
+    {
+        $this->authorizeTenant($request, $tenant);
+        $data = $request->validate(['prompt' => 'required|string|min:40|max:4000']);
+        $tenant->load(['profile', 'currentSubscription.plan.entitlements']);
+        $profile = $tenant->profile()->firstOrCreate();
+        $reservation = null;
+
+        try {
+            $budget->ensureAvailable($request->user()?->id);
+            $reservation = $imageGenerations->reserve($tenant);
+            $result = $openAi->image($data['prompt']);
+        } catch (Throwable $exception) {
+            if ($reservation) {
+                $imageGenerations->release($tenant, $reservation);
+            }
+            if ($exception->getMessage() === 'IMAGE_CREDIT_REQUIRED') {
+                return response()->json(['message' => 'IMAGE_CREDIT_REQUIRED', 'image_generation' => $imageGenerations->status($tenant)], 402);
+            }
+            report($exception);
+
+            return response()->json(['message' => 'Das Bild konnte nicht erstellt werden: '.$exception->getMessage(), 'image_generation' => $imageGenerations->status($tenant)], 422);
         }
 
         $path = 'tenant-social/'.$tenant->id.'/social-'.Str::uuid().'.'.$result['format'];
@@ -97,12 +139,38 @@ class TenantController extends Controller
         $before = $profile->only(['social_image_path', 'social_image_source']);
         $this->replaceSocialImage($profile->social_image_path, $path);
         $profile->update(['social_image_path' => $path, 'social_image_source' => 'ai']);
-        $budget->recordImage('tenant_social_image_generation', $result['model'], $result['quality'], $request->user()?->id);
-        $audit->log('tenant.social_image.generated', $profile, $before, ['social_image_path' => $path, 'social_image_source' => 'ai', 'model' => $result['model']], $tenant->id);
+        $budget->recordImage('tenant_social_image_generation', $result['model'], $result['quality'], $request->user()?->id, $tenant->id);
+        $audit->log('tenant.social_image.generated', $profile, $before, ['social_image_path' => $path, 'social_image_source' => 'ai', 'model' => $result['model'], 'prompt' => $data['prompt'], 'usage' => $reservation['type']], $tenant->id);
 
-        return response()->json(['social_image_path' => $path, 'social_image_url' => Storage::disk('public')->url($path), 'social_image_source' => 'ai'], 201);
+        return response()->json(['social_image_path' => $path, 'social_image_url' => Storage::disk('public')->url($path), 'social_image_source' => 'ai', 'image_generation' => $imageGenerations->status($tenant)], 201);
     }
 
+    public function buyImageCredits(Request $request, Tenant $tenant, StripeService $stripe, TenantImageGenerationService $imageGenerations): JsonResponse
+    {
+        $this->authorizeTenant($request, $tenant);
+        $data = $request->validate(['quantity' => 'required|integer|min:1|max:20']);
+        $status = $imageGenerations->status($tenant);
+        $quantity = (int) $data['quantity'];
+        $purchase = $tenant->imageCreditPurchases()->create([
+            'user_id' => $request->user()?->id,
+            'quantity' => $quantity,
+            'unit_amount' => $status['unit_price'],
+            'total_amount' => $status['unit_price'] * $quantity,
+            'currency' => $status['currency'],
+            'status' => 'pending',
+        ]);
+
+        try {
+            $checkout = $stripe->imageCreditCheckout($tenant, $request->user()->email, $purchase);
+            $purchase->update(['stripe_session_id' => $checkout['session_id']]);
+        } catch (RuntimeException $exception) {
+            $purchase->update(['status' => 'failed']);
+
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json(['checkout_url' => $checkout['url']]);
+    }
     private function replaceSocialImage(?string $oldPath, string $newPath): void
     {
         if ($oldPath && $oldPath !== $newPath && str_starts_with($oldPath, 'tenant-social/')) {

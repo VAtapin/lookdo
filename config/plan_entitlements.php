@@ -14,6 +14,8 @@ return [
         'staff_users' => ['group' => 'limits', 'type' => 'number', 'default' => 1, 'min' => 1, 'max' => 10000, 'label' => 'Team-Benutzer', 'help' => 'Anzahl der Benutzer im Kundenkonto.'],
         'app_languages' => ['group' => 'limits', 'type' => 'number', 'default' => 1, 'min' => 1, 'max' => 4, 'label' => 'App-Sprachen', 'help' => '1 = nur die bei der Registrierung gewählte Sprache; bis zu 4 = mehrsprachige Kunden-App.'],
         'sms_monthly_limit' => ['group' => 'limits', 'type' => 'number', 'default' => 0, 'min' => 0, 'max' => 10000, 'label' => 'SMS pro Monat', 'help' => 'Strikte technische Obergrenze. Es gibt keine automatische Mehrkosten-Abrechnung.'],
+        'social_image_free_generations' => ['group' => 'limits', 'type' => 'number', 'default' => 3, 'min' => 0, 'max' => 1000, 'label' => 'Kostenlose KI-Bilder', 'help' => 'Gesamtzahl kostenloser Vorschaubilder pro Betrieb.'],
+        'social_image_credit_price_cents' => ['group' => 'limits', 'type' => 'number', 'default' => 100, 'min' => 1, 'max' => 100000, 'label' => 'Preis je zusätzlichem KI-Bild (Cent)', 'help' => '100 = 1,00 EUR. Der Preis wird beim Stripe-Checkout verwendet.'],
         'video_max_mb' => ['group' => 'limits', 'type' => 'number', 'default' => 100, 'min' => 1, 'max' => 2048, 'label' => 'Maximale Videogröße (MB)', 'help' => 'Gilt nur, wenn Video aktiviert ist.'],
         'video_max_seconds' => ['group' => 'limits', 'type' => 'number', 'default' => 45, 'min' => 1, 'max' => 3600, 'label' => 'Maximale Videolänge (Sek.)', 'help' => 'Gilt nur, wenn Video aktiviert ist.'],
 

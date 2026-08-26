@@ -28,7 +28,9 @@ Route::prefix('api')->middleware('locale')->group(function () {
         Route::get('/tenant/{tenant}', [TenantController::class, 'show']);
         Route::put('/tenant/{tenant}/profile', [TenantController::class, 'updateProfile']);
         Route::post('/tenant/{tenant}/social-image', [TenantController::class, 'uploadSocialImage']);
+        Route::post('/tenant/{tenant}/social-image/prompt', [TenantController::class, 'prepareSocialImagePrompt'])->middleware('throttle:10,1');
         Route::post('/tenant/{tenant}/social-image/generate', [TenantController::class, 'generateSocialImage'])->middleware('throttle:5,1');
+        Route::post('/tenant/{tenant}/image-credits/checkout', [TenantController::class, 'buyImageCredits'])->middleware('throttle:5,1');
         Route::put('/tenant/{tenant}/slug', [TenantController::class, 'updateSlug']);
         Route::post('/tenant/{tenant}/domains', [TenantController::class, 'addDomain']);
         Route::post('/tenant/{tenant}/domains/{domain}/verify', [TenantController::class, 'verifyDomain']);

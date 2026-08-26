@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ImageCreditPurchase;
 use App\Models\Plan;
 use App\Models\Tenant;
 use Illuminate\Http\Client\Response;
@@ -58,6 +59,49 @@ class StripeService
         return (string) $response->json('url');
     }
 
+    /** @return array{url:string,session_id:string} */
+    public function imageCreditCheckout(Tenant $tenant, string $email, ImageCreditPurchase $purchase): array
+    {
+        $amount = (int) round((float) $purchase->total_amount * 100);
+        if ($amount < 1) {
+            throw new RuntimeException('The image credit price is not configured.');
+        }
+        $response = $this->post('/v1/checkout/sessions', [
+            'mode' => 'payment',
+            'customer_email' => $email,
+            'client_reference_id' => (string) $tenant->id,
+            'success_url' => rtrim(config('app.url'), '/').'/app/business?image-credit=success&session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url' => rtrim(config('app.url'), '/').'/app/business?image-credit=cancelled',
+            'line_items' => [[
+                'quantity' => 1,
+                'price_data' => [
+                    'currency' => strtolower($purchase->currency),
+                    'unit_amount' => $amount,
+                    'product_data' => [
+                        'name' => 'LOOKDO — '.$purchase->quantity.' KI-Bild'.($purchase->quantity === 1 ? '' : 'er'),
+                        'metadata' => ['lookdo_type' => 'image_credit'],
+                    ],
+                ],
+            ]],
+            'automatic_tax' => ['enabled' => (bool) config('services.stripe.automatic_tax')],
+            'metadata' => [
+                'lookdo_type' => 'image_credit',
+                'tenant_id' => (string) $tenant->id,
+                'purchase_id' => (string) $purchase->id,
+                'quantity' => (string) $purchase->quantity,
+            ],
+            'payment_intent_data' => ['metadata' => [
+                'lookdo_type' => 'image_credit',
+                'tenant_id' => (string) $tenant->id,
+                'purchase_id' => (string) $purchase->id,
+            ]],
+        ], 'lookdo-image-credit-'.$purchase->id);
+        if (! $response->json('url') || ! $response->json('id')) {
+            throw new RuntimeException('Stripe Checkout returned no URL.');
+        }
+
+        return ['url' => (string) $response->json('url'), 'session_id' => (string) $response->json('id')];
+    }
     public function syncPlan(Plan $plan): Plan
     {
         try {

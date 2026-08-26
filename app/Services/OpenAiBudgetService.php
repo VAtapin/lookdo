@@ -19,13 +19,14 @@ class OpenAiBudgetService
         }
     }
 
-    public function record(string $operation, string $model, int $inputTokens, int $outputTokens, ?int $userId = null, ?int $classificationId = null): AiUsageRecord
+    public function record(string $operation, string $model, int $inputTokens, int $outputTokens, ?int $userId = null, ?int $classificationId = null, ?int $tenantId = null): AiUsageRecord
     {
         $cost = ($inputTokens / 1_000_000 * (float) config('services.openai.text_input_cost_per_million'))
             + ($outputTokens / 1_000_000 * (float) config('services.openai.text_output_cost_per_million'));
 
         return AiUsageRecord::create([
             'user_id' => $userId,
+            'tenant_id' => $tenantId,
             'business_classification_id' => $classificationId,
             'operation' => $operation,
             'model' => $model,
@@ -36,12 +37,13 @@ class OpenAiBudgetService
         ]);
     }
 
-    public function recordImage(string $operation, string $model, string $quality = 'medium', ?int $userId = null): AiUsageRecord
+    public function recordImage(string $operation, string $model, string $quality = 'medium', ?int $userId = null, ?int $tenantId = null): AiUsageRecord
     {
         $cost = (float) config('services.openai.image_cost_'.$quality, config('services.openai.image_cost_medium'));
 
         return AiUsageRecord::create([
             'user_id' => $userId,
+            'tenant_id' => $tenantId,
             'operation' => $operation,
             'model' => $model,
             'input_tokens' => 0,

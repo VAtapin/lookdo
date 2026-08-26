@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ImageCreditPurchase;
 use App\Models\StripeWebhookEvent;
 use App\Models\Subscription;
 use App\Services\StripeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class StripeWebhookController extends Controller
 {
@@ -22,9 +24,25 @@ class StripeWebhookController extends Controller
             return response()->json(['received' => true, 'duplicate' => true]);
         }
         if (in_array($type, ['checkout.session.completed', 'checkout.session.async_payment_succeeded'], true)) {
-            $subscription = Subscription::find($object['metadata']['subscription_id'] ?? null);
-            if ($subscription) {
-                $subscription->update(['status' => 'active', 'provider' => 'stripe', 'provider_customer_id' => $object['customer'] ?? null, 'provider_subscription_id' => $object['subscription'] ?? null, 'started_at' => $subscription->started_at ?? now(), 'current_period_start' => now()]);
+            if (($object['metadata']['lookdo_type'] ?? null) === 'image_credit') {
+                DB::transaction(function () use ($object): void {
+                    $purchase = ImageCreditPurchase::lockForUpdate()->find($object['metadata']['purchase_id'] ?? null);
+                    if (! $purchase || $purchase->fulfilled_at) {
+                        return;
+                    }
+                    $purchase->tenant->profile()->firstOrCreate()->increment('image_generation_credits', $purchase->quantity);
+                    $purchase->update([
+                        'status' => 'paid',
+                        'stripe_session_id' => $object['id'] ?? $purchase->stripe_session_id,
+                        'stripe_payment_intent_id' => $object['payment_intent'] ?? null,
+                        'fulfilled_at' => now(),
+                    ]);
+                });
+            } else {
+                $subscription = Subscription::find($object['metadata']['subscription_id'] ?? null);
+                if ($subscription) {
+                    $subscription->update(['status' => 'active', 'provider' => 'stripe', 'provider_customer_id' => $object['customer'] ?? null, 'provider_subscription_id' => $object['subscription'] ?? null, 'started_at' => $subscription->started_at ?? now(), 'current_period_start' => now()]);
+                }
             }
         }
         if ($type === 'invoice.paid') {

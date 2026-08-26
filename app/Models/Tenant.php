@@ -56,4 +56,9 @@ class Tenant extends Model
     {
         return $this->hasMany(SmsMessage::class);
     }
+
+    public function imageCreditPurchases(): HasMany
+    {
+        return $this->hasMany(ImageCreditPurchase::class);
+    }
 }

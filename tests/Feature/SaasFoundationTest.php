@@ -752,32 +752,109 @@ class SaasFoundationTest extends TestCase
             ->assertSee('https://golden-wheel.lookdo.app/storage/tenant-social/'.$tenant->id.'/share.webp', false);
     }
 
-    public function test_tenant_can_upload_and_generate_its_social_image(): void
+    public function test_tenant_reviews_an_ai_prompt_before_social_image_generation(): void
     {
         Storage::fake('public');
         config(['services.openai.key' => 'test-key', 'services.openai.image_model' => 'gpt-image-2', 'services.openai.image_cost_medium' => .053]);
-        Http::fake(['api.openai.com/*' => Http::response(['data' => [['b64_json' => base64_encode('generated-webp')]]])]);
+        $reviewedPrompt = 'Realistic premium automotive workshop photography showing a technician precisely fitting an automobile door to a vehicle body, specialist tools visible, landscape composition, no text or logos.';
+        Http::fake(function (HttpRequest $request) use ($reviewedPrompt) {
+            if ($request->url() === 'https://api.openai.com/v1/responses') {
+                return Http::response(['output_text' => json_encode(['prompt' => $reviewedPrompt]), 'model' => 'gpt-5.6-luna', 'usage' => ['input_tokens' => 120, 'output_tokens' => 45]]);
+            }
+
+            return Http::response(['data' => [['b64_json' => base64_encode('generated-webp')]]]);
+        });
         $owner = User::factory()->create();
-        $tenant = Tenant::create(['name' => 'Golden Wheel', 'slug' => 'golden-wheel', 'country' => 'DE', 'locale' => 'de', 'status' => 'active', 'business_description' => 'Lenkräder neu beziehen']);
+        $tenant = Tenant::create(['name' => 'Auto Door Pro', 'slug' => 'auto-door-pro', 'country' => 'DE', 'locale' => 'ru', 'status' => 'active', 'business_description' => 'я устанавливаю двери']);
         $tenant->users()->attach($owner, ['role' => 'owner']);
+        $variation = BusinessVariation::where('code', 'automotive.general')->firstOrFail();
+        $template = RequestTemplate::where('code', 'automotive.general')->firstOrFail();
+        $tenant->businessProfile()->create(['category_id' => $variation->category_id, 'variation_id' => $variation->id, 'request_template_id' => $template->id, 'original_description' => $tenant->business_description]);
 
         $upload = $this->actingAs($owner)->post('/api/tenant/'.$tenant->id.'/social-image', [
             'image' => UploadedFile::fake()->image('share.jpg', 1200, 630),
         ], ['Accept' => 'application/json'])->assertCreated()->assertJsonPath('social_image_source', 'upload');
-        Storage::disk('public')->assertExists($upload->json('social_image_path'));
 
-        $generated = $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/social-image/generate')
-            ->assertCreated()->assertJsonPath('social_image_source', 'ai');
+        $prompt = $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/social-image/prompt')
+            ->assertOk()
+            ->assertJsonPath('prompt', $reviewedPrompt)
+            ->assertJsonPath('context.business_description', 'я устанавливаю двери')
+            ->assertJsonPath('image_generation.remaining_free', 3);
+
+        Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://api.openai.com/v1/responses'
+            && str_contains((string) $request['input'], 'я устанавливаю двери')
+            && str_contains((string) $request['input'], 'automotive'));
+
+        $generated = $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/social-image/generate', ['prompt' => $prompt->json('prompt')])
+            ->assertCreated()->assertJsonPath('social_image_source', 'ai')->assertJsonPath('image_generation.remaining_free', 2);
         Storage::disk('public')->assertExists($generated->json('social_image_path'));
         Storage::disk('public')->assertMissing($upload->json('social_image_path'));
-        $this->assertDatabaseHas('tenant_profiles', ['tenant_id' => $tenant->id, 'social_image_source' => 'ai']);
-        $this->assertDatabaseHas('ai_usage_records', ['user_id' => $owner->id, 'operation' => 'tenant_social_image_generation', 'model' => 'gpt-image-2', 'cost' => .053]);
+        $this->assertDatabaseHas('tenant_profiles', ['tenant_id' => $tenant->id, 'social_image_source' => 'ai', 'image_generation_free_used' => 1]);
+        $this->assertDatabaseHas('ai_usage_records', ['tenant_id' => $tenant->id, 'user_id' => $owner->id, 'operation' => 'tenant_social_image_generation', 'model' => 'gpt-image-2', 'cost' => .053]);
         Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://api.openai.com/v1/images/generations'
+            && $request['prompt'] === $reviewedPrompt
             && $request['model'] === 'gpt-image-2'
             && $request['size'] === '1536x1024'
             && $request['output_format'] === 'webp');
     }
 
+    public function test_image_limit_requires_credit_and_stripe_webhook_adds_it_once(): void
+    {
+        Storage::fake('public');
+        config([
+            'services.openai.key' => 'test-key',
+            'services.stripe.secret' => 'sk_live_test',
+            'services.stripe.webhook_secret' => 'whsec_image_test',
+        ]);
+        Http::fake(function (HttpRequest $request) {
+            if ($request->url() === 'https://api.stripe.com/v1/checkout/sessions') {
+                return Http::response(['id' => 'cs_live_image_1', 'url' => 'https://checkout.stripe.test/image-credit']);
+            }
+            if ($request->url() === 'https://api.openai.com/v1/images/generations') {
+                return Http::response(['data' => [['b64_json' => base64_encode('generated-webp')]]]);
+            }
+
+            return Http::response([], 404);
+        });
+        $owner = User::factory()->create();
+        $tenant = Tenant::create(['name' => 'Credit Test', 'slug' => 'credit-test', 'country' => 'DE', 'locale' => 'de', 'status' => 'active', 'business_description' => 'Automobile doors professionally installed and repaired']);
+        $tenant->users()->attach($owner, ['role' => 'owner']);
+        $plan = Plan::where('code', 'start')->firstOrFail();
+        $tenant->subscriptions()->create(['plan_id' => $plan->id, 'provider' => 'stripe', 'status' => 'active', 'billing_cycle' => 'monthly', 'currency' => 'EUR', 'unit_amount' => 19, 'started_at' => now()]);
+        DB::table('tenant_entitlement_overrides')->insert([
+            ['tenant_id' => $tenant->id, 'key' => 'social_image_free_generations', 'value' => '1', 'created_at' => now(), 'updated_at' => now()],
+            ['tenant_id' => $tenant->id, 'key' => 'social_image_credit_price_cents', 'value' => '150', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        $prompt = 'Premium realistic automotive workshop with a technician installing a vehicle door, landscape photography, no text, logos or watermarks.';
+
+        $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/social-image/generate', ['prompt' => $prompt])
+            ->assertCreated()->assertJsonPath('image_generation.remaining_free', 0);
+        $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/social-image/generate', ['prompt' => $prompt])
+            ->assertStatus(402)->assertJsonPath('message', 'IMAGE_CREDIT_REQUIRED');
+
+        $checkout = $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/image-credits/checkout', ['quantity' => 2])
+            ->assertOk()->assertJsonPath('checkout_url', 'https://checkout.stripe.test/image-credit');
+        $purchaseId = DB::table('image_credit_purchases')->value('id');
+        $this->assertDatabaseHas('image_credit_purchases', ['id' => $purchaseId, 'quantity' => 2, 'unit_amount' => 1.50, 'total_amount' => 3.00, 'status' => 'pending']);
+        Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://api.stripe.com/v1/checkout/sessions'
+            && $request['mode'] === 'payment'
+            && (int) data_get($request->data(), 'line_items.0.price_data.unit_amount') === 300
+            && data_get($request->data(), 'metadata.lookdo_type') === 'image_credit');
+
+        $event = ['id' => 'evt_image_credit_1', 'type' => 'checkout.session.completed', 'data' => ['object' => ['id' => 'cs_live_image_1', 'payment_intent' => 'pi_image_1', 'metadata' => ['lookdo_type' => 'image_credit', 'tenant_id' => (string) $tenant->id, 'purchase_id' => (string) $purchaseId, 'quantity' => '2']]]];
+        $payload = json_encode($event, JSON_UNESCAPED_SLASHES);
+        $timestamp = time();
+        $signature = hash_hmac('sha256', $timestamp.'.'.$payload, 'whsec_image_test');
+        $server = ['CONTENT_TYPE' => 'application/json', 'HTTP_STRIPE_SIGNATURE' => 't='.$timestamp.',v1='.$signature];
+        $this->call('POST', '/api/stripe/webhook', [], [], [], $server, $payload)->assertOk();
+        $this->assertDatabaseHas('tenant_profiles', ['tenant_id' => $tenant->id, 'image_generation_credits' => 2]);
+        $this->call('POST', '/api/stripe/webhook', [], [], [], $server, $payload)->assertOk()->assertJsonPath('duplicate', true);
+        $this->assertSame(2, (int) $tenant->profile()->value('image_generation_credits'));
+
+        $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/social-image/generate', ['prompt' => $prompt])
+            ->assertCreated()->assertJsonPath('image_generation.credits', 1);
+        $this->assertSame(1, (int) $tenant->profile()->value('image_generation_credits'));
+    }
     public function test_platform_exposes_configured_demo_video(): void
     {
         SystemSetting::updateOrCreate(['key' => 'demo_video_source'], ['value' => 'youtube']);
