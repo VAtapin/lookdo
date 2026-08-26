@@ -426,7 +426,9 @@ class SaasFoundationTest extends TestCase
             'usage' => ['input_tokens' => 100, 'output_tokens' => 60],
         ])]);
         $admin = User::factory()->create(['is_super_admin' => true]);
+        SystemSetting::updateOrCreate(['key' => 'legal_dispute_statement'], ['value' => 'obsolete']);
         $settings = $this->actingAs($admin)->getJson('/api/control/settings')->assertOk()->json('settings');
+        $this->assertArrayNotHasKey('legal_dispute_statement', $settings);
         $settings['legal_operator_name'] = 'LOOKDO GmbH';
         $settings['legal_phone'] = '+49 30 123456';
         $settings['default_request_template_code'] = RequestTemplate::where('enabled', true)->value('code');

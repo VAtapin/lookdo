@@ -546,7 +546,7 @@ class AdminController extends Controller
     public function settings(): JsonResponse
     {
         return response()->json([
-            'settings' => SystemSetting::where('is_secret', false)->pluck('value', 'key'),
+            'settings' => SystemSetting::where('is_secret', false)->where('key', '!=', 'legal_dispute_statement')->pluck('value', 'key'),
             'pages' => PlatformPage::orderBy('key')->get(),
             'templates' => RequestTemplate::where('enabled', true)->orderByDesc('sort_order')->get(['id', 'code', 'name']),
         ]);
@@ -577,7 +577,6 @@ class AdminController extends Controller
             'settings.legal_phone' => 'nullable|string|max:80',
             'settings.legal_register' => 'nullable|string|max:255',
             'settings.legal_vat_id' => 'nullable|string|max:120',
-            'settings.legal_dispute_statement' => 'nullable|string|max:2000',
         ]);
 
         $allowed = [
@@ -585,7 +584,6 @@ class AdminController extends Controller
             'trial_days_default', 'upload_base_limit_mb', 'registration_enabled', 'maintenance',
             'enabled_locales', 'integrations', 'legal_operator_name', 'legal_operator_address',
             'legal_representative', 'legal_email', 'legal_phone', 'legal_register', 'legal_vat_id',
-            'legal_dispute_statement',
         ];
         DB::transaction(function () use ($data, $allowed, $audit): void {
             foreach ($allowed as $key) {

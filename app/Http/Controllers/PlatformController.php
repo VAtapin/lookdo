@@ -8,6 +8,7 @@ use App\Models\PlatformPage;
 use App\Models\SystemSetting;
 use App\Services\BusinessClassifier;
 use App\Services\PlanFeaturePresenter;
+use App\Support\LegalContentSanitizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -24,7 +25,7 @@ class PlatformController extends Controller
     {
         $page = PlatformPage::where('key', $key)->where('is_published', true)->firstOrFail();
 
-        return response()->json(['key' => $key, 'title' => $page->localized('title'), 'content' => $this->replaceLegalTokens($page->localized('content'))]);
+        return response()->json(['key' => $key, 'title' => $page->localized('title'), 'content' => $this->replaceLegalTokens(LegalContentSanitizer::clean($page->localized('content')))]);
     }
 
     public function tenantSite(Request $request): JsonResponse
