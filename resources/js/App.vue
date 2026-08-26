@@ -23,7 +23,7 @@ function switchLocale(value: Locale) {
   <div class="site-shell">
     <header v-if="showChrome" class="topbar">
       <RouterLink class="public-wordmark" :to="`/${locale}`"><b>LOOK</b><span>DO</span></RouterLink>
-      <nav class="desktop-nav"><a href="#features">{{ tr('features') }}</a><a href="#how">{{ tr('how') }}</a><a href="#audience">{{ tr('forWhom') }}</a><a href="#pricing">{{ tr('pricing') }}</a></nav>
+      <nav class="desktop-nav"><RouterLink :to="{ path: `/${locale}`, hash: '#features' }">{{ tr('features') }}</RouterLink><RouterLink :to="{ path: `/${locale}`, hash: '#how' }">{{ tr('how') }}</RouterLink><RouterLink :to="{ path: `/${locale}`, hash: '#audience' }">{{ tr('forWhom') }}</RouterLink><RouterLink :to="{ path: `/${locale}`, hash: '#pricing' }">{{ tr('pricing') }}</RouterLink></nav>
       <div class="top-actions"><select :value="locale" aria-label="Language" @change="switchLocale(($event.target as HTMLSelectElement).value as Locale)"><option value="de">DE</option><option value="en">EN</option><option value="ru">RU</option><option value="uk">UK</option></select><RouterLink class="text-link" :to="`/${locale}/login`">{{ tr('login') }}</RouterLink><RouterLink class="button small" :to="`/${locale}/register`">{{ tr('create') }}</RouterLink></div>
     </header>
     <main><RouterView /></main>

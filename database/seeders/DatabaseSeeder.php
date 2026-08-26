@@ -126,15 +126,31 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        foreach (['impressum', 'datenschutz', 'agb', 'widerruf', 'kontakt'] as $key) {
-            PlatformPage::updateOrCreate(['key' => $key], ['title' => ['de' => ucfirst($key), 'en' => ucfirst($key), 'ru' => match ($key) {
-                'impressum' => 'Выходные данные','datenschutz' => 'Конфиденциальность','agb' => 'Условия использования','widerruf' => 'Отказ от договора','kontakt' => 'Контакты'
-            }, 'uk' => match ($key) {
-                'impressum' => 'Вихідні дані','datenschutz' => 'Конфіденційність','agb' => 'Умови використання','widerruf' => 'Відмова від договору','kontakt' => 'Контакти'
-            }], 'content' => ['de' => 'Dieser Inhalt wird vor dem Produktionsstart vom Betreiber vervollständigt.', 'en' => 'This content will be completed by the operator before production launch.', 'ru' => 'Содержимое заполняется владельцем платформы перед рабочим запуском.', 'uk' => 'Вміст заповнюється власником платформи перед робочим запуском.']]);
+        $legacyLegalContent = [
+            'de' => 'Dieser Inhalt wird vor dem Produktionsstart vom Betreiber vervollständigt.',
+            'en' => 'This content will be completed by the operator before production launch.',
+            'ru' => 'Содержимое заполняется владельцем платформы перед рабочим запуском.',
+            'uk' => 'Вміст заповнюється власником платформи перед робочим запуском.',
+        ];
+        foreach (config('legal_pages.pages', []) as $key => $definition) {
+            $page = PlatformPage::firstOrNew(['key' => $key]);
+            $titles = $page->title ?? [];
+            $contents = $page->content ?? [];
+            foreach (['de', 'en', 'ru', 'uk'] as $pageLocale) {
+                if (blank($titles[$pageLocale] ?? null) || ($titles[$pageLocale] ?? null) === ucfirst($key)) {
+                    $titles[$pageLocale] = $definition['title'][$pageLocale];
+                }
+                if (blank($contents[$pageLocale] ?? null) || ($contents[$pageLocale] ?? null) === $legacyLegalContent[$pageLocale]) {
+                    $contents[$pageLocale] = $definition['content'][$pageLocale];
+                }
+            }
+            $page->fill(['title' => $titles, 'content' => $contents, 'is_published' => $page->exists ? $page->is_published : true])->save();
         }
         foreach (['platform_name' => 'LOOKDO', 'default_locale' => 'ru', 'default_request_template_code' => 'general-services.general', 'registration_enabled' => true, 'enabled_locales' => ['de', 'en', 'ru', 'uk'], 'support_email' => 'support@lookdo.app', 'trial_days_default' => 0, 'upload_base_limit_mb' => 100, 'integrations' => ['stripe' => true, 'openai' => true], 'maintenance' => false] as $key => $value) {
-            SystemSetting::updateOrCreate(['key' => $key], ['value' => $value]);
+            SystemSetting::firstOrCreate(['key' => $key], ['value' => $value]);
+        }
+        foreach (config('legal_pages.operator_settings', []) as $key => $value) {
+            SystemSetting::firstOrCreate(['key' => $key], ['value' => $value]);
         }
     }
 

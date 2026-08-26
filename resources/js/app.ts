@@ -19,6 +19,6 @@ const routes = [
     { path: '/:key(impressum|datenschutz|agb|widerruf|kontakt)', component: LegalView },
     { path: '/:locale(de|en|ru|uk)/:key(impressum|datenschutz|agb|widerruf|kontakt)', component: LegalView },
 ];
-const router=createRouter({history:createWebHistory(),routes,scrollBehavior:()=>({top:0})});
+const router=createRouter({history:createWebHistory(),routes,scrollBehavior:(to)=>to.hash?({el:to.hash,top:78,behavior:'smooth'}):({top:0})});
 registerSW({immediate:true});
 createApp(App).use(router).mount('#app');

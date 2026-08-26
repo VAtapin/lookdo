@@ -22,6 +22,19 @@ class PlatformController extends Controller
     {
         $page = PlatformPage::where('key', $key)->where('is_published', true)->firstOrFail();
 
-        return response()->json(['key' => $key, 'title' => $page->localized('title'), 'content' => $page->localized('content')]);
+        return response()->json(['key' => $key, 'title' => $page->localized('title'), 'content' => $this->replaceLegalTokens($page->localized('content'))]);
+    }
+
+    private function replaceLegalTokens(string $content): string
+    {
+        $settings = config('legal_pages.operator_settings', []);
+        $tokens = [];
+        foreach ($settings as $key => $fallback) {
+            $token = str_replace('legal_', '', $key);
+            $value = (string) SystemSetting::read($key, $fallback);
+            $tokens['{{'.$token.'}}'] = $token === 'operator_address' ? nl2br(e($value)) : e($value);
+        }
+
+        return strtr($content, $tokens);
     }
 }

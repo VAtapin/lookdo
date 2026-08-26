@@ -6,6 +6,7 @@ use App\Models\BusinessClassification;
 use App\Models\BusinessPhrase;
 use App\Models\BusinessVariation;
 use App\Models\Plan;
+use App\Models\PlatformPage;
 use App\Models\RequestTemplate;
 use App\Models\SystemSetting;
 use App\Models\Tenant;
@@ -75,6 +76,35 @@ class SaasFoundationTest extends TestCase
         $this->artisan('lookdo:platform-data', ['--repair' => true])->assertSuccessful();
 
         $this->assertFalse($template->fresh()->enabled);
+    }
+
+    public function test_platform_repair_populates_legal_pages_without_overwriting_custom_content(): void
+    {
+        $contact = PlatformPage::where('key', 'kontakt')->firstOrFail();
+        $content = $contact->content;
+        $content['de'] = '<h2>Eigener Kontakttext</h2>';
+        $contact->update(['content' => $content]);
+
+        $this->artisan('lookdo:platform-data', ['--repair' => true])->assertSuccessful();
+
+        $this->assertSame('<h2>Eigener Kontakttext</h2>', $contact->fresh()->content['de']);
+        $this->assertStringContainsString('Privacy policy', PlatformPage::where('key', 'datenschutz')->firstOrFail()->title['en']);
+    }
+
+    public function test_public_legal_pages_replace_operator_tokens_from_system_settings(): void
+    {
+        SystemSetting::updateOrCreate(['key' => 'legal_operator_name'], ['value' => 'LOOKDO Test GmbH']);
+        SystemSetting::updateOrCreate(['key' => 'legal_operator_address'], ['value' => "Musterstraße 1\n10115 Berlin"]);
+
+        $this->withHeader('X-Locale', 'de')->getJson('/api/platform/pages/impressum')
+            ->assertOk()
+            ->assertJsonPath('title', 'Impressum')
+            ->assertJsonFragment(['key' => 'impressum']);
+
+        $content = $this->withHeader('X-Locale', 'de')->getJson('/api/platform/pages/impressum')->json('content');
+        $this->assertStringContainsString('LOOKDO Test GmbH', $content);
+        $this->assertStringContainsString('Musterstraße 1<br />', $content);
+        $this->assertStringNotContainsString('{{operator_name}}', $content);
     }
 
     public function test_exact_russian_phrases_and_combined_description_find_expected_templates(): void
