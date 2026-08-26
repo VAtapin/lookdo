@@ -14,6 +14,7 @@ class LegalContentSanitizerTest extends TestCase
 <h2>Hinweis zur Streitbeilegung</h2>
 <p>Wir nehmen nicht an einem Verfahren vor einer Verbraucherschlichtungsstelle teil. <a href="https://ec.europa.eu/consumers/odr/">OS-Plattform</a></p>
 <p>{{dispute_statement}}</p>
+<h2>Haftung für Links</h2><p>Dieser alte Text wird entfernt.</p>
 <h2>Kontakt</h2><p>Dieser Inhalt bleibt sichtbar.</p>
 HTML;
 
@@ -24,6 +25,7 @@ HTML;
         $this->assertStringNotContainsString('Verbraucherschlichtungsstelle', $clean);
         $this->assertStringNotContainsString('ec.europa.eu', $clean);
         $this->assertStringNotContainsString('dispute_statement', $clean);
+        $this->assertStringNotContainsString('Haftung für Links', $clean);
         $this->assertStringContainsString('<h2>Kontakt</h2>', $clean);
         $this->assertStringContainsString('Dieser Inhalt bleibt sichtbar.', $clean);
     }

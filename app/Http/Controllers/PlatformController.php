@@ -51,13 +51,65 @@ class PlatformController extends Controller
     private function replaceLegalTokens(string $content): string
     {
         $settings = config('legal_pages.operator_settings', []);
-        $tokens = [];
+        $values = [];
         foreach ($settings as $key => $fallback) {
-            $token = str_replace('legal_', '', $key);
-            $value = (string) SystemSetting::read($key, $fallback);
+            $values[str_replace('legal_', '', $key)] = (string) SystemSetting::read($key, $fallback);
+        }
+
+        $content = $this->normalizeOptionalLegalSections($content);
+        foreach (['representative', 'register', 'vat_id'] as $token) {
+            $content = preg_replace_callback(
+                '~\{\{#'.$token.'\}\}(.*?)\{\{/'.$token.'\}\}~isu',
+                fn (array $match): string => blank($values[$token] ?? null) ? '' : $match[1],
+                $content,
+            ) ?? $content;
+
+            if (blank($values[$token] ?? null)) {
+                $content = $this->removeEmptyOptionalField($content, $token);
+            }
+        }
+
+        $tokens = [];
+        foreach ($values as $token => $value) {
             $tokens['{{'.$token.'}}'] = $token === 'operator_address' ? nl2br(e($value)) : e($value);
         }
 
         return strtr($content, $tokens);
+    }
+
+    private function normalizeOptionalLegalSections(string $content): string
+    {
+        return strtr($content, [
+            '<p>Vertreten durch: {{representative}}</p>' => '{{#representative}}<h2>Vertretungsberechtigte Person</h2><p>{{representative}}</p>{{/representative}}',
+            '<p>Represented by: {{representative}}</p>' => '{{#representative}}<h2>Authorized representative</h2><p>{{representative}}</p>{{/representative}}',
+            '<p>Уполномоченный представитель: {{representative}}</p>' => '{{#representative}}<h2>Уполномоченный представитель</h2><p>{{representative}}</p>{{/representative}}',
+            '<p>Уповноважений представник: {{representative}}</p>' => '{{#representative}}<h2>Уповноважений представник</h2><p>{{representative}}</p>{{/representative}}',
+            '<h2>Register und Steuerangaben</h2><p>{{register}}<br>{{vat_id}}</p>' => '{{#register}}<h2>Registereintrag</h2><p>{{register}}</p>{{/register}}{{#vat_id}}<h2>Umsatzsteuer-ID</h2><p>{{vat_id}}</p>{{/vat_id}}',
+            '<h2>Register and tax information</h2><p>{{register}}<br>{{vat_id}}</p>' => '{{#register}}<h2>Register entry</h2><p>{{register}}</p>{{/register}}{{#vat_id}}<h2>VAT ID</h2><p>{{vat_id}}</p>{{/vat_id}}',
+            '<h2>Регистрация и налоговые сведения</h2><p>{{register}}<br>{{vat_id}}</p>' => '{{#register}}<h2>Запись в реестре</h2><p>{{register}}</p>{{/register}}{{#vat_id}}<h2>Идентификатор плательщика НДС</h2><p>{{vat_id}}</p>{{/vat_id}}',
+            '<h2>Реєстраційні та податкові відомості</h2><p>{{register}}<br>{{vat_id}}</p>' => '{{#register}}<h2>Запис у реєстрі</h2><p>{{register}}</p>{{/register}}{{#vat_id}}<h2>Ідентифікатор платника ПДВ</h2><p>{{vat_id}}</p>{{/vat_id}}',
+        ]);
+    }
+
+    private function removeEmptyOptionalField(string $content, string $token): string
+    {
+        $headings = [
+            'representative' => 'Vertretungsberechtigte Person|Vertreten durch|Authorized representative|Represented by|Уполномоченный представитель|Уповноважений представник',
+            'register' => 'Registereintrag|Handelsregister|Register entry|Запись в реестре|Запис у реєстрі',
+            'vat_id' => 'Umsatzsteuer-ID|USt-IdNr\.?|VAT ID|Идентификатор плательщика НДС|Ідентифікатор платника ПДВ',
+        ];
+        $placeholder = preg_quote('{{'.$token.'}}', '~');
+        $heading = $headings[$token];
+        $content = preg_replace(
+            '~<h([1-6])\b[^>]*>[^<]*(?:'.$heading.')[^<]*</h\1>\s*<(p|address)\b[^>]*>.*?'.$placeholder.'.*?</\2>\s*~isu',
+            '',
+            $content,
+        ) ?? $content;
+
+        return preg_replace_callback(
+            '~<(p|address)\b[^>]*>.*?</\1>~isu',
+            fn (array $match): string => str_contains($match[0], '{{'.$token.'}}') ? '' : $match[0],
+            $content,
+        ) ?? $content;
     }
 }

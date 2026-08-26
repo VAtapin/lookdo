@@ -17,31 +17,29 @@ return [
                 'de' => <<<'HTML'
 <h2>Angaben gemäß § 5 DDG</h2>
 <address><strong>{{operator_name}}</strong><br>{{operator_address}}</address>
-<p>Vertreten durch: {{representative}}</p>
+{{#representative}}<h2>Vertretungsberechtigte Person</h2><p>{{representative}}</p>{{/representative}}
 <h2>Kontakt</h2>
 <p>E-Mail: <a href="mailto:{{email}}">{{email}}</a><br>Telefon: {{phone}}</p>
-<h2>Register und Steuerangaben</h2>
-<p>{{register}}<br>{{vat_id}}</p>
-<h2>Verantwortung für Inhalte und Links</h2>
-<p>Wir sind für eigene Inhalte nach den allgemeinen Gesetzen verantwortlich. Für Inhalte externer Seiten, auf die wir verlinken, sind ausschließlich deren Betreiber verantwortlich. Bei Hinweisen auf Rechtsverletzungen prüfen und entfernen wir betroffene Links, soweit dies erforderlich ist.</p>
+{{#register}}<h2>Registereintrag</h2><p>{{register}}</p>{{/register}}
+{{#vat_id}}<h2>Umsatzsteuer-ID</h2><p>{{vat_id}}</p>{{/vat_id}}
 HTML,
                 'en' => <<<'HTML'
-<h2>Provider information</h2><address><strong>{{operator_name}}</strong><br>{{operator_address}}</address><p>Represented by: {{representative}}</p>
+<h2>Provider information</h2><address><strong>{{operator_name}}</strong><br>{{operator_address}}</address>{{#representative}}<h2>Authorized representative</h2><p>{{representative}}</p>{{/representative}}
 <h2>Contact</h2><p>Email: <a href="mailto:{{email}}">{{email}}</a><br>Phone: {{phone}}</p>
-<h2>Register and tax information</h2><p>{{register}}<br>{{vat_id}}</p>
-<h2>Content and external links</h2><p>We are responsible for our own content under applicable law. External websites remain the responsibility of their respective operators. We review substantiated notices of unlawful content and remove affected links where required.</p>
+{{#register}}<h2>Register entry</h2><p>{{register}}</p>{{/register}}{{#vat_id}}<h2>VAT ID</h2><p>{{vat_id}}</p>{{/vat_id}}
+
 HTML,
                 'ru' => <<<'HTML'
-<h2>Сведения о владельце сервиса</h2><address><strong>{{operator_name}}</strong><br>{{operator_address}}</address><p>Уполномоченный представитель: {{representative}}</p>
+<h2>Сведения о владельце сервиса</h2><address><strong>{{operator_name}}</strong><br>{{operator_address}}</address>{{#representative}}<h2>Уполномоченный представитель</h2><p>{{representative}}</p>{{/representative}}
 <h2>Контакты</h2><p>Электронная почта: <a href="mailto:{{email}}">{{email}}</a><br>Телефон: {{phone}}</p>
-<h2>Регистрация и налоговые сведения</h2><p>{{register}}<br>{{vat_id}}</p>
-<h2>Ответственность за содержимое и ссылки</h2><p>Мы отвечаем за собственное содержимое в соответствии с применимым законодательством. За содержимое внешних сайтов отвечают их владельцы. Обоснованные сообщения о нарушениях проверяются, а соответствующие ссылки при необходимости удаляются.</p>
+{{#register}}<h2>Запись в реестре</h2><p>{{register}}</p>{{/register}}{{#vat_id}}<h2>Идентификатор плательщика НДС</h2><p>{{vat_id}}</p>{{/vat_id}}
+
 HTML,
                 'uk' => <<<'HTML'
-<h2>Відомості про власника сервісу</h2><address><strong>{{operator_name}}</strong><br>{{operator_address}}</address><p>Уповноважений представник: {{representative}}</p>
+<h2>Відомості про власника сервісу</h2><address><strong>{{operator_name}}</strong><br>{{operator_address}}</address>{{#representative}}<h2>Уповноважений представник</h2><p>{{representative}}</p>{{/representative}}
 <h2>Контакти</h2><p>Електронна пошта: <a href="mailto:{{email}}">{{email}}</a><br>Телефон: {{phone}}</p>
-<h2>Реєстраційні та податкові відомості</h2><p>{{register}}<br>{{vat_id}}</p>
-<h2>Відповідальність за вміст і посилання</h2><p>Ми відповідаємо за власний вміст відповідно до чинного законодавства. За вміст зовнішніх сайтів відповідають їхні власники. Обґрунтовані повідомлення про порушення перевіряються, а відповідні посилання за потреби видаляються.</p>
+{{#register}}<h2>Запис у реєстрі</h2><p>{{register}}</p>{{/register}}{{#vat_id}}<h2>Ідентифікатор платника ПДВ</h2><p>{{vat_id}}</p>{{/vat_id}}
+
 HTML,
             ],
         ],
@@ -127,41 +125,20 @@ HTML,
 HTML,
             ],
         ],
-        'widerruf' => [
-            'title' => ['de' => 'Widerruf und Kündigung', 'en' => 'Withdrawal and cancellation', 'ru' => 'Отказ от договора и прекращение', 'uk' => 'Відмова від договору та припинення'],
-            'content' => [
-                'de' => <<<'HTML'
-<h2>Verträge mit Unternehmern</h2><p>LOOKDO richtet sich an Unternehmer im Sinne des § 14 BGB. Für Verträge, die in Ausübung einer gewerblichen oder selbstständigen beruflichen Tätigkeit geschlossen werden, besteht grundsätzlich kein gesetzliches Verbraucher-Widerrufsrecht. Die ordentliche Kündigung eines Abonnements richtet sich nach dem gebuchten Tarif und ist vom Widerruf zu unterscheiden.</p>
-<h2>Falls ausnahmsweise ein Verbrauchervertrag vorliegt</h2><h3>Widerrufsrecht</h3><p>Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen. Die Frist beginnt mit dem Tag des Vertragsschlusses.</p><p>Um Ihr Widerrufsrecht auszuüben, müssen Sie uns – {{operator_name}}, {{operator_address}}, E-Mail <a href="mailto:{{email}}">{{email}}</a>, Telefon {{phone}} – mittels einer eindeutigen Erklärung über Ihren Entschluss informieren. Zur Wahrung der Frist reicht die rechtzeitige Absendung.</p>
-<h3>Folgen des Widerrufs</h3><p>Wir erstatten erhaltene Zahlungen unverzüglich und spätestens binnen vierzehn Tagen ab Eingang des Widerrufs. Wurde auf ausdrücklichen Wunsch bereits vor Ablauf der Frist mit der Leistung begonnen, kann ein angemessener Betrag für die bis zum Widerruf erbrachte Leistung geschuldet sein.</p>
-<h2>Muster-Widerrufsformular</h2><p>An {{operator_name}}, {{operator_address}}, E-Mail {{email}}:</p><p>Hiermit widerrufe(n) ich/wir den von mir/uns abgeschlossenen Vertrag über die Nutzung von LOOKDO.<br>Bestellt am / freigeschaltet am:<br>Name des/der Verbraucher(s):<br>Anschrift:<br>Datum:<br>Unterschrift (nur bei Mitteilung auf Papier):</p>
-<h2>Abonnement kündigen</h2><p>Eine tarifgemäße Kündigung kann über die im Konto angebotene Abrechnungsverwaltung oder per E-Mail an <a href="mailto:{{email}}">{{email}}</a> erklärt werden. Die Bestätigung nennt den Beendigungszeitpunkt.</p>
-HTML,
-                'en' => <<<'HTML'
-<h2>Business contracts</h2><p>LOOKDO is intended for entrepreneurs. A statutory consumer withdrawal right generally does not apply to contracts concluded for a commercial or independent professional activity. Ordinary subscription cancellation follows the selected plan and is distinct from withdrawal.</p><h2>If a consumer contract exceptionally applies</h2><p>You may withdraw within fourteen days without giving a reason, starting on the contract date. Send a clear statement to {{operator_name}}, {{operator_address}}, <a href="mailto:{{email}}">{{email}}</a>, phone {{phone}}. Timely dispatch is sufficient.</p><p>Payments will be reimbursed no later than fourteen days after receipt. If performance began at your express request during the withdrawal period, a proportionate amount may be due for services already provided.</p><h2>Model withdrawal form</h2><p>To {{operator_name}}, {{operator_address}}, {{email}}:<br>I/we hereby withdraw from my/our LOOKDO contract.<br>Ordered/activated on:<br>Consumer name:<br>Address:<br>Date:<br>Signature (paper only):</p><h2>Cancel a subscription</h2><p>Plan cancellation can be submitted through the account's billing management or by email to <a href="mailto:{{email}}">{{email}}</a>. Confirmation will state the effective end date.</p>
-HTML,
-                'ru' => <<<'HTML'
-<h2>Договоры с предпринимателями</h2><p>LOOKDO предназначен для предпринимателей. Законное потребительское право на отзыв обычно не применяется к договору, заключённому в рамках коммерческой или самостоятельной профессиональной деятельности. Обычное прекращение подписки регулируется тарифом и отличается от отзыва договора.</p><h2>Если в исключительном случае договор является потребительским</h2><p>Вы вправе отказаться от договора без объяснения причин в течение 14 дней со дня его заключения. Отправьте однозначное заявление: {{operator_name}}, {{operator_address}}, <a href="mailto:{{email}}">{{email}}</a>, телефон {{phone}}. Для соблюдения срока достаточно своевременной отправки.</p><p>Платежи возвращаются не позднее 14 дней после получения заявления. Если по вашему прямому требованию оказание услуги началось до окончания срока, может удерживаться соразмерная стоимость уже оказанной части.</p><h2>Пример заявления</h2><p>Получатель: {{operator_name}}, {{operator_address}}, {{email}}.<br>Настоящим я/мы отказываюсь/отказываемся от договора LOOKDO.<br>Дата заказа/активации:<br>Имя потребителя:<br>Адрес:<br>Дата:<br>Подпись (только на бумаге):</p><h2>Прекращение подписки</h2><p>Подписку можно прекратить через управление оплатой в аккаунте или письмом на <a href="mailto:{{email}}">{{email}}</a>. В подтверждении будет указана дата окончания.</p>
-HTML,
-                'uk' => <<<'HTML'
-<h2>Договори з підприємцями</h2><p>LOOKDO призначений для підприємців. Законне споживче право на відкликання зазвичай не застосовується до договору, укладеного в межах комерційної або незалежної професійної діяльності. Звичайне припинення підписки регулюється тарифом і відрізняється від відкликання договору.</p><h2>Якщо у винятковому випадку договір є споживчим</h2><p>Ви можете відмовитися від договору без пояснення причин протягом 14 днів із дня укладення. Надішліть однозначну заяву: {{operator_name}}, {{operator_address}}, <a href="mailto:{{email}}">{{email}}</a>, телефон {{phone}}. Для дотримання строку достатньо своєчасного надсилання.</p><p>Платежі повертаються не пізніше 14 днів після отримання заяви. Якщо на ваше пряме прохання послуга почала надаватися раніше, може утримуватися пропорційна вартість уже наданої частини.</p><h2>Зразок заяви</h2><p>Одержувач: {{operator_name}}, {{operator_address}}, {{email}}.<br>Цим я/ми відмовляюся/відмовляємося від договору LOOKDO.<br>Дата замовлення/активації:<br>Ім'я споживача:<br>Адреса:<br>Дата:<br>Підпис (лише на папері):</p><h2>Припинення підписки</h2><p>Підписку можна припинити через керування оплатою в обліковому записі або листом на <a href="mailto:{{email}}">{{email}}</a>. У підтвердженні буде вказано дату завершення.</p>
-HTML,
-            ],
-        ],
         'kontakt' => [
             'title' => ['de' => 'Kontakt', 'en' => 'Contact', 'ru' => 'Контакты', 'uk' => 'Контакти'],
             'content' => [
                 'de' => <<<'HTML'
-<h2>LOOKDO Support</h2><p>Fragen zu Registrierung, Tarifen, Domains, Abrechnung oder Datenschutz senden Sie bitte an <a href="mailto:{{email}}">{{email}}</a>.</p><h2>Betreiber</h2><address><strong>{{operator_name}}</strong><br>{{operator_address}}<br>Telefon: {{phone}}</address><h2>Damit wir schneller helfen können</h2><p>Nennen Sie bitte die E-Mail-Adresse Ihres Kontos, den Namen Ihres Betriebs und – falls vorhanden – Ihre LOOKDO Subdomain. Senden Sie niemals Passwörter, vollständige Zahlungsdaten oder geheime API-Schlüssel per E-Mail.</p><h2>Rechtliche Mitteilungen</h2><p>Rechtlich erhebliche Erklärungen können an die oben genannte ladungsfähige Anschrift oder an <a href="mailto:{{email}}">{{email}}</a> gesendet werden. Für Kündigung und Widerruf beachten Sie bitte zusätzlich die Seite „Widerruf und Kündigung“.</p>
+<h2>LOOKDO Support</h2><p>Fragen zu Registrierung, Tarifen, Domains, Abrechnung oder Datenschutz senden Sie bitte an <a href="mailto:{{email}}">{{email}}</a>.</p><h2>Betreiber</h2><address><strong>{{operator_name}}</strong><br>{{operator_address}}<br>Telefon: {{phone}}</address><h2>Damit wir schneller helfen können</h2><p>Nennen Sie bitte die E-Mail-Adresse Ihres Kontos, den Namen Ihres Betriebs und – falls vorhanden – Ihre LOOKDO Subdomain. Senden Sie niemals Passwörter, vollständige Zahlungsdaten oder geheime API-Schlüssel per E-Mail.</p><h2>Rechtliche Mitteilungen</h2><p>Rechtlich erhebliche Erklärungen können an die oben genannte ladungsfähige Anschrift oder an <a href="mailto:{{email}}">{{email}}</a> gesendet werden.</p>
 HTML,
                 'en' => <<<'HTML'
-<h2>LOOKDO support</h2><p>For registration, plans, domains, billing or privacy questions, email <a href="mailto:{{email}}">{{email}}</a>.</p><h2>Operator</h2><address><strong>{{operator_name}}</strong><br>{{operator_address}}<br>Phone: {{phone}}</address><h2>Help us respond efficiently</h2><p>Include your account email, business name and LOOKDO subdomain where available. Never send passwords, full payment details or secret API keys by email.</p><h2>Legal notices</h2><p>Legally relevant notices may be sent to the service address above or to <a href="mailto:{{email}}">{{email}}</a>. Please also see “Withdrawal and cancellation”.</p>
+<h2>LOOKDO support</h2><p>For registration, plans, domains, billing or privacy questions, email <a href="mailto:{{email}}">{{email}}</a>.</p><h2>Operator</h2><address><strong>{{operator_name}}</strong><br>{{operator_address}}<br>Phone: {{phone}}</address><h2>Help us respond efficiently</h2><p>Include your account email, business name and LOOKDO subdomain where available. Never send passwords, full payment details or secret API keys by email.</p><h2>Legal notices</h2><p>Legally relevant notices may be sent to the service address above or to <a href="mailto:{{email}}">{{email}}</a>.</p>
 HTML,
                 'ru' => <<<'HTML'
-<h2>Поддержка LOOKDO</h2><p>Вопросы о регистрации, тарифах, доменах, оплате или конфиденциальности направляйте на <a href="mailto:{{email}}">{{email}}</a>.</p><h2>Владелец сервиса</h2><address><strong>{{operator_name}}</strong><br>{{operator_address}}<br>Телефон: {{phone}}</address><h2>Что указать в обращении</h2><p>Сообщите электронную почту аккаунта, название бизнеса и, если есть, поддомен LOOKDO. Никогда не присылайте пароли, полные платёжные данные или секретные API-ключи.</p><h2>Юридически значимые сообщения</h2><p>Их можно направлять на указанный выше почтовый адрес или на <a href="mailto:{{email}}">{{email}}</a>. Для прекращения подписки и отзыва договора также ознакомьтесь со страницей «Отказ от договора и прекращение».</p>
+<h2>Поддержка LOOKDO</h2><p>Вопросы о регистрации, тарифах, доменах, оплате или конфиденциальности направляйте на <a href="mailto:{{email}}">{{email}}</a>.</p><h2>Владелец сервиса</h2><address><strong>{{operator_name}}</strong><br>{{operator_address}}<br>Телефон: {{phone}}</address><h2>Что указать в обращении</h2><p>Сообщите электронную почту аккаунта, название бизнеса и, если есть, поддомен LOOKDO. Никогда не присылайте пароли, полные платёжные данные или секретные API-ключи.</p><h2>Юридически значимые сообщения</h2><p>Их можно направлять на указанный выше почтовый адрес или на <a href="mailto:{{email}}">{{email}}</a>.</p>
 HTML,
                 'uk' => <<<'HTML'
-<h2>Підтримка LOOKDO</h2><p>Питання щодо реєстрації, тарифів, доменів, оплати чи конфіденційності надсилайте на <a href="mailto:{{email}}">{{email}}</a>.</p><h2>Власник сервісу</h2><address><strong>{{operator_name}}</strong><br>{{operator_address}}<br>Телефон: {{phone}}</address><h2>Що вказати у зверненні</h2><p>Повідомте електронну пошту облікового запису, назву бізнесу та, якщо є, піддомен LOOKDO. Ніколи не надсилайте паролі, повні платіжні дані або секретні API-ключі.</p><h2>Юридично значущі повідомлення</h2><p>Їх можна надсилати на зазначену вище поштову адресу або на <a href="mailto:{{email}}">{{email}}</a>. Для припинення підписки та відкликання договору також перегляньте сторінку «Відмова від договору та припинення».</p>
+<h2>Підтримка LOOKDO</h2><p>Питання щодо реєстрації, тарифів, доменів, оплати чи конфіденційності надсилайте на <a href="mailto:{{email}}">{{email}}</a>.</p><h2>Власник сервісу</h2><address><strong>{{operator_name}}</strong><br>{{operator_address}}<br>Телефон: {{phone}}</address><h2>Що вказати у зверненні</h2><p>Повідомте електронну пошту облікового запису, назву бізнесу та, якщо є, піддомен LOOKDO. Ніколи не надсилайте паролі, повні платіжні дані або секретні API-ключі.</p><h2>Юридично значущі повідомлення</h2><p>Їх можна надсилати на зазначену вище поштову адресу або на <a href="mailto:{{email}}">{{email}}</a>.</p>
 HTML,
             ],
         ],

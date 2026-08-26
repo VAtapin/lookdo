@@ -19,8 +19,8 @@ const routes = [
     { path: '/register', component: RegisterView }, { path: '/:locale(de|en|ru|uk)/register', component: RegisterView },
     { path: '/app/:section?', component: TenantView, meta:{private:true} },
     { path: '/control/:section?', component: ControlView, meta:{private:true,control:true} },
-    { path: '/:key(impressum|datenschutz|agb|widerruf|kontakt)', component: LegalView },
-    { path: '/:locale(de|en|ru|uk)/:key(impressum|datenschutz|agb|widerruf|kontakt)', component: LegalView },
+    { path: '/:key(impressum|datenschutz|agb|kontakt)', component: LegalView },
+    { path: '/:locale(de|en|ru|uk)/:key(impressum|datenschutz|agb|kontakt)', component: LegalView },
 ];
 const router=createRouter({history:createWebHistory(),routes,scrollBehavior:(to)=>to.hash?({el:to.hash,top:78,behavior:'smooth'}):({top:0})});
 registerSW({immediate:true});

@@ -75,16 +75,19 @@ class AuthController extends Controller
             'country' => 'required|string|size:2', 'locale' => ['required', Rule::in(['de', 'en', 'ru', 'uk'])],
             'business_description' => 'required|string|max:1000', 'classification_id' => 'nullable|exists:business_classifications,id', 'variation_id' => 'nullable|exists:business_variations,id', 'plan_id' => 'required|exists:plans,id',
             'billing_cycle' => ['required', Rule::in(['monthly', 'yearly'])], 'currency' => ['nullable', Rule::in(['EUR', 'RUB', 'UAH'])],
-            'accept_terms' => 'accepted', 'accept_privacy' => 'accepted',
+            'confirm_business_customer' => 'accepted', 'accept_terms' => 'accepted', 'accept_privacy' => 'accepted',
         ], [
             'email.unique' => $this->registrationMessage('email_taken'),
             'email.email' => $this->registrationMessage('email_invalid'),
             'slug.unique' => $this->registrationMessage('slug_taken'),
             'slug.regex' => $this->registrationMessage('slug_invalid'),
             'slug.not_in' => $this->registrationMessage('slug_taken'),
+            'confirm_business_customer.accepted' => $this->registrationMessage('business_confirmation_required'),
         ]);
         $plan = Plan::where('is_active', true)->findOrFail($data['plan_id']);
-        $currency = $data['currency'] ?? match ($data['locale']) { 'ru' => 'RUB', 'uk' => 'UAH', default => 'EUR' };
+        $currency = $data['currency'] ?? match ($data['locale']) {
+            'ru' => 'RUB', 'uk' => 'UAH', default => 'EUR'
+        };
         $unitAmount = $plan->priceFor($currency, $data['billing_cycle']);
         abort_if($unitAmount === null, 422, $this->registrationMessage('price_unavailable'));
         $classification = ! empty($data['classification_id'])
@@ -115,6 +118,7 @@ class AuthController extends Controller
                 'user_id' => $user->id, 'tenant_id' => $tenant->id,
                 'terms_version_at' => PlatformPage::where('key', 'agb')->value('updated_at'),
                 'privacy_version_at' => PlatformPage::where('key', 'datenschutz')->value('updated_at'),
+                'business_customer_confirmed_at' => now(),
                 'accepted_at' => now(), 'ip_address' => $request->ip(), 'user_agent' => substr((string) $request->userAgent(), 0, 1000),
                 'created_at' => now(), 'updated_at' => now(),
             ]);
@@ -207,10 +211,10 @@ class AuthController extends Controller
     private function registrationMessage(string $key): string
     {
         $messages = [
-            'de' => ['email_invalid' => 'Bitte geben Sie eine gültige E-Mail-Adresse ein.', 'email_available' => 'Diese E-Mail-Adresse kann verwendet werden.', 'email_taken' => 'Diese E-Mail-Adresse ist bereits registriert. Bitte melden Sie sich an oder verwenden Sie eine andere Adresse.', 'slug_invalid' => 'Die App-Adresse darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten.', 'slug_available' => 'Diese App-Adresse ist verfügbar.', 'slug_taken' => 'Diese App-Adresse ist bereits vergeben. Wir haben eine freie Alternative vorbereitet.', 'price_unavailable' => 'Für diese Währung ist noch kein Preis hinterlegt.'],
-            'en' => ['email_invalid' => 'Enter a valid email address.', 'email_available' => 'This email address is available.', 'email_taken' => 'This email address is already registered. Sign in or use another address.', 'slug_invalid' => 'The app address may contain lowercase letters, numbers and hyphens only.', 'slug_available' => 'This app address is available.', 'slug_taken' => 'This app address is already taken. We prepared an available alternative.', 'price_unavailable' => 'No price has been configured for this currency yet.'],
-            'ru' => ['email_invalid' => 'Укажите корректный адрес электронной почты.', 'email_available' => 'Этот email можно использовать.', 'email_taken' => 'Этот email уже зарегистрирован. Войдите в аккаунт или укажите другой адрес.', 'slug_invalid' => 'В адресе приложения допустимы только латинские строчные буквы, цифры и дефисы.', 'slug_available' => 'Этот адрес приложения свободен.', 'slug_taken' => 'Этот адрес приложения уже занят. Мы подготовили свободный вариант.', 'price_unavailable' => 'Для выбранной валюты цена пока не настроена.'],
-            'uk' => ['email_invalid' => 'Укажіть коректну адресу електронної пошти.', 'email_available' => 'Цю електронну адресу можна використовувати.', 'email_taken' => 'Цю електронну адресу вже зареєстровано. Увійдіть або вкажіть іншу адресу.', 'slug_invalid' => 'В адресі застосунку дозволені лише латинські малі літери, цифри та дефіси.', 'slug_available' => 'Ця адреса застосунку вільна.', 'slug_taken' => 'Ця адреса застосунку вже зайнята. Ми підготували вільний варіант.', 'price_unavailable' => 'Для вибраної валюти ціну ще не налаштовано.'],
+            'de' => ['email_invalid' => 'Bitte geben Sie eine gültige E-Mail-Adresse ein.', 'email_available' => 'Diese E-Mail-Adresse kann verwendet werden.', 'email_taken' => 'Diese E-Mail-Adresse ist bereits registriert. Bitte melden Sie sich an oder verwenden Sie eine andere Adresse.', 'slug_invalid' => 'Die App-Adresse darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten.', 'slug_available' => 'Diese App-Adresse ist verfügbar.', 'slug_taken' => 'Diese App-Adresse ist bereits vergeben. Wir haben eine freie Alternative vorbereitet.', 'price_unavailable' => 'Für diese Währung ist noch kein Preis hinterlegt.', 'business_confirmation_required' => 'Bitte bestätigen Sie, dass Sie als Unternehmen oder selbstständige Person handeln.'],
+            'en' => ['email_invalid' => 'Enter a valid email address.', 'email_available' => 'This email address is available.', 'email_taken' => 'This email address is already registered. Sign in or use another address.', 'slug_invalid' => 'The app address may contain lowercase letters, numbers and hyphens only.', 'slug_available' => 'This app address is available.', 'slug_taken' => 'This app address is already taken. We prepared an available alternative.', 'price_unavailable' => 'No price has been configured for this currency yet.', 'business_confirmation_required' => 'Confirm that you are acting as a business or self-employed professional.'],
+            'ru' => ['email_invalid' => 'Укажите корректный адрес электронной почты.', 'email_available' => 'Этот email можно использовать.', 'email_taken' => 'Этот email уже зарегистрирован. Войдите в аккаунт или укажите другой адрес.', 'slug_invalid' => 'В адресе приложения допустимы только латинские строчные буквы, цифры и дефисы.', 'slug_available' => 'Этот адрес приложения свободен.', 'slug_taken' => 'Этот адрес приложения уже занят. Мы подготовили свободный вариант.', 'price_unavailable' => 'Для выбранной валюты цена пока не настроена.', 'business_confirmation_required' => 'Подтвердите, что вы действуете как фирма или предприниматель.'],
+            'uk' => ['email_invalid' => 'Укажіть коректну адресу електронної пошти.', 'email_available' => 'Цю електронну адресу можна використовувати.', 'email_taken' => 'Цю електронну адресу вже зареєстровано. Увійдіть або вкажіть іншу адресу.', 'slug_invalid' => 'В адресі застосунку дозволені лише латинські малі літери, цифри та дефіси.', 'slug_available' => 'Ця адреса застосунку вільна.', 'slug_taken' => 'Ця адреса застосунку вже зайнята. Ми підготували вільний варіант.', 'price_unavailable' => 'Для вибраної валюти ціну ще не налаштовано.', 'business_confirmation_required' => 'Підтвердьте, що ви дієте як компанія або підприємець.'],
         ];
 
         return $messages[app()->getLocale()][$key] ?? $messages['en'][$key];

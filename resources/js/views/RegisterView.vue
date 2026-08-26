@@ -22,7 +22,7 @@ let classificationRequest = 0;
 const form = reactive({
     name: '', email: '', password: '', password_confirmation: '', business_name: '', slug: '', country: 'DE', locale: locale.value,
     business_description: '', classification_id: null as number | null, variation_id: null as number | null,
-    plan_id: Number(route.query.plan) || null as number | null, billing_cycle: 'monthly', currency: 'EUR', accept_terms: false, accept_privacy: false,
+    plan_id: Number(route.query.plan) || null as number | null, billing_cycle: 'monthly', currency: 'EUR', confirm_business_customer: false, accept_terms: false, accept_privacy: false,
 });
 
 const candidates = computed<any[]>(() => classification.value?.candidates || []);
@@ -216,7 +216,7 @@ async function register() {
         <p class="eyebrow">{{ tr('stepLabel') }} 04</p><h2>{{ tr('choosePlan') }}</h2>
         <div class="billing-controls"><label>{{ tr('currency') }}<select v-model="form.currency" @change="currencyEdited = true"><option value="EUR">EUR — €</option><option value="RUB">RUB — ₽</option><option value="UAH">UAH — ₴</option></select></label><div class="cycle"><button type="button" :class="{ active: form.billing_cycle === 'monthly' }" @click="form.billing_cycle = 'monthly'">{{ tr('monthly') }}</button><button type="button" :class="{ active: form.billing_cycle === 'yearly' }" @click="form.billing_cycle = 'yearly'">{{ tr('yearly') }}</button></div></div>
         <div class="plan-options"><label v-for="plan in platform.plans" :key="plan.id" :class="{ selected: form.plan_id === plan.id }"><input v-model="form.plan_id" type="radio" :value="plan.id"><span><b>{{ plan.name }}</b><small>{{ plan.description }}</small><em v-if="form.billing_cycle === 'yearly' && yearlySaving(plan)">{{ tr('save') }} {{ yearlySaving(plan) }}%</em></span><strong>{{ formatPrice(price(plan)) }}<small>{{ form.billing_cycle === 'yearly' ? tr('perYear') : tr('month') }}</small></strong></label></div>
-        <label class="check"><input v-model="form.accept_terms" type="checkbox" required> {{ tr('acceptTerms') }}</label><label class="check"><input v-model="form.accept_privacy" type="checkbox" required> {{ tr('acceptPrivacy') }}</label>
+        <label class="check"><input v-model="form.confirm_business_customer" type="checkbox" required> {{ tr('confirmBusinessCustomer') }}</label><label class="check"><input v-model="form.accept_terms" type="checkbox" required> {{ tr('acceptTerms') }}</label><label class="check"><input v-model="form.accept_privacy" type="checkbox" required> {{ tr('acceptPrivacy') }}</label>
         <p v-if="error" class="alert error">{{ error }}</p><div class="form-actions"><button type="button" class="button ghost" @click="step = 3">← {{ tr('back') }}</button><button class="button" :disabled="busy">{{ busy ? tr('creating') : tr('create') }}</button></div>
       </form>
     </div></main>

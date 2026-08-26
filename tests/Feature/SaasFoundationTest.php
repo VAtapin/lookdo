@@ -17,6 +17,7 @@ use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -156,6 +157,40 @@ class SaasFoundationTest extends TestCase
         $this->assertStringNotContainsString('{{operator_name}}', $content);
     }
 
+    public function test_optional_impressum_sections_are_hidden_without_values_and_custom_text_is_preserved(): void
+    {
+        $page = PlatformPage::where('key', 'impressum')->firstOrFail();
+        $content = $page->content;
+        $content['de'] = '<h2>Mein eigener Text</h2><p>Bleibt unverändert.</p><h2>Vertretungsberechtigte Person</h2><p>{{representative}}</p><h2>Registereintrag</h2><p>{{register}}</p><h2>Umsatzsteuer-ID</h2><p>{{vat_id}}</p><h2>Haftung für Links</h2><p>Alter Haftungstext.</p>';
+        $page->update(['content' => $content]);
+        foreach (['legal_representative', 'legal_register', 'legal_vat_id'] as $key) {
+            SystemSetting::updateOrCreate(['key' => $key], ['value' => '']);
+        }
+
+        $hidden = $this->withHeader('X-Locale', 'de')->getJson('/api/platform/pages/impressum')->assertOk()->json('content');
+        $this->assertStringContainsString('Mein eigener Text', $hidden);
+        $this->assertStringContainsString('Bleibt unverändert.', $hidden);
+        $this->assertStringNotContainsString('Vertretungsberechtigte Person', $hidden);
+        $this->assertStringNotContainsString('Registereintrag', $hidden);
+        $this->assertStringNotContainsString('Umsatzsteuer-ID', $hidden);
+        $this->assertStringNotContainsString('Haftung für Links', $hidden);
+
+        SystemSetting::updateOrCreate(['key' => 'legal_representative'], ['value' => 'Max Mustermann']);
+        SystemSetting::updateOrCreate(['key' => 'legal_register'], ['value' => 'HRB 12345']);
+        SystemSetting::updateOrCreate(['key' => 'legal_vat_id'], ['value' => 'DE123456789']);
+        $visible = $this->withHeader('X-Locale', 'de')->getJson('/api/platform/pages/impressum')->assertOk()->json('content');
+        $this->assertStringContainsString('Max Mustermann', $visible);
+        $this->assertStringContainsString('HRB 12345', $visible);
+        $this->assertStringContainsString('DE123456789', $visible);
+        $this->assertStringNotContainsString('Haftung für Links', $visible);
+    }
+
+    public function test_b2b_platform_does_not_expose_a_consumer_withdrawal_page(): void
+    {
+        $this->assertDatabaseMissing('platform_pages', ['key' => 'widerruf']);
+        $this->getJson('/api/platform/pages/widerruf')->assertNotFound();
+    }
+
     public function test_exact_russian_phrases_and_combined_description_find_expected_templates(): void
     {
         $this->postJson('/api/classify', ['description' => 'ремонт', 'locale' => 'ru'])
@@ -209,7 +244,7 @@ class SaasFoundationTest extends TestCase
             'business_name' => 'Leonid Deluxe', 'country' => 'DE', 'locale' => 'ru', 'business_description' => 'Перетяжка рулей',
             'classification_id' => $classification->id, 'variation_id' => $variation->id, 'plan_id' => $plan->id, 'billing_cycle' => 'monthly',
             'currency' => 'RUB',
-            'accept_terms' => true, 'accept_privacy' => true,
+            'confirm_business_customer' => true, 'accept_terms' => true, 'accept_privacy' => true,
         ])->assertCreated()
             ->assertJsonPath('tenant.slug', 'leonid-deluxe')
             ->assertJsonPath('payment_required', true);
@@ -218,6 +253,7 @@ class SaasFoundationTest extends TestCase
         $this->assertDatabaseHas('subscriptions', ['tenant_id' => $tenant->id, 'plan_id' => $plan->id, 'status' => 'incomplete', 'billing_cycle' => 'monthly', 'currency' => 'RUB', 'unit_amount' => 1990]);
         $this->assertDatabaseHas('tenant_business_profiles', ['tenant_id' => $tenant->id, 'variation_id' => $variation->id]);
         $this->assertDatabaseHas('legal_acceptances', ['tenant_id' => $tenant->id, 'user_id' => $tenant->users()->firstOrFail()->id]);
+        $this->assertNotNull(DB::table('legal_acceptances')->where('tenant_id', $tenant->id)->value('business_customer_confirmed_at'));
 
         $site = $this->getJson('http://leonid-deluxe.lookdo.app/api/tenant-site')
             ->assertOk()
@@ -245,7 +281,7 @@ class SaasFoundationTest extends TestCase
         $this->postJson('/api/register', [
             'name' => 'Fallback Owner', 'email' => 'fallback@example.test', 'password' => 'SecurePass123', 'password_confirmation' => 'SecurePass123',
             'business_name' => 'Fallback Service', 'country' => 'DE', 'locale' => 'ru', 'business_description' => 'неизвестная деятельность',
-            'plan_id' => $plan->id, 'billing_cycle' => 'monthly', 'accept_terms' => true, 'accept_privacy' => true,
+            'plan_id' => $plan->id, 'billing_cycle' => 'monthly', 'confirm_business_customer' => true, 'accept_terms' => true, 'accept_privacy' => true,
         ])->assertCreated();
 
         $tenant = Tenant::where('slug', 'fallback-service')->firstOrFail();
@@ -253,6 +289,19 @@ class SaasFoundationTest extends TestCase
             'tenant_id' => $tenant->id,
             'variation_id' => BusinessVariation::where('code', 'general-services.general')->value('id'),
         ]);
+    }
+
+    public function test_registration_requires_business_customer_confirmation(): void
+    {
+        $plan = Plan::where('code', 'start')->firstOrFail();
+
+        $this->postJson('/api/register', [
+            'name' => 'Private Customer', 'email' => 'private@example.test', 'password' => 'SecurePass123', 'password_confirmation' => 'SecurePass123',
+            'business_name' => 'Private Test', 'country' => 'DE', 'locale' => 'ru', 'business_description' => 'ремонт',
+            'plan_id' => $plan->id, 'billing_cycle' => 'monthly', 'confirm_business_customer' => false, 'accept_terms' => true, 'accept_privacy' => true,
+        ])->assertUnprocessable()->assertJsonValidationErrors('confirm_business_customer');
+
+        $this->assertDatabaseMissing('users', ['email' => 'private@example.test']);
     }
 
     public function test_tenant_user_cannot_read_another_tenant(): void

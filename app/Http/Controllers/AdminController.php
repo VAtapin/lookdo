@@ -53,7 +53,7 @@ class AdminController extends Controller
 
         $billingAttention = Subscription::whereIn('status', ['incomplete', 'past_due'])->count();
         $unpublishedPages = PlatformPage::where('is_published', false)->count();
-        $legalMissing = collect(['legal_operator_name', 'legal_operator_address', 'legal_representative', 'legal_email', 'legal_phone', 'legal_register', 'legal_vat_id'])
+        $legalMissing = collect(['legal_operator_name', 'legal_operator_address', 'legal_email', 'legal_phone'])
             ->filter(function (string $key): bool {
                 $value = SystemSetting::read($key);
 

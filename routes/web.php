@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('api')->middleware('locale')->group(function () {
     Route::get('/platform', [PlatformController::class, 'bootstrap']);
     Route::get('/tenant-site', [PlatformController::class, 'tenantSite']);
-    Route::get('/platform/pages/{key}', [PlatformController::class, 'page'])->whereIn('key', ['impressum', 'datenschutz', 'agb', 'widerruf', 'kontakt']);
+    Route::get('/platform/pages/{key}', [PlatformController::class, 'page'])->whereIn('key', ['impressum', 'datenschutz', 'agb', 'kontakt']);
     Route::post('/classify', [AuthController::class, 'classify'])->middleware('throttle:30,1');
     Route::post('/register/availability', [AuthController::class, 'availability'])->middleware('throttle:40,1');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
@@ -85,7 +85,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
 
 Route::get('/sitemap.xml', function () {
     $base = rtrim(config('app.url'), '/');
-    $urls = ['/', '/de', '/en', '/ru', '/uk', '/pricing', '/de/pricing', '/en/pricing', '/ru/pricing', '/uk/pricing', '/impressum', '/datenschutz', '/agb', '/widerruf', '/kontakt'];
+    $urls = ['/', '/de', '/en', '/ru', '/uk', '/pricing', '/de/pricing', '/en/pricing', '/ru/pricing', '/uk/pricing', '/impressum', '/datenschutz', '/agb', '/kontakt'];
 
     return response(view('sitemap', ['urls' => array_map(fn ($u) => $base.$u, $urls)]), 200, ['Content-Type' => 'application/xml']);
 });
