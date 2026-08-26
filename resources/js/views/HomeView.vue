@@ -77,7 +77,7 @@ function showDemo(){
             <div class="customer-service-grid"><div v-for="(item,index) in phoneServices" :key="`${item[1]}-${index}`" class="customer-service-card" :class="{more:!item[0]}"><img v-if="item[0]" :src="item[0]" alt=""><span v-else>•••</span><b>{{ tr(item[1]) }}</b></div></div>
             <div class="customer-how"><b>{{ tr('how') }}</b><div><span><LineIcon name="photo"/><small>1</small></span><i>→</i><span><LineIcon name="phone"/><small>2</small></span><i>→</i><span><LineIcon name="shield"/><small>3</small></span></div></div>
             <button class="phone-camera-cta"><LineIcon name="photo"/><span><b>{{ tr('sendPhotoVideo') }}</b><small>{{ tr('describeWork') }}</small></span></button>
-            <nav class="phone-app-nav"><span>⌂<small>{{ tr('phoneHome') }}</small></span><span>▣<small>{{ tr('activity') }}</small></span><span class="camera-main"><LineIcon name="photo"/></span><span>□<small>{{ tr('phoneMessages') }}</small></span><span>♙<small>{{ tr('account') }}</small></span></nav>
+            <nav class="phone-app-nav"><span><LineIcon name="home"/><small>{{ tr('phoneHome') }}</small></span><span><LineIcon name="grid"/><small>{{ tr('activity') }}</small></span><span class="camera-main" aria-label="Create">+</span><span><LineIcon name="chat"/><small>{{ tr('phoneMessages') }}</small></span><span><LineIcon name="user"/><small>{{ tr('account') }}</small></span></nav>
           </div>
         </div>
         <div class="app-phone list-phone">
@@ -90,7 +90,7 @@ function showDemo(){
             <div class="phone-section-title"><b>{{ tr('phoneMessages') }}</b><em>{{ tr('viewAll') }}</em></div>
             <div class="master-message"><i>L</i><span><b>Leonid</b><small>{{ tr('howReply') }}</small></span><time>10:32</time></div>
             <div class="master-message"><i>M</i><span><b>Maria</b><small>{{ tr('howReceive') }}</small></span><time>09:48</time></div>
-            <nav class="phone-app-nav master-nav"><span>⌂<small>{{ tr('phoneHome') }}</small></span><span>▣<small>{{ tr('activity') }}</small></span><span>□<small>{{ tr('phoneMessages') }}</small></span><span>♙<small>{{ tr('account') }}</small></span></nav>
+            <nav class="phone-app-nav master-nav"><span><LineIcon name="home"/><small>{{ tr('phoneHome') }}</small></span><span><LineIcon name="grid"/><small>{{ tr('activity') }}</small></span><span><LineIcon name="chat"/><small>{{ tr('phoneMessages') }}</small></span><span><LineIcon name="user"/><small>{{ tr('account') }}</small></span></nav>
           </div>
         </div>
       </div>
