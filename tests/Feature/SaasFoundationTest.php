@@ -529,6 +529,7 @@ class SaasFoundationTest extends TestCase
             ->assertJsonPath('settings.social_share_images.uk', '/brand/lookdo-social-uk.png');
         $this->actingAs($admin)->get('/control/settings/media')->assertOk();
     }
+
     public function test_control_dashboard_returns_clickable_tasks_metrics_and_activity(): void
     {
         $admin = User::factory()->create(['is_super_admin' => true]);
@@ -601,6 +602,52 @@ class SaasFoundationTest extends TestCase
         Http::assertSent(fn (HttpRequest $request) => str_ends_with($request->url(), '/v1/prices/price_month') && $request['active'] === 'false');
     }
 
+    public function test_stripe_checkout_serializes_automatic_tax_boolean_as_a_string(): void
+    {
+        config([
+            'services.stripe.secret' => 'sk_live_example',
+            'services.stripe.automatic_tax' => true,
+        ]);
+        Http::fake([
+            'api.stripe.com/v1/checkout/sessions' => Http::response([
+                'id' => 'cs_live_subscription_1',
+                'url' => 'https://checkout.stripe.test/subscription',
+            ]),
+        ]);
+        $owner = User::factory()->create();
+        $tenant = Tenant::create([
+            'name' => 'Checkout Test',
+            'slug' => 'checkout-test',
+            'country' => 'DE',
+            'locale' => 'de',
+            'status' => 'active',
+        ]);
+        $tenant->users()->attach($owner, ['role' => 'owner']);
+        $plan = Plan::where('code', 'start')->firstOrFail();
+        $plan->forceFill([
+            'stripe_product_id' => 'prod_start',
+            'stripe_monthly_price_id' => 'price_start_monthly',
+            'stripe_currency' => 'EUR',
+        ])->save();
+        $tenant->subscriptions()->create([
+            'plan_id' => $plan->id,
+            'provider' => 'stripe',
+            'status' => 'incomplete',
+            'billing_cycle' => 'monthly',
+            'currency' => 'EUR',
+            'unit_amount' => $plan->priceFor('EUR', 'monthly'),
+            'started_at' => now(),
+        ]);
+
+        $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/checkout', [
+            'plan_id' => $plan->id,
+            'cycle' => 'monthly',
+            'currency' => 'EUR',
+        ])->assertOk()->assertJsonPath('checkout_url', 'https://checkout.stripe.test/subscription');
+
+        Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://api.stripe.com/v1/checkout/sessions'
+            && data_get($request->data(), 'automatic_tax.enabled') === 'true');
+    }
 
     public function test_stripe_connection_mode_is_derived_from_the_configured_key(): void
     {
@@ -628,6 +675,7 @@ class SaasFoundationTest extends TestCase
         Http::assertSentCount(1);
         Http::assertSent(fn (HttpRequest $request) => $request->method() === 'GET' && str_ends_with($request->url(), '/v1/account'));
     }
+
     public function test_sms_settings_are_encrypted_and_never_returned_to_the_admin_client(): void
     {
         $admin = User::factory()->create(['is_super_admin' => true]);
@@ -855,6 +903,7 @@ class SaasFoundationTest extends TestCase
             ->assertCreated()->assertJsonPath('image_generation.credits', 1);
         $this->assertSame(1, (int) $tenant->profile()->value('image_generation_credits'));
     }
+
     public function test_platform_exposes_configured_demo_video(): void
     {
         SystemSetting::updateOrCreate(['key' => 'demo_video_source'], ['value' => 'youtube']);

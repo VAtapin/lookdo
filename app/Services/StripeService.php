@@ -48,7 +48,7 @@ class StripeService
             'success_url' => rtrim(config('app.url'), '/').'/app/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}',
             'cancel_url' => rtrim(config('app.url'), '/').'/app/billing?checkout=cancelled',
             'line_items' => [$lineItem],
-            'automatic_tax' => ['enabled' => (bool) config('services.stripe.automatic_tax')],
+            'automatic_tax' => ['enabled' => $this->formBoolean(config('services.stripe.automatic_tax'))],
             'metadata' => ['tenant_id' => (string) $tenant->id, 'subscription_id' => (string) $subscription->id, 'currency' => $currency, 'billing_cycle' => $cycle],
             'subscription_data' => ['metadata' => ['tenant_id' => (string) $tenant->id, 'subscription_id' => (string) $subscription->id, 'currency' => $currency, 'billing_cycle' => $cycle]],
         ], 'lookdo-subscription-'.$subscription->id.'-'.$cycle.'-'.strtolower($currency));
@@ -83,7 +83,7 @@ class StripeService
                     ],
                 ],
             ]],
-            'automatic_tax' => ['enabled' => (bool) config('services.stripe.automatic_tax')],
+            'automatic_tax' => ['enabled' => $this->formBoolean(config('services.stripe.automatic_tax'))],
             'metadata' => [
                 'lookdo_type' => 'image_credit',
                 'tenant_id' => (string) $tenant->id,
@@ -102,6 +102,7 @@ class StripeService
 
         return ['url' => (string) $response->json('url'), 'session_id' => (string) $response->json('id')];
     }
+
     public function syncPlan(Plan $plan): Plan
     {
         try {
@@ -195,6 +196,11 @@ class StripeService
         $this->ensureSuccessful($response);
 
         return $response;
+    }
+
+    private function formBoolean(mixed $value): string
+    {
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN) ? 'true' : 'false';
     }
 
     private function ensureConfigured(): void
