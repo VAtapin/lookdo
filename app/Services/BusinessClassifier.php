@@ -24,13 +24,14 @@ class BusinessClassifier
     public function classify(string $text, string $locale = 'ru'): BusinessClassification
     {
         $normalized = $this->normalize($text);
-        $enabledTemplateCodes = RequestTemplate::where('enabled', true)->pluck('code');
+        $templates = RequestTemplate::where('enabled', true)->get(['code', 'configuration'])->keyBy('code');
+        $enabledTemplateCodes = $templates->keys();
         $phrases = BusinessPhrase::with(['category', 'variation'])
             ->where('enabled', true)
             ->whereIn('locale', array_unique([$locale, 'uk', 'ru', 'de', 'en']))
             ->whereHas('variation', fn ($query) => $query->where('enabled', true)->whereIn('template_code', $enabledTemplateCodes))
             ->get();
-        $ranked = $phrases->map(function (BusinessPhrase $phrase) use ($normalized) {
+        $ranked = $phrases->map(function (BusinessPhrase $phrase) use ($normalized, $templates) {
             similar_text($normalized, $phrase->normalized_phrase, $percent);
             $exact = $normalized === $phrase->normalized_phrase;
             $contains = $phrase->normalized_phrase !== '' && (str_contains($normalized, $phrase->normalized_phrase) || str_contains($phrase->normalized_phrase, $normalized));
@@ -46,8 +47,11 @@ class BusinessClassifier
             };
             $score *= max(.5, min(1.25, $phrase->weight));
 
-            return ['category_id' => $phrase->category_id, 'variation_id' => $phrase->variation_id, 'category' => $phrase->category?->localized('name'), 'variation' => $phrase->variation?->localized('name'), 'template_code' => $phrase->variation?->template_code, 'score' => round(min(1, $score), 4), 'phrase' => $phrase->phrase, 'exact' => $exact];
-        })->sortByDesc('score')->unique(fn ($r) => $r['category_id'].':'.($r['variation_id'] ?? 0))->take(3)->values();
+            $templateCode = $phrase->variation?->template_code;
+
+            return ['category_id' => $phrase->category_id, 'variation_id' => $phrase->variation_id, 'category' => $phrase->category?->localized('name'), 'variation' => $phrase->variation?->localized('name'), 'template_code' => $templateCode, 'preview' => data_get($templates->get($templateCode), 'configuration.preview', $this->fallbackPreview()), 'score' => round(min(1, $score), 4), 'phrase' => $phrase->phrase, 'exact' => $exact];
+        })->filter(fn (array $result) => $result['score'] > 0)
+            ->sortByDesc('score')->unique(fn ($r) => $r['category_id'].':'.($r['variation_id'] ?? 0))->take(3)->values();
         $best = $ranked->first();
         $source = ($best['exact'] ?? false) ? 'exact' : 'fuzzy';
         $ai = null;
@@ -115,6 +119,7 @@ class BusinessClassifier
             'category' => $template->category?->localized('name'),
             'variation' => $template->variation?->localized('name'),
             'template_code' => $template->code,
+            'preview' => $template->configuration['preview'] ?? $this->fallbackPreview(),
             'score' => 0,
             'phrase' => null,
             'exact' => false,
@@ -125,5 +130,10 @@ class BusinessClassifier
     public function defaultVariation(): BusinessVariation
     {
         return BusinessVariation::with('category')->findOrFail($this->defaultCandidate()['variation_id']);
+    }
+
+    private function fallbackPreview(): array
+    {
+        return ['image' => '/brand/service-renovation.webp', 'primary_color' => '#ff6b00', 'secondary_color' => '#25282e'];
     }
 }

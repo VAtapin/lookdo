@@ -168,6 +168,7 @@ export PATH="$NODE_DIR:$PATH"
 hash -r
 
 $PHP_BIN artisan backup:create
+$PHP_BIN artisan backup:verify
 $PHP_BIN artisan down
 git pull --ff-only
 $PHP_BIN $COMPOSER_PHAR install --no-dev --prefer-dist --optimize-autoloader --no-interaction
@@ -178,6 +179,9 @@ $PHP_BIN artisan lookdo:platform-data --repair
 $PHP_BIN artisan optimize
 $PHP_BIN artisan queue:restart
 $PHP_BIN artisan up
+$PHP_BIN artisan lookdo:platform-data
+curl -I https://lookdo.app/
+curl -I https://lookdo.app/favicon.svg
 ```
 
 Команда `lookdo:platform-data` выводит фактическое количество тарифов, категорий, вариантов, шаблонов, фраз словаря и страниц. Ключ `--repair` безопасно восстанавливает отсутствующие системные записи без дубликатов.

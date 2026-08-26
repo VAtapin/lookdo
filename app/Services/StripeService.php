@@ -23,22 +23,32 @@ class StripeService
         return ['id' => $response->json('id'), 'country' => $response->json('country'), 'livemode' => (bool) $response->json('livemode')];
     }
 
-    public function checkout(Tenant $tenant, Plan $plan, string $email, string $cycle = 'monthly'): string
+    public function checkout(Tenant $tenant, Plan $plan, string $email, string $cycle = 'monthly', string $currency = 'EUR'): string
     {
-        $price = $cycle === 'yearly' ? $plan->stripe_yearly_price_id : $plan->stripe_monthly_price_id;
-        if (! $price) {
-            throw new RuntimeException('The selected plan is not synchronized with Stripe.');
+        $currency = strtoupper($currency);
+        $amount = $plan->priceFor($currency, $cycle);
+        if ($amount === null) {
+            throw new RuntimeException('The selected currency is not configured for this plan.');
         }
+        $price = $cycle === 'yearly' ? $plan->stripe_yearly_price_id : $plan->stripe_monthly_price_id;
+        if (! $plan->stripe_product_id) {
+            $plan = $this->syncPlan($plan);
+            $price = $cycle === 'yearly' ? $plan->stripe_yearly_price_id : $plan->stripe_monthly_price_id;
+        }
+        $useSynchronizedPrice = $currency === strtoupper($plan->currency) && filled($price);
+        $lineItem = $useSynchronizedPrice
+            ? ['quantity' => 1, 'price' => $price]
+            : ['quantity' => 1, 'price_data' => ['product' => $plan->stripe_product_id, 'currency' => strtolower($currency), 'unit_amount' => (int) round($amount * 100), 'recurring' => ['interval' => $cycle === 'yearly' ? 'year' : 'month']]];
         $subscription = $tenant->subscriptions()->latest()->firstOrFail();
         $response = $this->post('/v1/checkout/sessions', [
             'mode' => 'subscription', 'customer_email' => $email, 'client_reference_id' => (string) $tenant->id,
             'success_url' => rtrim(config('app.url'), '/').'/app/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}',
             'cancel_url' => rtrim(config('app.url'), '/').'/app/billing?checkout=cancelled',
-            'line_items' => [['quantity' => 1, 'price' => $price]],
+            'line_items' => [$lineItem],
             'automatic_tax' => ['enabled' => (bool) config('services.stripe.automatic_tax')],
-            'metadata' => ['tenant_id' => (string) $tenant->id, 'subscription_id' => (string) $subscription->id],
-            'subscription_data' => ['metadata' => ['tenant_id' => (string) $tenant->id, 'subscription_id' => (string) $subscription->id]],
-        ], 'lookdo-subscription-'.$subscription->id.'-'.$cycle);
+            'metadata' => ['tenant_id' => (string) $tenant->id, 'subscription_id' => (string) $subscription->id, 'currency' => $currency, 'billing_cycle' => $cycle],
+            'subscription_data' => ['metadata' => ['tenant_id' => (string) $tenant->id, 'subscription_id' => (string) $subscription->id, 'currency' => $currency, 'billing_cycle' => $cycle]],
+        ], 'lookdo-subscription-'.$subscription->id.'-'.$cycle.'-'.strtolower($currency));
         if (! $response->json('url')) {
             throw new RuntimeException('Stripe Checkout returned no URL.');
         }

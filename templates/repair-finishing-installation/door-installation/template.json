@@ -6,6 +6,11 @@
   "ui_reference": "/UI",
   "ui_strict": true,
   "theme_hint_palette": "cool-blue-teal-neutral",
+  "preview": {
+    "image": "/brand/service-door.webp",
+    "primary_color": "#247d88",
+    "secondary_color": "#edf7f8"
+  },
   "cta_label": "Показать дверной проём",
   "title": "Покажите место установки",
   "intro": "Сделайте несколько фотографий проёма и места вокруг него. Сначала покажите всё целиком, затем снимите проём ближе и добавьте важные детали — так мастер быстрее поймёт условия монтажа.",

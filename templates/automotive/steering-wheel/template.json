@@ -9,6 +9,11 @@
     "path": "/UI",
     "rule": "Tenant App must follow approved UI images strictly. Do not replace the app-like flow, bottom navigation, camera/upload states, cards, modals or screen composition with a different generic interface."
   },
+  "preview": {
+    "image": "/brand/leonid-demo.png",
+    "primary_color": "#d6a552",
+    "secondary_color": "#101114"
+  },
   "cta_label": "Оценить мой руль",
   "title": "Покажите ваш руль",
   "intro": "Сделайте несколько фотографий руля. Покажите его целиком и крупно основные части — так мастер сможет увидеть форму, состояние материала, швы и повреждения.",

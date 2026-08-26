@@ -3,6 +3,11 @@
   "parent_template": "beauty.general",
   "name": {"uk":"Брови / Brow Master","ru":"Брови / Brow Master","de":"Augenbrauen / Brow Artist"},
   "primary_action": {"uk":"Записатися","ru":"Записаться","de":"Termin buchen"},
+  "preview": {
+    "image": "/brand/service-brows.webp",
+    "primary_color": "#b96d55",
+    "secondary_color": "#f7eee9"
+  },
   "capabilities": {
     "request": true,
     "booking": true,

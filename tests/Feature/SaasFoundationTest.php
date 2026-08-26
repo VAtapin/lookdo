@@ -51,6 +51,8 @@ class SaasFoundationTest extends TestCase
             ->assertJsonFragment(['code' => 'automotive']);
 
         $plans = collect($response->json('plans'))->keyBy('code');
+        $this->assertSame(1990, $plans['start']['prices']['RUB']['monthly']);
+        $this->assertSame(19900, $plans['start']['prices']['RUB']['yearly']);
         $this->assertFalse(collect($plans['start']['features'])->firstWhere('key', 'custom_domain')['included']);
         $this->assertTrue(collect($plans['pro']['features'])->firstWhere('key', 'custom_domain')['included']);
         $this->assertTrue(collect($plans['business']['features'])->firstWhere('key', 'ai')['included']);
@@ -63,6 +65,32 @@ class SaasFoundationTest extends TestCase
             ->assertOk()->assertJsonPath('source', 'fuzzy');
         $variationId = $response->json('candidates.0.variation_id');
         $this->assertDatabaseHas('business_variations', ['id' => $variationId, 'code' => 'automotive.steering-wheel-upholstery']);
+        $this->assertSame('/brand/leonid-demo.png', $response->json('candidates.0.preview.image'));
+    }
+
+    public function test_registration_availability_reports_existing_email_and_slug_before_submit(): void
+    {
+        User::factory()->create(['email' => 'owner@example.test']);
+        Tenant::create(['name' => 'Taken Service', 'slug' => 'taken-service', 'country' => 'DE', 'locale' => 'ru']);
+
+        $this->withHeader('X-Locale', 'ru')->postJson('/api/register/availability', [
+            'email' => 'owner@example.test',
+            'slug' => 'taken-service',
+            'business_name' => 'Taken Service',
+        ])->assertOk()
+            ->assertJsonPath('email.valid', true)
+            ->assertJsonPath('email.available', false)
+            ->assertJsonPath('slug.valid', true)
+            ->assertJsonPath('slug.available', false)
+            ->assertJsonPath('slug.normalized', 'taken-service');
+
+        $suggested = $this->withHeader('X-Locale', 'ru')->postJson('/api/register/availability', [
+            'email' => 'new@example.test',
+            'business_name' => 'Taken Service',
+        ])->assertOk()->json('slug.suggested');
+
+        $this->assertNotSame('taken-service', $suggested);
+        $this->assertFalse(Tenant::where('slug', $suggested)->exists());
     }
 
     public function test_four_language_catalog_contains_booking_first_brow_template(): void
@@ -170,11 +198,12 @@ class SaasFoundationTest extends TestCase
             'name' => 'Leonid Owner', 'email' => 'leonid@example.test', 'password' => 'SecurePass123', 'password_confirmation' => 'SecurePass123',
             'business_name' => 'Leonid Deluxe', 'country' => 'DE', 'locale' => 'ru', 'business_description' => 'Перетяжка рулей',
             'classification_id' => $classification->id, 'variation_id' => $variation->id, 'plan_id' => $plan->id, 'billing_cycle' => 'monthly',
+            'currency' => 'RUB',
             'accept_terms' => true, 'accept_privacy' => true,
         ])->assertCreated()->assertJsonPath('tenant.slug', 'leonid-deluxe');
         $tenant = Tenant::where('slug', 'leonid-deluxe')->firstOrFail();
         $this->assertDatabaseHas('tenant_domains', ['tenant_id' => $tenant->id, 'domain' => 'leonid-deluxe.lookdo.app', 'type' => 'platform', 'status' => 'active']);
-        $this->assertDatabaseHas('subscriptions', ['tenant_id' => $tenant->id, 'plan_id' => $plan->id, 'status' => 'incomplete']);
+        $this->assertDatabaseHas('subscriptions', ['tenant_id' => $tenant->id, 'plan_id' => $plan->id, 'status' => 'incomplete', 'billing_cycle' => 'monthly', 'currency' => 'RUB', 'unit_amount' => 1990]);
         $this->assertDatabaseHas('tenant_business_profiles', ['tenant_id' => $tenant->id, 'variation_id' => $variation->id]);
         $this->assertDatabaseHas('legal_acceptances', ['tenant_id' => $tenant->id, 'user_id' => $tenant->users()->firstOrFail()->id]);
     }
@@ -238,11 +267,13 @@ class SaasFoundationTest extends TestCase
         $this->actingAs($admin)->postJson('/api/control/plans', [
             'code' => 'custom', 'name' => ['de' => 'Individuell', 'en' => 'Custom', 'ru' => 'Индивидуальный', 'uk' => 'Індивідуальний'],
             'description' => ['de' => 'Test', 'en' => 'Test', 'ru' => 'Тест', 'uk' => 'Тест'], 'badge_text' => ['de' => '', 'en' => '', 'ru' => '', 'uk' => ''], 'price_monthly' => 99, 'price_yearly' => 990,
+            'prices' => ['EUR' => ['monthly' => 99, 'yearly' => 990], 'RUB' => ['monthly' => 9990, 'yearly' => 99900], 'UAH' => ['monthly' => 4490, 'yearly' => 44900]],
             'currency' => 'EUR', 'trial_days' => 0, 'is_active' => true, 'is_public' => false, 'sort_order' => 90,
             'entitlements' => $this->entitlementPayload(['custom_domain' => '1', 'staff_users' => '5']),
         ])->assertCreated()->assertJsonPath('code', 'custom');
 
         $this->assertDatabaseHas('plan_entitlements', ['key' => 'staff_users', 'value' => '5']);
+        $this->assertSame(99900.0, Plan::where('code', 'custom')->firstOrFail()->priceFor('RUB', 'yearly'));
 
         $this->postJson('/api/classify', ['description' => 'устанавливаю входные двери', 'locale' => 'ru'])->assertOk();
         $this->actingAs($admin)->getJson('/api/control/classifications')

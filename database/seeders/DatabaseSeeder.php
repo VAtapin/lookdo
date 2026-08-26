@@ -17,14 +17,17 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $plans = [
-            ['code' => 'start', 'name' => ['de' => 'Start', 'en' => 'Start', 'ru' => 'Старт', 'uk' => 'Старт'], 'description' => ['de' => 'Für Einzelmeister mit visuellen Anfragen oder einfacher Terminbuchung.', 'en' => 'For solo specialists with visual enquiries or simple booking.', 'ru' => 'Для частного мастера с визуальными заявками или простой записью.', 'uk' => 'Для приватного майстра з візуальними заявками або простим записом.'], 'price_monthly' => 19, 'price_yearly' => 190, 'sort_order' => 10, 'entitlements' => ['requests_monthly' => '100', 'storage_mb' => '2048', 'request_enabled' => '1', 'booking_enabled' => '1', 'services_enabled' => '1', 'customers_enabled' => '1', 'video_enabled' => '0', 'custom_domain' => '0', 'staff_users' => '1', 'branding_colors' => '1', 'push_enabled' => '1']],
-            ['code' => 'pro', 'name' => ['de' => 'Pro', 'en' => 'Pro', 'ru' => 'Профессиональный', 'uk' => 'Професійний'], 'description' => ['de' => 'Domain, Video, Erinnerungen und Kundenbindung für wachsende Betriebe.', 'en' => 'Domain, video, reminders and retention for growing businesses.', 'ru' => 'Домен, видео, напоминания и возврат клиентов для растущего бизнеса.', 'uk' => 'Домен, відео, нагадування та повернення клієнтів для бізнесу, що зростає.'], 'price_monthly' => 39, 'price_yearly' => 390, 'sort_order' => 20, 'badge_text' => ['de' => 'Empfohlen', 'en' => 'Recommended', 'ru' => 'Рекомендуем', 'uk' => 'Рекомендуємо'], 'entitlements' => ['requests_monthly' => '500', 'storage_mb' => '10240', 'request_enabled' => '1', 'booking_enabled' => '1', 'services_enabled' => '1', 'customers_enabled' => '1', 'reminders_enabled' => '1', 'before_after_enabled' => '1', 'social_content_enabled' => '1', 'video_enabled' => '1', 'video_max_mb' => '100', 'video_max_seconds' => '45', 'custom_domain' => '1', 'staff_users' => '3', 'branding_colors' => '1', 'platform_branding_removable' => '1', 'push_enabled' => '1', 'telegram_integration' => '1']],
-            ['code' => 'business', 'name' => ['de' => 'Business', 'en' => 'Business', 'ru' => 'Бизнес', 'uk' => 'Бізнес'], 'description' => ['de' => 'Für Teams mit KI, erweiterten Kommunikations- und Integrationsfunktionen.', 'en' => 'For teams with AI, advanced communication and integrations.', 'ru' => 'Для команд с AI, расширенными коммуникациями и интеграциями.', 'uk' => 'Для команд з AI, розширеними комунікаціями та інтеграціями.'], 'price_monthly' => 79, 'price_yearly' => 790, 'sort_order' => 30, 'entitlements' => ['requests_monthly' => '0', 'storage_mb' => '51200', 'request_enabled' => '1', 'booking_enabled' => '1', 'services_enabled' => '1', 'customers_enabled' => '1', 'reminders_enabled' => '1', 'repeat_visit_enabled' => '1', 'vacancy_fill_enabled' => '1', 'segments_enabled' => '1', 'before_after_enabled' => '1', 'ai_media_enabled' => '1', 'ai_communication_enabled' => '1', 'social_content_enabled' => '1', 'video_enabled' => '1', 'video_max_mb' => '250', 'video_max_seconds' => '90', 'custom_domain' => '1', 'staff_users' => '10', 'branding_colors' => '1', 'platform_branding_removable' => '1', 'push_enabled' => '1', 'telegram_integration' => '1', 'vk_integration' => '1']],
+            ['code' => 'start', 'name' => ['de' => 'Start', 'en' => 'Start', 'ru' => 'Старт', 'uk' => 'Старт'], 'description' => ['de' => 'Für Einzelmeister mit visuellen Anfragen oder einfacher Terminbuchung.', 'en' => 'For solo specialists with visual enquiries or simple booking.', 'ru' => 'Для частного мастера с визуальными заявками или простой записью.', 'uk' => 'Для приватного майстра з візуальними заявками або простим записом.'], 'price_monthly' => 19, 'price_yearly' => 190, 'prices' => ['EUR' => ['monthly' => 19, 'yearly' => 190], 'RUB' => ['monthly' => 1990, 'yearly' => 19900], 'UAH' => ['monthly' => 890, 'yearly' => 8900]], 'sort_order' => 10, 'entitlements' => ['requests_monthly' => '100', 'storage_mb' => '2048', 'request_enabled' => '1', 'booking_enabled' => '1', 'services_enabled' => '1', 'customers_enabled' => '1', 'video_enabled' => '0', 'custom_domain' => '0', 'staff_users' => '1', 'branding_colors' => '1', 'push_enabled' => '1']],
+            ['code' => 'pro', 'name' => ['de' => 'Pro', 'en' => 'Pro', 'ru' => 'Профессиональный', 'uk' => 'Професійний'], 'description' => ['de' => 'Domain, Video, Erinnerungen und Kundenbindung für wachsende Betriebe.', 'en' => 'Domain, video, reminders and retention for growing businesses.', 'ru' => 'Домен, видео, напоминания и возврат клиентов для растущего бизнеса.', 'uk' => 'Домен, відео, нагадування та повернення клієнтів для бізнесу, що зростає.'], 'price_monthly' => 39, 'price_yearly' => 390, 'prices' => ['EUR' => ['monthly' => 39, 'yearly' => 390], 'RUB' => ['monthly' => 3990, 'yearly' => 39900], 'UAH' => ['monthly' => 1790, 'yearly' => 17900]], 'sort_order' => 20, 'badge_text' => ['de' => 'Empfohlen', 'en' => 'Recommended', 'ru' => 'Рекомендуем', 'uk' => 'Рекомендуємо'], 'entitlements' => ['requests_monthly' => '500', 'storage_mb' => '10240', 'request_enabled' => '1', 'booking_enabled' => '1', 'services_enabled' => '1', 'customers_enabled' => '1', 'reminders_enabled' => '1', 'before_after_enabled' => '1', 'social_content_enabled' => '1', 'video_enabled' => '1', 'video_max_mb' => '100', 'video_max_seconds' => '45', 'custom_domain' => '1', 'staff_users' => '3', 'branding_colors' => '1', 'platform_branding_removable' => '1', 'push_enabled' => '1', 'telegram_integration' => '1']],
+            ['code' => 'business', 'name' => ['de' => 'Business', 'en' => 'Business', 'ru' => 'Бизнес', 'uk' => 'Бізнес'], 'description' => ['de' => 'Für Teams mit KI, erweiterten Kommunikations- und Integrationsfunktionen.', 'en' => 'For teams with AI, advanced communication and integrations.', 'ru' => 'Для команд с AI, расширенными коммуникациями и интеграциями.', 'uk' => 'Для команд з AI, розширеними комунікаціями та інтеграціями.'], 'price_monthly' => 79, 'price_yearly' => 790, 'prices' => ['EUR' => ['monthly' => 79, 'yearly' => 790], 'RUB' => ['monthly' => 7990, 'yearly' => 79900], 'UAH' => ['monthly' => 3590, 'yearly' => 35900]], 'sort_order' => 30, 'entitlements' => ['requests_monthly' => '0', 'storage_mb' => '51200', 'request_enabled' => '1', 'booking_enabled' => '1', 'services_enabled' => '1', 'customers_enabled' => '1', 'reminders_enabled' => '1', 'repeat_visit_enabled' => '1', 'vacancy_fill_enabled' => '1', 'segments_enabled' => '1', 'before_after_enabled' => '1', 'ai_media_enabled' => '1', 'ai_communication_enabled' => '1', 'social_content_enabled' => '1', 'video_enabled' => '1', 'video_max_mb' => '250', 'video_max_seconds' => '90', 'custom_domain' => '1', 'staff_users' => '10', 'branding_colors' => '1', 'platform_branding_removable' => '1', 'push_enabled' => '1', 'telegram_integration' => '1', 'vk_integration' => '1']],
         ];
         foreach ($plans as $data) {
             $entitlements = $data['entitlements'];
             unset($data['entitlements']);
             $plan = Plan::firstOrCreate(['code' => $data['code']], $data + ['currency' => 'EUR']);
+            if (! $plan->prices) {
+                $plan->update(['prices' => $data['prices']]);
+            }
             foreach ($entitlements as $key => $value) {
                 $plan->entitlements()->firstOrCreate(['key' => $key], ['value' => $value]);
             }
@@ -83,12 +86,25 @@ class DatabaseSeeder extends Seeder
             'beauty.general' => 'templates/BASE_REQUEST_TEMPLATE.md',
             'general-services.general' => 'templates/BASE_REQUEST_TEMPLATE.md',
         ];
+        $templatePreviews = [
+            'automotive.general' => ['/brand/leonid-demo.png', '#f6a928', '#101114'],
+            'repair-finishing-installation.general' => ['/brand/service-renovation.webp', '#ff6b00', '#262a30'],
+            'beauty.general' => ['/brand/service-brows.webp', '#b96d55', '#f7eee9'],
+            'appliance-repair.general' => ['/brand/service-appliance.webp', '#ff6b00', '#252a31'],
+            'furniture.general' => ['/brand/service-furniture.webp', '#b56b39', '#f2e7dc'],
+            'garden.general' => ['/brand/service-renovation.webp', '#57854a', '#eef4ea'],
+            'cleaning.general' => ['/brand/service-appliance.webp', '#2f92a3', '#edf7f8'],
+            'bicycles.general' => ['/brand/service-renovation.webp', '#ee6b2f', '#24272d'],
+            'advertising-signage.general' => ['/brand/service-door.webp', '#ff6b00', '#22252b'],
+            'general-services.general' => ['/brand/service-renovation.webp', '#ff6b00', '#25282e'],
+        ];
         foreach ($requestTemplates as $code => [$categoryCode, $sortOrder, $video, $photosMax]) {
             RequestTemplate::updateOrCreate(['code' => $code], [
                 'category_id' => $categories[$categoryCode]->id, 'variation_id' => $variations[$code]->id,
                 'name' => $variations[$code]->name, 'configuration' => [
                     'engine' => 'request', 'capabilities' => ['request' => true, 'messages' => true, 'push' => true],
                     'media' => ['photos_min' => 1, 'photos_max' => $photosMax, 'video_allowed' => $video],
+                    'preview' => ['image' => $templatePreviews[$code][0], 'primary_color' => $templatePreviews[$code][1], 'secondary_color' => $templatePreviews[$code][2]],
                     'locales' => ['de', 'en', 'ru', 'uk'], 'source_document' => $sourceDocuments[$code] ?? 'templates/'.str_replace('.', '/', $code).'.md',
                 ], 'version' => 1, 'sort_order' => $sortOrder,
             ]);
@@ -171,7 +187,9 @@ class DatabaseSeeder extends Seeder
             'success' => $raw['success'] ?? ['title' => $raw['success_title'] ?? 'Готово!', 'text' => $raw['success_text'] ?? ''],
             'push_prompt' => $raw['push_prompt'] ?? [], 'ai_phrases' => $raw['ai_phrases'] ?? [],
             'ai_rules' => $raw['ai_rules'] ?? null, 'locales' => $raw['locales'] ?? ['de', 'en', 'ru', 'uk'],
-            'ui_reference' => $raw['ui_reference'] ?? null, 'source_definition' => str_replace(base_path().DIRECTORY_SEPARATOR, '', $path),
+            'ui_reference' => $raw['ui_reference'] ?? null,
+            'preview' => $raw['preview'] ?? ['image' => '/brand/service-renovation.webp', 'primary_color' => '#ff6b00', 'secondary_color' => '#25282e'],
+            'source_definition' => str_replace(base_path().DIRECTORY_SEPARATOR, '', $path),
         ];
         if ($variation->code === 'beauty.brows') {
             $configuration['ui_reference'] = ['strict' => true, 'path' => 'templates/beauty/brows/UI/mobile-reference.svg'];

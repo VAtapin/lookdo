@@ -100,11 +100,14 @@ class TenantController extends Controller
     public function checkout(Request $request, Tenant $tenant, StripeService $stripe): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
-        $data = $request->validate(['plan_id' => 'required|exists:plans,id', 'cycle' => ['required', Rule::in(['monthly', 'yearly'])]]);
+        $data = $request->validate(['plan_id' => 'required|exists:plans,id', 'cycle' => ['required', Rule::in(['monthly', 'yearly'])], 'currency' => ['nullable', Rule::in(['EUR', 'RUB', 'UAH'])]]);
         $plan = Plan::where('is_active', true)->findOrFail($data['plan_id']);
-        $subscription = $tenant->subscriptions()->create(['plan_id' => $plan->id, 'provider' => 'stripe', 'status' => 'incomplete', 'started_at' => now()]);
+        $currency = $data['currency'] ?? 'EUR';
+        $amount = $plan->priceFor($currency, $data['cycle']);
+        abort_if($amount === null, 422, 'The selected currency is not configured for this plan.');
+        $subscription = $tenant->subscriptions()->create(['plan_id' => $plan->id, 'provider' => 'stripe', 'status' => 'incomplete', 'billing_cycle' => $data['cycle'], 'currency' => $currency, 'unit_amount' => $amount, 'started_at' => now()]);
         try {
-            $url = $stripe->checkout($tenant, $plan, $request->user()->email, $data['cycle']);
+            $url = $stripe->checkout($tenant, $plan, $request->user()->email, $data['cycle'], $currency);
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

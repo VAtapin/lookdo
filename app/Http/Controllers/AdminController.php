@@ -203,6 +203,7 @@ class AdminController extends Controller
             'price_monthly' => 'required|numeric|min:0',
             'price_yearly' => 'nullable|numeric|min:0',
             'currency' => 'required|string|size:3',
+            'prices' => 'nullable|array:EUR,RUB,UAH',
             'trial_days' => 'integer|min:0|max:365',
             'is_active' => 'boolean',
             'is_public' => 'boolean',
@@ -214,6 +215,11 @@ class AdminController extends Controller
             $rules["description.$locale"] = 'nullable|string|max:2000';
             $rules["badge_text.$locale"] = 'nullable|string|max:80';
         }
+        foreach (['EUR', 'RUB', 'UAH'] as $currency) {
+            $rules["prices.$currency"] = 'nullable|array:monthly,yearly';
+            $rules["prices.$currency.monthly"] = 'nullable|numeric|min:0';
+            $rules["prices.$currency.yearly"] = 'nullable|numeric|min:0';
+        }
         foreach ($definitions as $key => $definition) {
             $rules["entitlements.$key"] = ($definition['type'] ?? 'boolean') === 'number'
                 ? ['required', 'numeric', 'min:'.($definition['min'] ?? 0), 'max:'.($definition['max'] ?? PHP_INT_MAX)]
@@ -223,6 +229,12 @@ class AdminController extends Controller
         $data = $request->validate($rules);
         $entitlements = $data['entitlements'];
         unset($data['entitlements']);
+        $data['prices'] = $data['prices'] ?? [strtoupper($data['currency']) => ['monthly' => $data['price_monthly'], 'yearly' => $data['price_yearly']]];
+        if (isset($data['prices']['EUR']['monthly'])) {
+            $data['currency'] = 'EUR';
+            $data['price_monthly'] = $data['prices']['EUR']['monthly'];
+            $data['price_yearly'] = $data['prices']['EUR']['yearly'] ?? null;
+        }
         $before = $plan?->toArray();
         $plan ? $plan->update($data) : $plan = Plan::create($data);
         foreach ($definitions as $key => $definition) {
