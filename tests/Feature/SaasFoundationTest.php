@@ -200,12 +200,32 @@ class SaasFoundationTest extends TestCase
             'classification_id' => $classification->id, 'variation_id' => $variation->id, 'plan_id' => $plan->id, 'billing_cycle' => 'monthly',
             'currency' => 'RUB',
             'accept_terms' => true, 'accept_privacy' => true,
-        ])->assertCreated()->assertJsonPath('tenant.slug', 'leonid-deluxe');
+        ])->assertCreated()
+            ->assertJsonPath('tenant.slug', 'leonid-deluxe')
+            ->assertJsonPath('payment_required', true);
         $tenant = Tenant::where('slug', 'leonid-deluxe')->firstOrFail();
         $this->assertDatabaseHas('tenant_domains', ['tenant_id' => $tenant->id, 'domain' => 'leonid-deluxe.lookdo.app', 'type' => 'platform', 'status' => 'active']);
         $this->assertDatabaseHas('subscriptions', ['tenant_id' => $tenant->id, 'plan_id' => $plan->id, 'status' => 'incomplete', 'billing_cycle' => 'monthly', 'currency' => 'RUB', 'unit_amount' => 1990]);
         $this->assertDatabaseHas('tenant_business_profiles', ['tenant_id' => $tenant->id, 'variation_id' => $variation->id]);
         $this->assertDatabaseHas('legal_acceptances', ['tenant_id' => $tenant->id, 'user_id' => $tenant->users()->firstOrFail()->id]);
+
+        $site = $this->getJson('http://leonid-deluxe.lookdo.app/api/tenant-site')
+            ->assertOk()
+            ->assertJsonPath('name', 'Leonid Deluxe')
+            ->assertJsonPath('locale', 'ru')
+            ->assertJsonPath('template.preview.image', '/brand/leonid-demo.png');
+        $this->assertArrayNotHasKey('contact', $site->json());
+        $this->assertArrayNotHasKey('current_subscription', $site->json());
+        $this->get('http://leonid-deluxe.lookdo.app/')
+            ->assertOk()
+            ->assertSee('data-tenant-host="true"', false);
+
+        $this->postJson('/api/tenant/'.$tenant->id.'/checkout', [
+            'plan_id' => $plan->id,
+            'cycle' => 'monthly',
+            'currency' => 'RUB',
+        ])->assertUnprocessable();
+        $this->assertSame(1, $tenant->subscriptions()->count());
     }
 
     public function test_registration_resolves_fallback_without_classification_or_variation_ids(): void

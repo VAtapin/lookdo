@@ -9,6 +9,7 @@ use App\Models\SystemSetting;
 use App\Services\BusinessClassifier;
 use App\Services\PlanFeaturePresenter;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class PlatformController extends Controller
 {
@@ -24,6 +25,26 @@ class PlatformController extends Controller
         $page = PlatformPage::where('key', $key)->where('is_published', true)->firstOrFail();
 
         return response()->json(['key' => $key, 'title' => $page->localized('title'), 'content' => $this->replaceLegalTokens($page->localized('content'))]);
+    }
+
+    public function tenantSite(Request $request): JsonResponse
+    {
+        $tenant = $request->attributes->get('tenant');
+        abort_unless($tenant, 404);
+        app()->setLocale($tenant->locale);
+        $tenant->load(['businessProfile.category', 'businessProfile.variation', 'businessProfile.template']);
+        $configuration = $tenant->businessProfile?->template?->configuration ?? [];
+
+        return response()->json([
+            'name' => $tenant->name,
+            'locale' => $tenant->locale,
+            'description' => $tenant->business_description,
+            'template' => [
+                'name' => $tenant->businessProfile?->variation?->localized('name'),
+                'category' => $tenant->businessProfile?->category?->localized('name'),
+                'preview' => $configuration['preview'] ?? ['image' => '/brand/service-renovation.webp', 'primary_color' => '#ff6b00', 'secondary_color' => '#25282e'],
+            ],
+        ]);
     }
 
     private function replaceLegalTokens(string $content): string

@@ -155,6 +155,7 @@ async function register() {
     try {
         const result = await api<any>('/register', { method: 'POST', body: JSON.stringify(form) });
         if (result.checkout_url) location.href = result.checkout_url;
+        else if (result.payment_required) router.push('/app/billing?payment=required');
         else router.push('/app');
     } catch (exception: any) {
         error.value = exception.message;

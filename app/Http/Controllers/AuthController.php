@@ -125,6 +125,7 @@ class AuthController extends Controller
         $request->session()->regenerate();
         $audit->log('tenant.registered', $tenant, null, $tenant->toArray(), $tenant->id);
         $checkoutUrl = null;
+        $paymentRequired = $subscription->status === 'incomplete';
         if ($subscription->status === 'incomplete') {
             try {
                 $checkoutUrl = $stripe->checkout($tenant, $plan, $user->email, $data['billing_cycle'], $currency);
@@ -133,7 +134,7 @@ class AuthController extends Controller
             }
         }
 
-        return response()->json(['user' => $user, 'tenant' => $tenant, 'checkout_url' => $checkoutUrl], 201);
+        return response()->json(['user' => $user, 'tenant' => $tenant, 'checkout_url' => $checkoutUrl, 'payment_required' => $paymentRequired], 201);
     }
 
     public function login(Request $request): JsonResponse

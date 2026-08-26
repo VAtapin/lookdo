@@ -5,8 +5,9 @@ import { locale, setLocale, tr, type Locale } from './i18n';
 
 const route = useRoute();
 const router = useRouter();
+const isTenantHost = document.documentElement.dataset.tenantHost === 'true';
 const publicPage = computed(() => !route.path.startsWith('/app') && !route.path.startsWith('/control'));
-const showChrome = computed(() => publicPage.value && !/(^|\/)(login|register)(\/|$)/.test(route.path));
+const showChrome = computed(() => !isTenantHost && publicPage.value && !/(^|\/)(login|register)(\/|$)/.test(route.path));
 onMounted(() => { const value = route.params.locale as Locale; if (['de', 'en', 'ru', 'uk'].includes(value)) setLocale(value); });
 watch(() => route.params.locale, value => { if (['de', 'en', 'ru', 'uk'].includes(String(value))) setLocale(value as Locale); });
 function switchLocale(value: Locale) {
