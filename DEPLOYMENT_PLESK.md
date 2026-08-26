@@ -181,7 +181,7 @@ $PHP_BIN artisan queue:restart
 $PHP_BIN artisan up
 $PHP_BIN artisan lookdo:platform-data
 curl -I https://lookdo.app/
-curl -I https://lookdo.app/favicon.svg
+curl -I https://lookdo.app/favicon.png
 ```
 
 Команда `lookdo:platform-data` выводит фактическое количество тарифов, категорий, вариантов, шаблонов, фраз словаря и страниц. Ключ `--repair` безопасно восстанавливает отсутствующие системные записи без дубликатов.

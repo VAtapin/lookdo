@@ -68,7 +68,7 @@
     <link rel="alternate" hreflang="ru" href="{{ rtrim(config('app.url'), '/') }}/ru">
     <link rel="alternate" hreflang="uk" href="{{ rtrim(config('app.url'), '/') }}/uk">
     <link rel="alternate" hreflang="x-default" href="{{ rtrim(config('app.url'), '/') }}/de">
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="/favicon.png" type="image/png">
     <link rel="manifest" href="/build/manifest.webmanifest">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <title>{{ $socialTitle }}</title>

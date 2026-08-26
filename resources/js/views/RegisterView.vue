@@ -168,7 +168,7 @@ async function register() {
 <template>
   <div class="register-page">
     <aside class="register-aside">
-      <RouterLink class="public-wordmark" :to="`/${locale}`"><b>LOOK</b><span>DO</span></RouterLink>
+      <RouterLink class="public-wordmark" :to="`/${locale}`"><img :src="'/brand/lookdo-logo.png'" alt="LOOKDO"></RouterLink>
       <div class="register-promise"><p class="eyebrow">{{ tr('create') }}</p><h1>{{ tr('registerTitle') }}</h1><p>{{ tr('registerIntro') }}</p></div>
       <div class="register-aside-lower">
         <div class="register-progress">

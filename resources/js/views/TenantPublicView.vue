@@ -22,7 +22,7 @@ onMounted(async () => {
 
 <template>
   <div class="tenant-public-site" :style="theme">
-    <header class="tenant-public-header"><div class="tenant-wordmark"><b>LOOK</b><span>DO</span></div><small>{{ tr('poweredBy') }}</small></header>
+    <header class="tenant-public-header"><div class="tenant-wordmark wide"><img :src="'/brand/lookdo-logo.png'" alt="LOOKDO"></div><small>{{ tr('poweredBy') }}</small></header>
     <main v-if="tenant" class="tenant-public-main">
       <div class="tenant-public-visual"><img :src="tenant.template.preview.image" :alt="tenant.template.name"></div>
       <section class="tenant-public-copy">
