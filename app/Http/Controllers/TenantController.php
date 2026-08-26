@@ -104,7 +104,7 @@ class TenantController extends Controller
         } catch (Throwable $exception) {
             report($exception);
 
-            return response()->json(['message' => 'Der Bild-Prompt konnte nicht vorbereitet werden: '.$exception->getMessage()], 422);
+            return response()->json(['message' => 'IMAGE_PROMPT_PREPARATION_FAILED'], 422);
         }
 
         return response()->json(['prompt' => $prompt, 'context' => $context, 'image_generation' => $imageGenerations->status($tenant)]);
