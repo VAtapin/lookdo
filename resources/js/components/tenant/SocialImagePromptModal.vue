@@ -21,7 +21,8 @@ function money(value:number){return new Intl.NumberFormat(locale.value,{style:'c
     <p v-if="error" class="alert error image-prompt-error" role="alert">{{ error }}</p>
     <p class="image-prompt-warning">{{ tr('checkPromptBeforeGenerate') }}</p>
     <div class="image-credit-status"><div><strong>{{ quotaText() }}</strong><small>{{ tr('purchasedCredits') }}: {{ status?.credits ?? 0 }}</small></div><span>{{ tr('additionalImagePrice') }} <b>{{ money(Number(status?.unit_price || 0)) }}</b></span></div>
-    <div v-if="!canGenerate" class="image-credit-purchase"><div><b>{{ tr('freeLimitReached') }}</b><small>{{ tr('buyCreditsText') }}</small></div><label>{{ tr('creditQuantity') }}<input v-model.number="quantity" type="number" min="1" max="20"></label><button type="button" class="button" :disabled="busy" @click="emit('buy', quantity)">{{ tr('buyCredits') }} · {{ money(total) }}</button></div>
+    <p v-if="status?.payment_required" class="alert error">{{ tr('aiRequiresPayment') }}</p>
+    <div v-else-if="!canGenerate" class="image-credit-purchase"><div><b>{{ tr('freeLimitReached') }}</b><small>{{ tr('buyCreditsText') }}</small></div><label>{{ tr('creditQuantity') }}<input v-model.number="quantity" type="number" min="1" max="20"></label><button type="button" class="button" :disabled="busy" @click="emit('buy', quantity)">{{ tr('buyCredits') }} · {{ money(total) }}</button></div>
     <footer><button type="button" class="button ghost" :disabled="busy" @click="emit('close')">{{ tr('cancel') }}</button><button type="button" class="button" :disabled="busy || !canGenerate || prompt.trim().length < 40" @click="emit('generate')">{{ busy ? tr('pleaseWait') : tr('generateAfterCheck') }}</button></footer>
   </section>
 </div>

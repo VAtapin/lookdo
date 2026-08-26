@@ -100,6 +100,10 @@ Object.assign(messages.ru, {
 Object.assign(messages.uk, {
     imagePromptEyebrow:'ШІ-ЗОБРАЖЕННЯ', checkImagePrompt:'Перевірте промпт перед генерацією', selectedIndustry:'Обрана сфера', enteredActivity:'Ваша діяльність', imagePromptLabel:'Промпт для генерації зображення', preparingPrompt:'ШІ готує відповідний промпт…', imagePromptPreparationFailed:'Не вдалося підготувати промпт зображення. Спробуйте ще раз.', checkPromptBeforeGenerate:'Будь ласка, перевірте та за потреби виправте промпт. Платна генерація зображення запускається лише після підтвердження.', freeImagesRemaining:'Залишилося безкоштовно: :remaining з :limit', purchasedCredits:'Придбані кредити', additionalImagePrice:'Наступне зображення:', freeLimitReached:'Безкоштовні генерації закінчилися.', buyCreditsText:'Придбайте кредити, щоб створювати додаткові зображення.', creditQuantity:'Кількість', buyCredits:'Придбати кредити', generateAfterCheck:'Перевірено — створити зображення', imageCreditProcessing:'Оплата обробляється. Кредити з’являться автоматично після підтвердження Stripe.', imageCreditCancelled:'Придбання кредитів скасовано.'
 });
+Object.assign(messages.de, { aiRequiresPayment:'Bezahlen Sie zuerst Ihren Tarif. Die KI-Bildgenerierung wird erst nach der Aktivierung freigeschaltet.' });
+Object.assign(messages.en, { aiRequiresPayment:'Pay for your plan first. AI image generation is unlocked after activation.' });
+Object.assign(messages.ru, { aiRequiresPayment:'Сначала оплатите тариф. Генерация изображений с помощью ИИ станет доступна после активации подписки.' });
+Object.assign(messages.uk, { aiRequiresPayment:'Спочатку оплатіть тариф. Генерація зображень за допомогою ШІ стане доступною після активації підписки.' });
 export const t = (key: string) => computed(() => messages[locale.value][key] || key);
 export function tr(key: string): string { return messages[locale.value][key] || key; }
 export function setLocale(value: Locale) { locale.value=value;localStorage.setItem('lookdo-locale',value);document.documentElement.lang=value; }

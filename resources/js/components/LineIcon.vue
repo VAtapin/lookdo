@@ -23,6 +23,10 @@ defineProps<{ name: string }>();
     <template v-else-if="name === 'home'"><path d="m3 11 9-8 9 8"/><path d="M5 10v11h14V10M9 21v-7h6v7"/></template>
     <template v-else-if="name === 'grid'"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></template>
     <template v-else-if="name === 'user'"><circle cx="12" cy="8" r="4"/><path d="M4 22a8 8 0 0 1 16 0"/></template>
+    <template v-else-if="name === 'briefcase'"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V4h8v3M3 12h18M10 12v2h4v-2"/></template>
+    <template v-else-if="name === 'card'"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></template>
+    <template v-else-if="name === 'external'"><path d="M14 3h7v7M10 14 21 3"/><path d="M18 13v7a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h7"/></template>
+    <template v-else-if="name === 'logout'"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M14 3h6a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-6"/></template>
     <template v-else><path d="M4 19h16M7 19v-5M17 19v-8M10 14l7-7M14 7h3v3"/></template>
   </svg>
 </template>

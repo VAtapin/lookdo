@@ -61,4 +61,14 @@ class Tenant extends Model
     {
         return $this->hasMany(ImageCreditPurchase::class);
     }
+
+    public function hasActiveSubscription(): bool
+    {
+        $subscription = $this->currentSubscription;
+
+        return (bool) $subscription && (
+            $subscription->complimentary
+            || in_array($subscription->status, ['active', 'trialing', 'complimentary'], true)
+        );
+    }
 }

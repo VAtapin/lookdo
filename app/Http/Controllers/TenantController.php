@@ -28,6 +28,11 @@ class TenantController extends Controller
         abort_unless($request->user()->is_super_admin || $request->user()->tenants()->whereKey($tenant->id)->exists(), 403);
     }
 
+    private function requireActiveSubscription(Tenant $tenant): void
+    {
+        abort_unless($tenant->hasActiveSubscription(), 402, 'SUBSCRIPTION_PAYMENT_REQUIRED');
+    }
+
     public function show(Request $request, Tenant $tenant, EntitlementService $entitlements, TenantImageGenerationService $imageGenerations): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
@@ -69,23 +74,31 @@ class TenantController extends Controller
     public function prepareSocialImagePrompt(Request $request, Tenant $tenant, OpenAiService $openAi, OpenAiBudgetService $budget, TenantImageGenerationService $imageGenerations): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
+        $this->requireActiveSubscription($tenant);
         $tenant->load(['profile', 'businessProfile.category', 'businessProfile.variation', 'businessProfile.template']);
         $profile = $tenant->profile()->firstOrCreate();
         $context = [
             'business_name' => $tenant->name,
             'business_description' => $tenant->business_description,
-            'selected_category' => $tenant->businessProfile?->category?->localized('name'),
-            'selected_variation' => $tenant->businessProfile?->variation?->localized('name'),
-            'selected_template' => $tenant->businessProfile?->template?->localized('name'),
+            'selected_category' => $tenant->businessProfile?->category?->localized('name', $tenant->locale),
+            'selected_variation' => $tenant->businessProfile?->variation?->localized('name', $tenant->locale),
+            'selected_template' => $tenant->businessProfile?->template?->localized('name', $tenant->locale),
             'template_code' => $tenant->businessProfile?->template?->code,
             'city' => $profile->city,
             'language' => $tenant->locale,
         ];
 
+        $promptLanguage = match ($tenant->locale) {
+            'ru' => 'Russian',
+            'uk' => 'Ukrainian',
+            'de' => 'German',
+            default => 'English',
+        };
+
         try {
             $budget->ensureAvailable($request->user()?->id);
             $result = $openAi->structured(
-                'Create one precise English prompt for a commercial social-sharing image. Combine the selected category and the exact business description into one coherent real-world service. The category defines the industry context and the description defines the action. For example, automotive plus installing doors means installing or repairing automobile doors in an auto workshop, never building doors. Do not invent unrelated services. Request realistic premium landscape photography with a clear central subject and useful tools or materials. Require no text, letters, logos, UI, watermarks, prices, phone numbers or invented brand marks. Return JSON only.',
+                'Create one precise prompt written entirely in '.$promptLanguage.' for a commercial social-sharing image. Combine the selected category and the exact business description into one coherent real-world service. The category defines the industry context and the description defines the action. For example, automotive plus installing doors means installing or repairing automobile doors in an auto workshop, never building doors. Do not invent unrelated services. Request realistic premium landscape photography with a clear central subject and useful tools or materials. Require no text, letters, logos, UI, watermarks, prices, phone numbers or invented brand marks. Return JSON only.',
                 json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 'social_image_prompt',
                 [
@@ -113,6 +126,7 @@ class TenantController extends Controller
     public function generateSocialImage(Request $request, Tenant $tenant, OpenAiService $openAi, OpenAiBudgetService $budget, AuditService $audit, TenantImageGenerationService $imageGenerations): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
+        $this->requireActiveSubscription($tenant);
         $data = $request->validate(['prompt' => 'required|string|min:40|max:4000']);
         $tenant->load(['profile', 'currentSubscription.plan.entitlements']);
         $profile = $tenant->profile()->firstOrCreate();
@@ -148,6 +162,7 @@ class TenantController extends Controller
     public function buyImageCredits(Request $request, Tenant $tenant, StripeService $stripe, TenantImageGenerationService $imageGenerations): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
+        $this->requireActiveSubscription($tenant);
         $data = $request->validate(['quantity' => 'required|integer|min:1|max:20']);
         $status = $imageGenerations->status($tenant);
         $quantity = (int) $data['quantity'];

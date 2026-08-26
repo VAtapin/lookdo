@@ -832,11 +832,38 @@ class SaasFoundationTest extends TestCase
             ->assertSee('https://golden-wheel.lookdo.app/storage/tenant-social/'.$tenant->id.'/share.webp', false);
     }
 
+    public function test_unpaid_tenant_cannot_use_ai_images_or_add_a_custom_domain(): void
+    {
+        Http::fake();
+        $owner = User::factory()->create();
+        $tenant = Tenant::create(['name' => 'Unpaid Start', 'slug' => 'unpaid-start', 'country' => 'DE', 'locale' => 'ru', 'status' => 'active', 'business_description' => 'перетяжка рулей автомобилей']);
+        $tenant->users()->attach($owner, ['role' => 'owner']);
+        $plan = Plan::where('code', 'start')->firstOrFail();
+        $tenant->subscriptions()->create(['plan_id' => $plan->id, 'provider' => 'stripe', 'status' => 'incomplete', 'billing_cycle' => 'monthly', 'currency' => 'EUR', 'unit_amount' => 19, 'started_at' => now()]);
+
+        $this->actingAs($owner)->getJson('/api/tenant/'.$tenant->id)
+            ->assertOk()
+            ->assertJsonPath('entitlements.custom_domain', '0')
+            ->assertJsonPath('image_generation.can_generate', false)
+            ->assertJsonPath('image_generation.payment_required', true);
+
+        $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/social-image/prompt')
+            ->assertStatus(402)->assertJsonPath('message', 'SUBSCRIPTION_PAYMENT_REQUIRED');
+        $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/social-image/generate', [
+            'prompt' => 'Реалистичная фотография мастерской по перетяжке автомобильных рулей без текста и логотипов.',
+        ])->assertStatus(402)->assertJsonPath('message', 'SUBSCRIPTION_PAYMENT_REQUIRED');
+        $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/image-credits/checkout', ['quantity' => 1])
+            ->assertStatus(402)->assertJsonPath('message', 'SUBSCRIPTION_PAYMENT_REQUIRED');
+        $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/domains', ['domain' => 'unpaid-start.de'])
+            ->assertForbidden();
+
+        Http::assertNothingSent();
+    }
     public function test_tenant_reviews_an_ai_prompt_before_social_image_generation(): void
     {
         Storage::fake('public');
         config(['services.openai.key' => 'test-key', 'services.openai.image_model' => 'gpt-image-2', 'services.openai.image_cost_medium' => .053]);
-        $reviewedPrompt = 'Realistic premium automotive workshop photography showing a technician precisely fitting an automobile door to a vehicle body, specialist tools visible, landscape composition, no text or logos.';
+        $reviewedPrompt = 'Реалистичная премиальная фотография автосервиса: мастер точно устанавливает автомобильную дверь на кузов, рядом видны специальные инструменты, горизонтальная композиция, без текста и логотипов.';
         Http::fake(function (HttpRequest $request) use ($reviewedPrompt) {
             if ($request->url() === 'https://api.openai.com/v1/responses') {
                 return Http::response(['output_text' => json_encode(['prompt' => $reviewedPrompt]), 'model' => 'gpt-5.6-luna', 'usage' => ['input_tokens' => 120, 'output_tokens' => 45]]);
@@ -847,6 +874,8 @@ class SaasFoundationTest extends TestCase
         $owner = User::factory()->create();
         $tenant = Tenant::create(['name' => 'Auto Door Pro', 'slug' => 'auto-door-pro', 'country' => 'DE', 'locale' => 'ru', 'status' => 'active', 'business_description' => 'я устанавливаю двери']);
         $tenant->users()->attach($owner, ['role' => 'owner']);
+        $plan = Plan::where('code', 'start')->firstOrFail();
+        $tenant->subscriptions()->create(['plan_id' => $plan->id, 'provider' => 'stripe', 'status' => 'active', 'billing_cycle' => 'monthly', 'currency' => 'EUR', 'unit_amount' => 19, 'started_at' => now()]);
         $variation = BusinessVariation::where('code', 'automotive.general')->firstOrFail();
         $template = RequestTemplate::where('code', 'automotive.general')->firstOrFail();
         $tenant->businessProfile()->create(['category_id' => $variation->category_id, 'variation_id' => $variation->id, 'request_template_id' => $template->id, 'original_description' => $tenant->business_description]);
@@ -863,7 +892,8 @@ class SaasFoundationTest extends TestCase
 
         Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://api.openai.com/v1/responses'
             && str_contains((string) $request['input'], 'я устанавливаю двери')
-            && str_contains((string) $request['input'], 'automotive'));
+            && str_contains((string) $request['input'], 'automotive')
+            && str_contains((string) $request['instructions'], 'Russian'));
 
         $generated = $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/social-image/generate', ['prompt' => $prompt->json('prompt')])
             ->assertCreated()->assertJsonPath('social_image_source', 'ai')->assertJsonPath('image_generation.remaining_free', 2);

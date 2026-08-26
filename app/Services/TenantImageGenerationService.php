@@ -10,13 +10,15 @@ class TenantImageGenerationService
 {
     public function __construct(private readonly EntitlementService $entitlements) {}
 
-    /** @return array{free_limit:int,free_used:int,remaining_free:int,credits:int,unit_price:float,currency:string,can_generate:bool} */
+    /** @return array{free_limit:int,free_used:int,remaining_free:int,credits:int,unit_price:float,currency:string,can_generate:bool,payment_required:bool} */
     public function status(Tenant $tenant): array
     {
         $profile = $tenant->profile()->firstOrCreate();
         $freeLimit = max(0, (int) $this->entitlements->get($tenant, 'social_image_free_generations', 3));
         $freeUsed = min($freeLimit, max(0, (int) $profile->image_generation_free_used));
         $credits = max(0, (int) $profile->image_generation_credits);
+
+        $subscriptionActive = $tenant->hasActiveSubscription();
 
         return [
             'free_limit' => $freeLimit,
@@ -25,7 +27,8 @@ class TenantImageGenerationService
             'credits' => $credits,
             'unit_price' => max(0.01, (int) $this->entitlements->get($tenant, 'social_image_credit_price_cents', 100) / 100),
             'currency' => 'EUR',
-            'can_generate' => $freeUsed < $freeLimit || $credits > 0,
+            'can_generate' => $subscriptionActive && ($freeUsed < $freeLimit || $credits > 0),
+            'payment_required' => ! $subscriptionActive,
         ];
     }
 
