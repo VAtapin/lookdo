@@ -38,6 +38,11 @@ Object.assign(messages.en, {
     audienceBrows:'Brow care', audienceBeauty:'Beauty & care', bookingTitle:'Online booking', bookingText:'Services, available times, reminders and repeat visits.', socialTitle:'Content & contact', socialText:'Prepare posts and open channels the business actually connected.', appAddress:'App address', appAddressHelp:'Optional. If left blank, LOOKDO creates it from the business name.',
 });
 
+messages.ru.whyTitle = 'Получайте заявки, ведите запись и общайтесь с клиентами — в одном приложении';
+messages.de.whyTitle = 'Anfragen erhalten, Termine verwalten und mit Kunden kommunizieren — in einer App';
+messages.en.whyTitle = 'Receive requests, manage bookings and talk to customers — all in one app';
+messages.uk.whyTitle = 'Отримуйте заявки, ведіть запис і спілкуйтеся з клієнтами — в одному застосунку';
+
 export const t = (key: string) => computed(() => messages[locale.value][key] || key);
 export function tr(key: string): string { return messages[locale.value][key] || key; }
 export function setLocale(value: Locale) { locale.value=value;localStorage.setItem('lookdo-locale',value);document.documentElement.lang=value; }
