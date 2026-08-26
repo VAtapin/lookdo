@@ -3,14 +3,18 @@
 namespace App\Models;
 
 use App\Support\LocalizesJson;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 
 class Plan extends Model
 {
     use LocalizesJson;
 
     protected $guarded = [];
+
+    protected $appends = ['image_url'];
 
     protected function casts(): array
     {
@@ -25,6 +29,24 @@ class Plan extends Model
     public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class);
+    }
+
+    protected function imageUrl(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->image_path
+            ? Storage::disk('public')->url($this->image_path)
+            : null);
+    }
+
+    public function stripeImageUrl(): ?string
+    {
+        if (! $this->image_url) {
+            return null;
+        }
+
+        return str_starts_with($this->image_url, 'http://') || str_starts_with($this->image_url, 'https://')
+            ? $this->image_url
+            : rtrim((string) config('app.url'), '/').'/'.ltrim($this->image_url, '/');
     }
 
     public function priceFor(string $currency, string $cycle): ?float

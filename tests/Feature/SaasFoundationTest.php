@@ -365,6 +365,38 @@ class SaasFoundationTest extends TestCase
             ->assertOk()->assertJsonPath('data.0.variation.code', 'repair-finishing-installation.door-installation');
     }
 
+    public function test_plan_image_is_uploaded_exposed_publicly_and_sent_to_stripe(): void
+    {
+        Storage::fake('public');
+        config(['app.url' => 'https://lookdo.test', 'filesystems.disks.public.url' => 'https://lookdo.test/storage', 'services.stripe.secret' => 'sk_live_example']);
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $plan = Plan::where('code', 'start')->firstOrFail();
+
+        $upload = $this->actingAs($admin)->post('/api/control/plans/'.$plan->id.'/image', [
+            'image' => UploadedFile::fake()->image('start-plan.jpg', 1200, 630),
+        ], ['Accept' => 'application/json'])->assertCreated();
+
+        $path = $upload->json('image_path');
+        Storage::disk('public')->assertExists($path);
+        $this->assertStringContainsString('/storage/plan-images/', $upload->json('image_url'));
+        $platform = $this->withHeader('X-Locale', 'de')->getJson('/api/platform')->assertOk();
+        $this->assertSame($upload->json('image_url'), collect($platform->json('plans'))->firstWhere('code', 'start')['image_url']);
+
+        $plan->forceFill(['stripe_product_id' => null, 'stripe_monthly_price_id' => null, 'stripe_yearly_price_id' => null])->save();
+        Http::fake(function (HttpRequest $request) {
+            if (str_ends_with($request->url(), '/v1/prices')) {
+                return Http::response(['id' => ($request['recurring']['interval'] ?? null) === 'year' ? 'price_year' : 'price_month']);
+            }
+
+            return Http::response(['id' => 'prod_start']);
+        });
+
+        app(StripeService::class)->syncPlan($plan->refresh());
+
+        Http::assertSent(fn (HttpRequest $request) => str_ends_with($request->url(), '/v1/products')
+            && str_contains(urldecode($request->body()), (string) $upload->json('image_url')));
+    }
+
     public function test_super_admin_can_translate_a_plan_into_all_platform_languages(): void
     {
         config(['services.openai.key' => 'test-key', 'services.openai.text_model' => 'gpt-5.6-luna']);

@@ -55,6 +55,8 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::post('/plans/translate', [AdminController::class, 'translatePlan'])->middleware('throttle:20,1');
             Route::post('/plans', [AdminController::class, 'savePlan']);
             Route::put('/plans/{plan}', [AdminController::class, 'savePlan']);
+            Route::post('/plans/{plan}/image', [AdminController::class, 'uploadPlanImage']);
+            Route::delete('/plans/{plan}/image', [AdminController::class, 'deletePlanImage']);
             Route::post('/plans/{plan}/stripe-sync', [AdminController::class, 'syncPlan']);
             Route::get('/stripe', [AdminController::class, 'stripeStatus']);
             Route::post('/stripe/sync-plans', [AdminController::class, 'syncAllPlans']);

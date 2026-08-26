@@ -320,6 +320,42 @@ class AdminController extends Controller
         return response()->json($plan->fresh('entitlements'), $before ? 200 : 201);
     }
 
+    public function uploadPlanImage(Request $request, Plan $plan, AuditService $audit): JsonResponse
+    {
+        $request->validate(['image' => 'required|file|mimes:jpg,jpeg,png,webp|max:8192']);
+        $before = $plan->toArray();
+        $oldPath = $plan->image_path;
+        $path = $request->file('image')->store('plan-images/'.$plan->id, 'public');
+
+        $plan->forceFill([
+            'image_path' => $path,
+            'stripe_synced_at' => null,
+            'stripe_sync_error' => null,
+        ])->save();
+        if ($oldPath && $oldPath !== $path) {
+            Storage::disk('public')->delete($oldPath);
+        }
+        $audit->log('plan.image.updated', $plan, $before, $plan->fresh()->toArray());
+
+        return response()->json($plan->fresh(), 201);
+    }
+
+    public function deletePlanImage(Plan $plan, AuditService $audit): JsonResponse
+    {
+        $before = $plan->toArray();
+        if ($plan->image_path) {
+            Storage::disk('public')->delete($plan->image_path);
+        }
+        $plan->forceFill([
+            'image_path' => null,
+            'stripe_synced_at' => null,
+            'stripe_sync_error' => null,
+        ])->save();
+        $audit->log('plan.image.deleted', $plan, $before, $plan->fresh()->toArray());
+
+        return response()->json($plan->fresh());
+    }
+
     public function translatePlan(Request $request, OpenAiService $openAi, OpenAiBudgetService $budget, AuditService $audit): JsonResponse
     {
         $locales = ['de', 'en', 'ru', 'uk'];

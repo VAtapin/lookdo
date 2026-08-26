@@ -107,6 +107,9 @@ class StripeService
     {
         try {
             $productData = ['name' => 'LOOKDO — '.$plan->localized('name'), 'active' => $plan->is_active ? 'true' : 'false'];
+            if ($imageUrl = $plan->stripeImageUrl()) {
+                $productData['images'] = [$imageUrl];
+            }
             $product = $plan->stripe_product_id
                 ? $this->post('/v1/products/'.$plan->stripe_product_id, $productData)
                 : $this->post('/v1/products', $productData + ['description' => $plan->localized('description'), 'metadata' => ['lookdo_plan_id' => (string) $plan->id]]);
