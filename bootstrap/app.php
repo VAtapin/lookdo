@@ -18,7 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(prepend: [SecurityHeaders::class, ResolveTenant::class]);
-        $middleware->validateCsrfTokens(except: ['api/stripe/webhook']);
+        $middleware->validateCsrfTokens(except: ['api/stripe/webhook', 'api/webhooks/seven/sms']);
         $middleware->alias([
             'active' => EnsureUserIsActive::class,
             'locale' => SetLocale::class,

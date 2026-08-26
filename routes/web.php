@@ -3,6 +3,8 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PlatformController;
+use App\Http\Controllers\SevenSmsWebhookController;
+use App\Http\Controllers\SmsAdminController;
 use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\TenantController;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +20,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
     Route::post('/forgot-password', [AuthController::class, 'forgot'])->middleware('throttle:5,1');
     Route::post('/reset-password', [AuthController::class, 'reset'])->middleware('throttle:5,1');
     Route::post('/stripe/webhook', StripeWebhookController::class);
+    Route::post('/webhooks/seven/sms', SevenSmsWebhookController::class)->middleware('throttle:120,1');
 
     Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
@@ -52,6 +55,8 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::post('/plans/{plan}/stripe-sync', [AdminController::class, 'syncPlan']);
             Route::get('/stripe', [AdminController::class, 'stripeStatus']);
             Route::post('/stripe/sync-plans', [AdminController::class, 'syncAllPlans']);
+            Route::get('/sms', [SmsAdminController::class, 'index']);
+            Route::post('/sms/test', [SmsAdminController::class, 'testConnection'])->middleware('throttle:10,1');
             Route::get('/backups', [AdminController::class, 'backups']);
             Route::post('/backups', [AdminController::class, 'createBackup']);
             Route::post('/backups/{name}/verify', [AdminController::class, 'verifyBackup']);

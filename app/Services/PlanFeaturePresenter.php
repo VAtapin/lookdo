@@ -18,6 +18,8 @@ class PlanFeaturePresenter
         $staff = max(1, $number('staff_users', 1));
         $languages = max(1, min(4, $number('app_languages', 1)));
         $video = $enabled('video_enabled');
+        $smsLimit = $number('sms_monthly_limit');
+        $sms = $enabled('sms_enabled') && $smsLimit > 0;
         $advancedRetention = $enabled('repeat_visit_enabled') || $enabled('segments_enabled') || $enabled('vacancy_fill_enabled');
         $retention = $advancedRetention || $enabled('reminders_enabled') || $enabled('before_after_enabled');
         $ai = $enabled('ai_media_enabled') || $enabled('ai_communication_enabled');
@@ -29,6 +31,7 @@ class PlanFeaturePresenter
         return [
             $this->row('requests', $enabled('request_enabled'), $requestLimit === 0 ? $this->label('request_unlimited', $locale) : $this->label('request_limited', $locale, ['value' => $requestLimit])),
             $this->row('booking', $enabled('booking_enabled'), $this->label('booking', $locale)),
+            $this->row('sms', $sms, $this->label($sms ? 'sms_limited' : 'sms_disabled', $locale, ['value' => $smsLimit])),
             $this->row('storage', $storage > 0, $storage >= 1024 ? $this->label('storage_gb', $locale, ['value' => $this->formatNumber($storage / 1024)]) : $this->label('storage_mb', $locale, ['value' => $storage])),
             $this->row('staff', true, $this->label($staff === 1 ? 'staff_one' : 'staff_many', $locale, ['value' => $staff])),
             $this->row('languages', true, $this->label($languages === 1 ? 'languages_one' : 'languages_many', $locale, ['value' => $languages])),

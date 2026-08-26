@@ -549,6 +549,12 @@ class AdminController extends Controller
             'settings' => SystemSetting::where('is_secret', false)->where('key', '!=', 'legal_dispute_statement')->pluck('value', 'key'),
             'pages' => PlatformPage::orderBy('key')->get(),
             'templates' => RequestTemplate::where('enabled', true)->orderByDesc('sort_order')->get(['id', 'code', 'name']),
+            'sms' => [
+                'providers' => [['value' => 'seven', 'label' => 'seven.io']],
+                'api_key_configured' => filled(SystemSetting::readSecret('sms_seven_api_key')),
+                'signing_key_configured' => filled(SystemSetting::readSecret('sms_seven_signing_key')),
+                'webhook_url' => rtrim((string) config('app.url'), '/').'/api/webhooks/seven/sms',
+            ],
         ]);
     }
 
@@ -567,9 +573,21 @@ class AdminController extends Controller
             'settings.maintenance' => 'required|boolean',
             'settings.enabled_locales' => 'required|array|min:1',
             'settings.enabled_locales.*' => Rule::in($locales),
-            'settings.integrations' => 'required|array:stripe,openai',
+            'settings.integrations' => 'required|array:stripe,openai,sms',
             'settings.integrations.stripe' => 'required|boolean',
             'settings.integrations.openai' => 'required|boolean',
+            'settings.integrations.sms' => 'required|boolean',
+            'settings.sms_provider' => ['required', Rule::in(['seven'])],
+            'settings.sms_sender' => ['required', 'string', 'max:16', 'regex:/^(?:[A-Za-z0-9]{1,11}|[0-9]{1,16})$/'],
+            'settings.sms_events' => 'required|array:request_received,master_replied,work_ready,agreement_reminder',
+            'settings.sms_events.request_received' => 'required|boolean',
+            'settings.sms_events.master_replied' => 'required|boolean',
+            'settings.sms_events.work_ready' => 'required|boolean',
+            'settings.sms_events.agreement_reminder' => 'required|boolean',
+            'settings.sms_seven_api_key' => 'nullable|string|max:1024',
+            'settings.sms_seven_signing_key' => 'nullable|string|max:1024',
+            'settings.sms_clear_api_key' => 'nullable|boolean',
+            'settings.sms_clear_signing_key' => 'nullable|boolean',
             'settings.legal_operator_name' => 'nullable|string|max:255',
             'settings.legal_operator_address' => 'nullable|string|max:2000',
             'settings.legal_representative' => 'nullable|string|max:255',
@@ -582,7 +600,7 @@ class AdminController extends Controller
         $allowed = [
             'platform_name', 'support_email', 'default_locale', 'default_request_template_code',
             'trial_days_default', 'upload_base_limit_mb', 'registration_enabled', 'maintenance',
-            'enabled_locales', 'integrations', 'legal_operator_name', 'legal_operator_address',
+            'enabled_locales', 'integrations', 'sms_provider', 'sms_sender', 'sms_events', 'legal_operator_name', 'legal_operator_address',
             'legal_representative', 'legal_email', 'legal_phone', 'legal_register', 'legal_vat_id',
         ];
         DB::transaction(function () use ($data, $allowed, $audit): void {
@@ -593,6 +611,16 @@ class AdminController extends Controller
                 $setting->is_secret = false;
                 $setting->save();
                 $audit->log('setting.updated', $setting, $before, $setting->toArray());
+            }
+            foreach ([
+                'sms_seven_api_key' => 'sms_clear_api_key',
+                'sms_seven_signing_key' => 'sms_clear_signing_key',
+            ] as $secretKey => $clearKey) {
+                if ($data['settings'][$clearKey] ?? false) {
+                    SystemSetting::writeSecret($secretKey, null);
+                } elseif (filled($data['settings'][$secretKey] ?? null)) {
+                    SystemSetting::writeSecret($secretKey, (string) $data['settings'][$secretKey]);
+                }
             }
         });
 

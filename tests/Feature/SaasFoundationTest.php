@@ -2,16 +2,20 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendSmsMessage;
 use App\Models\BusinessClassification;
 use App\Models\BusinessPhrase;
 use App\Models\BusinessVariation;
 use App\Models\Plan;
 use App\Models\PlatformPage;
 use App\Models\RequestTemplate;
+use App\Models\SmsMessage;
 use App\Models\SystemSetting;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\BackupService;
+use App\Services\SmsGateway;
+use App\Services\SmsService;
 use App\Services\StripeService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,8 +24,10 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use ReflectionMethod;
 use Tests\TestCase;
 
@@ -481,7 +487,7 @@ class SaasFoundationTest extends TestCase
         $settings['legal_operator_name'] = 'LOOKDO GmbH';
         $settings['legal_phone'] = '+49 30 123456';
         $settings['default_request_template_code'] = RequestTemplate::where('enabled', true)->value('code');
-        $settings['integrations'] = ['stripe' => true, 'openai' => true];
+        $settings['integrations'] = ['stripe' => true, 'openai' => true, 'sms' => false];
 
         $this->actingAs($admin)->putJson('/api/control/settings', ['settings' => $settings])->assertOk()
             ->assertJsonPath('settings.legal_operator_name', 'LOOKDO GmbH');
@@ -565,5 +571,105 @@ class SaasFoundationTest extends TestCase
         $this->assertSame('price_month_new', $plan->refresh()->stripe_monthly_price_id);
         $this->assertSame(2500, $plan->stripe_monthly_amount);
         Http::assertSent(fn (HttpRequest $request) => str_ends_with($request->url(), '/v1/prices/price_month') && $request['active'] === 'false');
+    }
+
+    public function test_sms_settings_are_encrypted_and_never_returned_to_the_admin_client(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $settings = $this->actingAs($admin)->getJson('/api/control/settings')->assertOk()->json('settings');
+        $settings['integrations'] = ['stripe' => true, 'openai' => true, 'sms' => true];
+        $settings['sms_seven_api_key'] = 'seven-api-secret';
+        $settings['sms_seven_signing_key'] = 'seven-signing-secret';
+
+        $this->actingAs($admin)->putJson('/api/control/settings', ['settings' => $settings])
+            ->assertOk()
+            ->assertJsonPath('sms.api_key_configured', true)
+            ->assertJsonPath('sms.signing_key_configured', true)
+            ->assertJsonMissing(['sms_seven_api_key' => 'seven-api-secret']);
+
+        $this->assertSame('seven-api-secret', SystemSetting::readSecret('sms_seven_api_key'));
+        $this->assertSame('seven-signing-secret', SystemSetting::readSecret('sms_seven_signing_key'));
+        $this->assertNotSame('seven-api-secret', SystemSetting::where('key', 'sms_seven_api_key')->firstOrFail()->value);
+    }
+
+    public function test_sms_service_enforces_plan_limit_and_records_provider_cost(): void
+    {
+        Queue::fake();
+        Http::fake(['gateway.seven.io/api/sms' => Http::response([
+            'success' => '100',
+            'total_price' => 0.075,
+            'messages' => [['id' => 'provider-message-1', 'parts' => 1, 'price' => 0.075, 'success' => true]],
+        ])]);
+        SystemSetting::updateOrCreate(['key' => 'integrations'], ['value' => ['stripe' => true, 'openai' => true, 'sms' => true]]);
+        SystemSetting::writeSecret('sms_seven_api_key', 'test-api-key');
+
+        $plan = Plan::where('code', 'start')->firstOrFail();
+        $plan->entitlements()->updateOrCreate(['key' => 'sms_enabled'], ['value' => '1']);
+        $plan->entitlements()->updateOrCreate(['key' => 'sms_monthly_limit'], ['value' => '1']);
+        $tenant = Tenant::create(['name' => 'SMS Client', 'slug' => 'sms-client', 'country' => 'DE', 'locale' => 'de', 'status' => 'active']);
+        $tenant->subscriptions()->create(['plan_id' => $plan->id, 'provider' => 'manual', 'status' => 'active', 'started_at' => now()]);
+
+        $sms = app(SmsService::class)->queueImportant($tenant, '+4915112345678', 'Ihre Anfrage ist eingegangen.', 'request_received', 'request-1-received');
+        $duplicate = app(SmsService::class)->queueImportant($tenant, '+4915112345678', 'Ihre Anfrage ist eingegangen.', 'request_received', 'request-1-received');
+        $this->assertSame($sms->id, $duplicate->id);
+        Queue::assertPushed(SendSmsMessage::class, 1);
+
+        (new SendSmsMessage($sms->id))->handle(app(SmsGateway::class));
+        $this->assertDatabaseHas('sms_messages', [
+            'id' => $sms->id,
+            'status' => 'accepted',
+            'provider_message_id' => 'provider-message-1',
+            'parts' => 1,
+            'cost' => 0.075,
+        ]);
+
+        try {
+            app(SmsService::class)->queueImportant($tenant, '+4915112345678', 'Ihre Arbeit ist fertig.', 'work_ready', 'request-1-ready');
+            $this->fail('The strict monthly SMS limit was not enforced.');
+        } catch (\DomainException $exception) {
+            $this->assertStringContainsString('limit', $exception->getMessage());
+        }
+
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $this->actingAs($admin)->getJson('/api/control/sms')
+            ->assertOk()
+            ->assertJsonPath('data.0.recipient_masked', '•••• 5678')
+            ->assertJsonPath('summary.cost', 0.075);
+    }
+
+    public function test_signed_seven_delivery_report_updates_sms_journal(): void
+    {
+        SystemSetting::writeSecret('sms_seven_signing_key', 'test-signing-key');
+        $tenant = Tenant::create(['name' => 'DLR Client', 'slug' => 'dlr-client', 'country' => 'DE', 'locale' => 'de', 'status' => 'active']);
+        $sms = SmsMessage::create([
+            'tenant_id' => $tenant->id,
+            'uuid' => (string) Str::uuid(),
+            'provider' => 'seven',
+            'event_type' => 'work_ready',
+            'recipient' => '+4915112345678',
+            'recipient_hash' => hash('sha256', '+4915112345678'),
+            'message' => 'Ihre Arbeit ist fertig.',
+            'provider_message_id' => 'provider-message-2',
+            'status' => 'accepted',
+        ]);
+        $body = json_encode([
+            'webhook_event' => 'dlr',
+            'data' => ['msg_id' => 'provider-message-2', 'status' => 'DELIVERED', 'timestamp' => now()->toIso8601String()],
+        ], JSON_UNESCAPED_SLASHES);
+        $timestamp = time();
+        $nonce = 'sms-test-nonce';
+        $target = rtrim((string) config('app.url'), '/').'/api/webhooks/seven/sms';
+        $signature = hash_hmac('sha256', implode("\n", [$timestamp, $nonce, 'POST', $target, md5($body)]), 'test-signing-key');
+
+        $this->call('POST', '/api/webhooks/seven/sms', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_SIGNATURE' => $signature,
+            'HTTP_X_NONCE' => $nonce,
+            'HTTP_X_TIMESTAMP' => (string) $timestamp,
+        ], $body)->assertOk()->assertJsonPath('matched', true);
+
+        $this->assertSame('delivered', $sms->fresh()->status);
+        $this->assertSame('DELIVERED', $sms->fresh()->provider_status);
+        $this->assertNotNull($sms->fresh()->delivered_at);
     }
 }

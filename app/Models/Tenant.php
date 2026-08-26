@@ -51,4 +51,9 @@ class Tenant extends Model
     {
         return $this->hasOne(TenantBusinessProfile::class);
     }
+
+    public function smsMessages(): HasMany
+    {
+        return $this->hasMany(SmsMessage::class);
+    }
 }

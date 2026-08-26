@@ -13,6 +13,7 @@ return [
         'storage_mb' => ['group' => 'limits', 'type' => 'number', 'default' => 2048, 'min' => 0, 'max' => 1048576, 'label' => 'Speicherplatz (MB)', 'help' => '1024 MB entsprechen 1 GB.'],
         'staff_users' => ['group' => 'limits', 'type' => 'number', 'default' => 1, 'min' => 1, 'max' => 10000, 'label' => 'Team-Benutzer', 'help' => 'Anzahl der Benutzer im Kundenkonto.'],
         'app_languages' => ['group' => 'limits', 'type' => 'number', 'default' => 1, 'min' => 1, 'max' => 4, 'label' => 'App-Sprachen', 'help' => '1 = nur die bei der Registrierung gewählte Sprache; bis zu 4 = mehrsprachige Kunden-App.'],
+        'sms_monthly_limit' => ['group' => 'limits', 'type' => 'number', 'default' => 0, 'min' => 0, 'max' => 10000, 'label' => 'SMS pro Monat', 'help' => 'Strikte technische Obergrenze. Es gibt keine automatische Mehrkosten-Abrechnung.'],
         'video_max_mb' => ['group' => 'limits', 'type' => 'number', 'default' => 100, 'min' => 1, 'max' => 2048, 'label' => 'Maximale Videogröße (MB)', 'help' => 'Gilt nur, wenn Video aktiviert ist.'],
         'video_max_seconds' => ['group' => 'limits', 'type' => 'number', 'default' => 45, 'min' => 1, 'max' => 3600, 'label' => 'Maximale Videolänge (Sek.)', 'help' => 'Gilt nur, wenn Video aktiviert ist.'],
 
@@ -22,6 +23,7 @@ return [
         'customers_enabled' => ['group' => 'core', 'type' => 'boolean', 'default' => 1, 'label' => 'Kundenverwaltung'],
 
         'push_enabled' => ['group' => 'communication', 'type' => 'boolean', 'default' => 1, 'label' => 'Push-Benachrichtigungen'],
+        'sms_enabled' => ['group' => 'communication', 'type' => 'boolean', 'default' => 0, 'label' => 'SMS an Endkunden'],
         'video_enabled' => ['group' => 'communication', 'type' => 'boolean', 'default' => 0, 'label' => 'Videoanfragen'],
         'reminders_enabled' => ['group' => 'communication', 'type' => 'boolean', 'default' => 0, 'label' => 'Erinnerungen'],
         'before_after_enabled' => ['group' => 'communication', 'type' => 'boolean', 'default' => 0, 'label' => 'Vorher/Nachher'],
@@ -43,6 +45,8 @@ return [
         'request_limited' => ['de' => 'Bis zu :value Anfragen pro Monat', 'en' => 'Up to :value requests per month', 'ru' => 'До :value заявок в месяц', 'uk' => 'До :value заявок на місяць'],
         'request_unlimited' => ['de' => 'Unbegrenzte Anfragen', 'en' => 'Unlimited requests', 'ru' => 'Неограниченные заявки', 'uk' => 'Необмежені заявки'],
         'booking' => ['de' => 'Online-Termine', 'en' => 'Online booking', 'ru' => 'Онлайн-запись', 'uk' => 'Онлайн-запис'],
+        'sms_limited' => ['de' => 'Bis zu :value wichtige SMS an Endkunden', 'en' => 'Up to :value important customer SMS', 'ru' => 'До :value важных SMS конечным заказчикам', 'uk' => 'До :value важливих SMS кінцевим замовникам'],
+        'sms_disabled' => ['de' => 'SMS an Endkunden', 'en' => 'Customer SMS', 'ru' => 'SMS конечным заказчикам', 'uk' => 'SMS кінцевим замовникам'],
         'storage_gb' => ['de' => ':value GB Speicher', 'en' => ':value GB storage', 'ru' => ':value ГБ хранилища', 'uk' => ':value ГБ сховища'],
         'storage_mb' => ['de' => ':value MB Speicher', 'en' => ':value MB storage', 'ru' => ':value МБ хранилища', 'uk' => ':value МБ сховища'],
         'staff_one' => ['de' => '1 Benutzer', 'en' => '1 user', 'ru' => '1 пользователь', 'uk' => '1 користувач'],

@@ -16,6 +16,7 @@ LOOKDO — мультитенантная платформа, в которой 
 - **[DOMAIN_ARCHITECTURE.md](DOMAIN_ARCHITECTURE.md)** — tenant subdomains/custom domains/DNS/SSL;
 - **[DEPLOYMENT_PLESK.md](DEPLOYMENT_PLESK.md)** — production deployment;
 - **[BACKUP.md](BACKUP.md)** — backup/restore.
+- **[SMS.md](SMS.md)** — SMS an Endkunden, Tariflimits und seven.io Delivery Reports.
 
 ## Часть 2 — Tenant App
 
