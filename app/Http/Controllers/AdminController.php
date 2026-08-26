@@ -20,6 +20,8 @@ use App\Services\AuditService;
 use App\Services\BackupService;
 use App\Services\BusinessClassifier;
 use App\Services\DomainService;
+use App\Services\OpenAiBudgetService;
+use App\Services\OpenAiService;
 use App\Services\StripeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,6 +32,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class AdminController extends Controller
 {
@@ -179,20 +183,112 @@ class AdminController extends Controller
         return response()->json(Plan::withCount('subscriptions')->with('entitlements')->orderBy('sort_order')->get());
     }
 
+    public function planEntitlements(): JsonResponse
+    {
+        return response()->json([
+            'groups' => config('plan_entitlements.groups', []),
+            'definitions' => config('plan_entitlements.definitions', []),
+        ]);
+    }
+
     public function savePlan(Request $request, ?Plan $plan = null, ?AuditService $audit = null): JsonResponse
     {
-        $data = $request->validate(['code' => ['required', 'alpha_dash', 'max:80', $plan ? Rule::unique('plans', 'code')->ignore($plan->id) : Rule::unique('plans', 'code')], 'name' => 'required|array', 'description' => 'nullable|array', 'price_monthly' => 'required|numeric|min:0', 'price_yearly' => 'nullable|numeric|min:0', 'currency' => 'required|string|size:3', 'trial_days' => 'integer|min:0|max:365', 'is_active' => 'boolean', 'is_public' => 'boolean', 'sort_order' => 'integer|min:0', 'badge_text' => 'nullable|array', 'entitlements' => 'nullable|array']);
-        $entitlements = $data['entitlements'] ?? null;
+        $locales = ['de', 'en', 'ru', 'uk'];
+        $definitions = config('plan_entitlements.definitions', []);
+        $rules = [
+            'code' => ['required', 'alpha_dash', 'max:80', $plan ? Rule::unique('plans', 'code')->ignore($plan->id) : Rule::unique('plans', 'code')],
+            'name' => ['required', 'array:'.implode(',', $locales)],
+            'description' => ['nullable', 'array:'.implode(',', $locales)],
+            'badge_text' => ['nullable', 'array:'.implode(',', $locales)],
+            'price_monthly' => 'required|numeric|min:0',
+            'price_yearly' => 'nullable|numeric|min:0',
+            'currency' => 'required|string|size:3',
+            'trial_days' => 'integer|min:0|max:365',
+            'is_active' => 'boolean',
+            'is_public' => 'boolean',
+            'sort_order' => 'integer|min:0',
+            'entitlements' => ['required', 'array:'.implode(',', array_keys($definitions))],
+        ];
+        foreach ($locales as $locale) {
+            $rules["name.$locale"] = 'required|string|max:120';
+            $rules["description.$locale"] = 'nullable|string|max:2000';
+            $rules["badge_text.$locale"] = 'nullable|string|max:80';
+        }
+        foreach ($definitions as $key => $definition) {
+            $rules["entitlements.$key"] = ($definition['type'] ?? 'boolean') === 'number'
+                ? ['required', 'numeric', 'min:'.($definition['min'] ?? 0), 'max:'.($definition['max'] ?? PHP_INT_MAX)]
+                : ['required', Rule::in([0, 1, '0', '1', false, true])];
+        }
+
+        $data = $request->validate($rules);
+        $entitlements = $data['entitlements'];
         unset($data['entitlements']);
         $before = $plan?->toArray();
         $plan ? $plan->update($data) : $plan = Plan::create($data);
-        if (is_array($entitlements)) {
-            foreach ($entitlements as $key => $value) {
-                $plan->entitlements()->updateOrCreate(['key' => $key], ['value' => is_bool($value) ? (int) $value : (string) $value]);
-            }$plan->entitlements()->whereNotIn('key', array_keys($entitlements))->delete();
-        }$audit?->log($before ? 'plan.updated' : 'plan.created', $plan, $before, $plan->fresh('entitlements')->toArray());
+        foreach ($definitions as $key => $definition) {
+            $value = $entitlements[$key];
+            $plan->entitlements()->updateOrCreate(['key' => $key], ['value' => ($definition['type'] ?? 'boolean') === 'boolean' ? (int) filter_var($value, FILTER_VALIDATE_BOOL) : (string) $value]);
+        }
+        $plan->entitlements()->whereNotIn('key', array_keys($definitions))->delete();
+        $audit?->log($before ? 'plan.updated' : 'plan.created', $plan, $before, $plan->fresh('entitlements')->toArray());
 
         return response()->json($plan->fresh('entitlements'), $before ? 200 : 201);
+    }
+
+    public function translatePlan(Request $request, OpenAiService $openAi, OpenAiBudgetService $budget, AuditService $audit): JsonResponse
+    {
+        $locales = ['de', 'en', 'ru', 'uk'];
+        $data = $request->validate([
+            'source_locale' => ['required', Rule::in($locales)],
+            'name' => 'required|string|max:120',
+            'description' => 'nullable|string|max:2000',
+            'badge_text' => 'nullable|string|max:80',
+        ]);
+
+        $localizedStrings = [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'properties' => array_fill_keys($locales, ['type' => 'string']),
+            'required' => $locales,
+        ];
+        $schema = [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'properties' => [
+                'name' => $localizedStrings,
+                'description' => $localizedStrings,
+                'badge_text' => $localizedStrings,
+            ],
+            'required' => ['name', 'description', 'badge_text'],
+        ];
+
+        try {
+            $budget->ensureAvailable($request->user()?->id);
+            $result = $openAi->structured(
+                'Translate SaaS tariff marketing content from the supplied source language into German, English, Russian, and Ukrainian. Preserve the exact commercial meaning. Do not invent or remove features, limits, prices, guarantees, or product claims. Keep plan names short. If badge_text is empty, return an empty badge_text in every language.',
+                json_encode($data, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                'lookdo_plan_translation',
+                $schema,
+            );
+            $translations = json_decode($result['text'], true, flags: JSON_THROW_ON_ERROR);
+            foreach (['name', 'description', 'badge_text'] as $field) {
+                if (! is_array($translations[$field] ?? null)) {
+                    throw new \RuntimeException('OpenAI returned an incomplete translation.');
+                }
+            }
+        } catch (Throwable $exception) {
+            report($exception);
+            throw ValidationException::withMessages(['translation' => $exception->getMessage()]);
+        }
+
+        $source = $data['source_locale'];
+        $translations['name'][$source] = $data['name'];
+        $translations['description'][$source] = $data['description'] ?? '';
+        $translations['badge_text'][$source] = $data['badge_text'] ?? '';
+        $budget->record('plan_translation', $result['model'], $result['input_tokens'], $result['output_tokens'], $request->user()?->id);
+        $audit->log('plan.translation.generated', null, null, ['source_locale' => $source, 'model' => $result['model']]);
+
+        return response()->json($translations);
     }
 
     public function syncPlan(Plan $plan, StripeService $stripe, AuditService $audit): JsonResponse

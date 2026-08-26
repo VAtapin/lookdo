@@ -34,11 +34,27 @@ class SaasFoundationTest extends TestCase
         $this->seed(DatabaseSeeder::class);
     }
 
+    /** @param array<string, int|string> $overrides */
+    private function entitlementPayload(array $overrides = []): array
+    {
+        $defaults = collect(config('plan_entitlements.definitions'))
+            ->mapWithKeys(fn (array $definition, string $key) => [$key => (string) ($definition['default'] ?? 0)])
+            ->all();
+
+        return array_replace($defaults, $overrides);
+    }
+
     public function test_public_platform_returns_localized_plans_and_taxonomy(): void
     {
-        $this->withHeader('X-Locale', 'ru')->getJson('/api/platform')
+        $response = $this->withHeader('X-Locale', 'ru')->getJson('/api/platform')
             ->assertOk()->assertJsonPath('locale', 'ru')->assertJsonCount(3, 'plans')
             ->assertJsonFragment(['code' => 'automotive']);
+
+        $plans = collect($response->json('plans'))->keyBy('code');
+        $this->assertFalse(collect($plans['start']['features'])->firstWhere('key', 'custom_domain')['included']);
+        $this->assertTrue(collect($plans['pro']['features'])->firstWhere('key', 'custom_domain')['included']);
+        $this->assertTrue(collect($plans['business']['features'])->firstWhere('key', 'ai')['included']);
+        $this->assertStringContainsString('Неограниченные', collect($plans['business']['features'])->firstWhere('key', 'requests')['label']);
     }
 
     public function test_dictionary_classification_only_returns_existing_variations(): void
@@ -72,10 +88,15 @@ class SaasFoundationTest extends TestCase
     {
         $template = RequestTemplate::where('code', 'beauty.brows')->firstOrFail();
         $template->update(['enabled' => false]);
+        $plan = Plan::where('code', 'start')->firstOrFail();
+        $plan->update(['price_monthly' => 27]);
+        $plan->entitlements()->where('key', 'requests_monthly')->update(['value' => '77']);
 
         $this->artisan('lookdo:platform-data', ['--repair' => true])->assertSuccessful();
 
         $this->assertFalse($template->fresh()->enabled);
+        $this->assertSame('27.00', $plan->fresh()->price_monthly);
+        $this->assertSame('77', $plan->entitlements()->where('key', 'requests_monthly')->value('value'));
     }
 
     public function test_platform_repair_populates_legal_pages_without_overwriting_custom_content(): void
@@ -215,10 +236,10 @@ class SaasFoundationTest extends TestCase
         $admin = User::factory()->create(['is_super_admin' => true]);
 
         $this->actingAs($admin)->postJson('/api/control/plans', [
-            'code' => 'custom', 'name' => ['de' => 'Individuell', 'en' => 'Custom', 'ru' => 'Индивидуальный'],
-            'description' => ['de' => 'Test', 'en' => 'Test', 'ru' => 'Тест'], 'price_monthly' => 99, 'price_yearly' => 990,
+            'code' => 'custom', 'name' => ['de' => 'Individuell', 'en' => 'Custom', 'ru' => 'Индивидуальный', 'uk' => 'Індивідуальний'],
+            'description' => ['de' => 'Test', 'en' => 'Test', 'ru' => 'Тест', 'uk' => 'Тест'], 'badge_text' => ['de' => '', 'en' => '', 'ru' => '', 'uk' => ''], 'price_monthly' => 99, 'price_yearly' => 990,
             'currency' => 'EUR', 'trial_days' => 0, 'is_active' => true, 'is_public' => false, 'sort_order' => 90,
-            'entitlements' => ['custom_domain' => '1', 'staff_users' => '5'],
+            'entitlements' => $this->entitlementPayload(['custom_domain' => '1', 'staff_users' => '5']),
         ])->assertCreated()->assertJsonPath('code', 'custom');
 
         $this->assertDatabaseHas('plan_entitlements', ['key' => 'staff_users', 'value' => '5']);
@@ -226,6 +247,34 @@ class SaasFoundationTest extends TestCase
         $this->postJson('/api/classify', ['description' => 'устанавливаю входные двери', 'locale' => 'ru'])->assertOk();
         $this->actingAs($admin)->getJson('/api/control/classifications')
             ->assertOk()->assertJsonPath('data.0.variation.code', 'repair-finishing-installation.door-installation');
+    }
+
+    public function test_super_admin_can_translate_a_plan_into_all_platform_languages(): void
+    {
+        config(['services.openai.key' => 'test-key', 'services.openai.text_model' => 'gpt-5.6-luna']);
+        Http::fake(['api.openai.com/*' => Http::response([
+            'model' => 'gpt-5.6-luna',
+            'output_text' => json_encode([
+                'name' => ['de' => 'Profi', 'en' => 'Professional', 'ru' => 'Профессиональный', 'uk' => 'Професійний'],
+                'description' => ['de' => 'Für wachsende Betriebe.', 'en' => 'For growing businesses.', 'ru' => 'Для растущего бизнеса.', 'uk' => 'Для бізнесу, що зростає.'],
+                'badge_text' => ['de' => 'Empfohlen', 'en' => 'Recommended', 'ru' => 'Рекомендуем', 'uk' => 'Рекомендуємо'],
+            ], JSON_UNESCAPED_UNICODE),
+            'usage' => ['input_tokens' => 120, 'output_tokens' => 80],
+        ])]);
+        $admin = User::factory()->create(['is_super_admin' => true]);
+
+        $this->actingAs($admin)->postJson('/api/control/plans/translate', [
+            'source_locale' => 'ru',
+            'name' => 'Профессиональный',
+            'description' => 'Для растущего бизнеса.',
+            'badge_text' => 'Рекомендуем',
+        ])->assertOk()
+            ->assertJsonPath('name.de', 'Profi')
+            ->assertJsonPath('name.ru', 'Профессиональный')
+            ->assertJsonPath('description.uk', 'Для бізнесу, що зростає.');
+
+        $this->assertDatabaseHas('ai_usage_records', ['user_id' => $admin->id, 'operation' => 'plan_translation', 'model' => 'gpt-5.6-luna']);
+        Http::assertSent(fn (HttpRequest $request) => $request['text']['format']['type'] === 'json_schema' && $request['text']['format']['strict'] === true && $request['store'] === false);
     }
 
     public function test_super_admin_can_create_a_complete_client_account(): void

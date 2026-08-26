@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { ref, watch } from 'vue';
 import { api } from '../api';
 import LineIcon from '../components/LineIcon.vue';
 import { locale, tr } from '../i18n';
 
 defineProps<{ pricingOnly?: boolean }>();
 const plans = ref<any[]>([]);
-onMounted(async () => { plans.value = (await api('/platform')).plans; });
+let planRequest = 0;
+watch(locale, async () => { const request = ++planRequest; const response = await api<any>('/platform'); if (request === planRequest) plans.value = response.plans; }, { immediate: true });
 const workflow = [['photo', 'howShow'], ['phone', 'howPhone'], ['bell', 'howReceive'], ['chat', 'howReply']];
 const audiences = [['car', 'audienceAuto'], ['tools', 'audienceConstruction'], ['washer', 'audienceAppliance'], ['sofa', 'audienceFurniture'], ['leaf', 'audienceGarden'], ['service', 'audienceCleaning'], ['star', 'audienceBeauty']];
 const benefits = [['globe', 'benefitDomainTitle', 'linkDomain'], ['photo', 'benefitMediaTitle', 'photosVideos'], ['bell', 'benefitPushTitle', 'messagesPush'], ['star', 'benefitReviewTitle', 'reviews'], ['calendar', 'bookingTitle', 'bookingText'], ['chat', 'socialTitle', 'socialText']];
@@ -54,7 +55,7 @@ const faqs = {
 
     <section v-if="!pricingOnly" id="features" class="compact-section benefits-section"><h2>{{ tr('whyTitle') }}</h2><div class="benefits-grid"><article v-for="item in benefits" :key="item[1]"><LineIcon :name="item[0]"/><div><b>{{ tr(item[1]) }}</b><small>{{ tr(item[2]) }}</small></div></article></div></section>
 
-    <section id="pricing" class="compact-section public-pricing"><h2>{{ tr('pricing') }}</h2><div class="pricing-grid"><article v-for="plan in plans" :key="plan.id" class="price-card" :class="{ featured: plan.badge }"><span v-if="plan.badge" class="badge">{{ plan.badge }}</span><h3>{{ plan.name }}</h3><p>{{ plan.description }}</p><div class="price"><strong>{{ plan.price_monthly }} €</strong><span>{{ tr('perMonth') }}</span></div><ul><li>✓ {{ tr('photosVideos') }}</li><li>✓ {{ tr('messagesPush') }}</li><li>✓ {{ tr('brandDomain') }}</li></ul><RouterLink class="button full" :to="`/${locale}/register?plan=${plan.id}`">{{ tr('choose') }}</RouterLink></article></div></section>
+    <section id="pricing" class="compact-section public-pricing"><h2>{{ tr('pricing') }}</h2><div class="pricing-grid"><article v-for="plan in plans" :key="plan.id" class="price-card" :class="{ featured: plan.badge }"><span v-if="plan.badge" class="badge">{{ plan.badge }}</span><h3>{{ plan.name }}</h3><p>{{ plan.description }}</p><div class="price"><strong>{{ plan.price_monthly }} €</strong><span>{{ tr('perMonth') }}</span></div><ul class="plan-feature-list"><li v-for="feature in plan.features" :key="feature.key" :class="{ disabled: !feature.included }"><span>{{ feature.included ? '✓' : '—' }}</span>{{ feature.label }}</li></ul><RouterLink class="button full" :to="`/${locale}/register?plan=${plan.id}`">{{ tr('choose') }}</RouterLink></article></div></section>
 
     <section v-if="!pricingOnly" class="compact-section public-faq"><h2>{{ tr('faqTitle') }}</h2><div><details v-for="item in faqs[locale]" :key="item[0]"><summary>{{ item[0] }}<span>＋</span></summary><p>{{ item[1] }}</p></details></div></section>
   </div>

@@ -15,6 +15,29 @@ class OpenAiService
     /** @return array{text:string,model:string,input_tokens:int,output_tokens:int} */
     public function text(string $instructions, string $input): array
     {
+        return $this->request($instructions, $input, ['type' => 'json_object']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $schema
+     * @return array{text:string,model:string,input_tokens:int,output_tokens:int}
+     */
+    public function structured(string $instructions, string $input, string $name, array $schema): array
+    {
+        return $this->request($instructions, $input, [
+            'type' => 'json_schema',
+            'name' => $name,
+            'strict' => true,
+            'schema' => $schema,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $format
+     * @return array{text:string,model:string,input_tokens:int,output_tokens:int}
+     */
+    private function request(string $instructions, string $input, array $format): array
+    {
         if (! $this->configured()) {
             throw new RuntimeException('OPENAI_API_KEY is not configured.');
         }
@@ -25,7 +48,8 @@ class OpenAiService
                 'model' => config('services.openai.text_model'),
                 'instructions' => $instructions,
                 'input' => $input,
-                'text' => ['format' => ['type' => 'json_object']],
+                'text' => ['format' => $format],
+                'store' => false,
             ]);
 
         if ($response->failed()) {

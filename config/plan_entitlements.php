@@ -1,0 +1,60 @@
+<?php
+
+return [
+    'groups' => [
+        'limits' => 'Nutzung & Limits',
+        'core' => 'Grundfunktionen',
+        'communication' => 'Medien & Kommunikation',
+        'growth' => 'Kundenbindung & KI',
+        'branding' => 'Marke & Integrationen',
+    ],
+    'definitions' => [
+        'requests_monthly' => ['group' => 'limits', 'type' => 'number', 'default' => 100, 'min' => 0, 'max' => 1000000, 'label' => 'Anfragen pro Monat', 'help' => '0 bedeutet unbegrenzt.'],
+        'storage_mb' => ['group' => 'limits', 'type' => 'number', 'default' => 2048, 'min' => 0, 'max' => 1048576, 'label' => 'Speicherplatz (MB)', 'help' => '1024 MB entsprechen 1 GB.'],
+        'staff_users' => ['group' => 'limits', 'type' => 'number', 'default' => 1, 'min' => 1, 'max' => 10000, 'label' => 'Team-Benutzer', 'help' => 'Anzahl der Benutzer im Kundenkonto.'],
+        'video_max_mb' => ['group' => 'limits', 'type' => 'number', 'default' => 100, 'min' => 1, 'max' => 2048, 'label' => 'Maximale Videogröße (MB)', 'help' => 'Gilt nur, wenn Video aktiviert ist.'],
+        'video_max_seconds' => ['group' => 'limits', 'type' => 'number', 'default' => 45, 'min' => 1, 'max' => 3600, 'label' => 'Maximale Videolänge (Sek.)', 'help' => 'Gilt nur, wenn Video aktiviert ist.'],
+
+        'request_enabled' => ['group' => 'core', 'type' => 'boolean', 'default' => 1, 'label' => 'Visuelle Anfragen'],
+        'booking_enabled' => ['group' => 'core', 'type' => 'boolean', 'default' => 1, 'label' => 'Online-Termine'],
+        'services_enabled' => ['group' => 'core', 'type' => 'boolean', 'default' => 1, 'label' => 'Leistungskatalog'],
+        'customers_enabled' => ['group' => 'core', 'type' => 'boolean', 'default' => 1, 'label' => 'Kundenverwaltung'],
+
+        'push_enabled' => ['group' => 'communication', 'type' => 'boolean', 'default' => 1, 'label' => 'Push-Benachrichtigungen'],
+        'video_enabled' => ['group' => 'communication', 'type' => 'boolean', 'default' => 0, 'label' => 'Videoanfragen'],
+        'reminders_enabled' => ['group' => 'communication', 'type' => 'boolean', 'default' => 0, 'label' => 'Erinnerungen'],
+        'before_after_enabled' => ['group' => 'communication', 'type' => 'boolean', 'default' => 0, 'label' => 'Vorher/Nachher'],
+
+        'repeat_visit_enabled' => ['group' => 'growth', 'type' => 'boolean', 'default' => 0, 'label' => 'Wiederbesuche'],
+        'vacancy_fill_enabled' => ['group' => 'growth', 'type' => 'boolean', 'default' => 0, 'label' => 'Freie Termine füllen'],
+        'segments_enabled' => ['group' => 'growth', 'type' => 'boolean', 'default' => 0, 'label' => 'Kundensegmente'],
+        'social_content_enabled' => ['group' => 'growth', 'type' => 'boolean', 'default' => 0, 'label' => 'Social-Content'],
+        'ai_media_enabled' => ['group' => 'growth', 'type' => 'boolean', 'default' => 0, 'label' => 'KI für Medien'],
+        'ai_communication_enabled' => ['group' => 'growth', 'type' => 'boolean', 'default' => 0, 'label' => 'KI für Kommunikation'],
+
+        'custom_domain' => ['group' => 'branding', 'type' => 'boolean', 'default' => 0, 'label' => 'Eigene Domain'],
+        'branding_colors' => ['group' => 'branding', 'type' => 'boolean', 'default' => 1, 'label' => 'Eigene Farben'],
+        'platform_branding_removable' => ['group' => 'branding', 'type' => 'boolean', 'default' => 0, 'label' => 'LOOKDO Branding ausblendbar'],
+        'telegram_integration' => ['group' => 'branding', 'type' => 'boolean', 'default' => 0, 'label' => 'Telegram-Integration'],
+        'vk_integration' => ['group' => 'branding', 'type' => 'boolean', 'default' => 0, 'label' => 'VK-Integration'],
+    ],
+    'public' => [
+        'request_limited' => ['de' => 'Bis zu :value Anfragen pro Monat', 'en' => 'Up to :value requests per month', 'ru' => 'До :value заявок в месяц', 'uk' => 'До :value заявок на місяць'],
+        'request_unlimited' => ['de' => 'Unbegrenzte Anfragen', 'en' => 'Unlimited requests', 'ru' => 'Неограниченные заявки', 'uk' => 'Необмежені заявки'],
+        'booking' => ['de' => 'Online-Termine', 'en' => 'Online booking', 'ru' => 'Онлайн-запись', 'uk' => 'Онлайн-запис'],
+        'storage_gb' => ['de' => ':value GB Speicher', 'en' => ':value GB storage', 'ru' => ':value ГБ хранилища', 'uk' => ':value ГБ сховища'],
+        'storage_mb' => ['de' => ':value MB Speicher', 'en' => ':value MB storage', 'ru' => ':value МБ хранилища', 'uk' => ':value МБ сховища'],
+        'staff_one' => ['de' => '1 Benutzer', 'en' => '1 user', 'ru' => '1 пользователь', 'uk' => '1 користувач'],
+        'staff_many' => ['de' => ':value Benutzer', 'en' => ':value users', 'ru' => ':value пользователей', 'uk' => ':value користувачів'],
+        'video' => ['de' => 'Video bis :seconds Sek. / :size MB', 'en' => 'Video up to :seconds sec / :size MB', 'ru' => 'Видео до :seconds сек. / :size МБ', 'uk' => 'Відео до :seconds сек. / :size МБ'],
+        'video_disabled' => ['de' => 'Videoanfragen', 'en' => 'Video requests', 'ru' => 'Видео в заявках', 'uk' => 'Відео в заявках'],
+        'custom_domain' => ['de' => 'Eigene Domain', 'en' => 'Custom domain', 'ru' => 'Собственный домен', 'uk' => 'Власний домен'],
+        'retention' => ['de' => 'Erinnerungen & Vorher/Nachher', 'en' => 'Reminders & before/after', 'ru' => 'Напоминания и До/После', 'uk' => 'Нагадування та До/Після'],
+        'retention_advanced' => ['de' => 'Segmente, Wiederbesuche & freie Termine', 'en' => 'Segments, repeat visits & vacancy filling', 'ru' => 'Сегменты, повторные визиты и свободные окна', 'uk' => 'Сегменти, повторні візити та вільні вікна'],
+        'retention_disabled' => ['de' => 'Werkzeuge zur Kundenbindung', 'en' => 'Customer retention tools', 'ru' => 'Инструменты возврата клиентов', 'uk' => 'Інструменти повернення клієнтів'],
+        'ai' => ['de' => 'KI für Medien & Kommunikation', 'en' => 'AI for media & communication', 'ru' => 'ИИ для медиа и общения', 'uk' => 'ШІ для медіа та спілкування'],
+        'ai_disabled' => ['de' => 'KI-Assistenten', 'en' => 'AI assistants', 'ru' => 'ИИ-помощники', 'uk' => 'ШІ-помічники'],
+        'integrations' => ['de' => 'Integrationen: :value', 'en' => 'Integrations: :value', 'ru' => 'Интеграции: :value', 'uk' => 'Інтеграції: :value'],
+        'integrations_disabled' => ['de' => 'Messenger-Integrationen', 'en' => 'Messenger integrations', 'ru' => 'Интеграции с мессенджерами', 'uk' => 'Інтеграції з месенджерами'],
+    ],
+];

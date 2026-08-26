@@ -42,6 +42,8 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::post('/users/{user}/password-reset', [AdminController::class, 'sendPasswordReset']);
             Route::get('/subscriptions', [AdminController::class, 'subscriptions']);
             Route::get('/plans', [AdminController::class, 'plans']);
+            Route::get('/plan-entitlements', [AdminController::class, 'planEntitlements']);
+            Route::post('/plans/translate', [AdminController::class, 'translatePlan'])->middleware('throttle:20,1');
             Route::post('/plans', [AdminController::class, 'savePlan']);
             Route::put('/plans/{plan}', [AdminController::class, 'savePlan']);
             Route::post('/plans/{plan}/stripe-sync', [AdminController::class, 'syncPlan']);
