@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { api } from '../api';
 import LineIcon from '../components/LineIcon.vue';
 import { locale, tr } from '../i18n';
@@ -11,7 +11,20 @@ const demoOpen = ref(false);
 const pricingCurrency = ref('EUR');
 const pricingCycle = ref('monthly');
 const pricingCurrencyEdited = ref(false);
+const phoneTime = ref('9:41');
+let phoneClockTimer: number | undefined;
 let planRequest = 0;
+function updatePhoneTime() {
+    const now = new Date();
+    phoneTime.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+}
+onMounted(() => {
+    updatePhoneTime();
+    phoneClockTimer = window.setInterval(updatePhoneTime, 30_000);
+});
+onBeforeUnmount(() => {
+    if (phoneClockTimer !== undefined) window.clearInterval(phoneClockTimer);
+});
 watch(locale, async () => { if (!pricingCurrencyEdited.value) pricingCurrency.value = locale.value === 'ru' ? 'RUB' : locale.value === 'uk' ? 'UAH' : 'EUR'; const request = ++planRequest; const response = await api<any>('/platform'); if (request === planRequest) { plans.value = response.plans; demoVideo.value = response.demo_video || { source: 'none', url: '' }; } }, { immediate: true });
 const workflow = [['photo', 'howShow'], ['phone', 'howPhone'], ['bell', 'howReceive'], ['chat', 'howReply']];
 const audiences = [['car', 'audienceAuto'], ['tools', 'audienceConstruction'], ['washer', 'audienceAppliance'], ['sofa', 'audienceFurniture'], ['leaf', 'audienceGarden'], ['service', 'audienceCleaning'], ['star', 'audienceBeauty']];
@@ -57,7 +70,7 @@ function showDemo(){
       <div id="demo" class="public-phone-stage">
         <div class="phone-photo-backdrop" aria-hidden="true"></div>
         <div class="app-phone request-phone">
-          <div class="phone-island"></div><div class="phone-status">9:41 <span>● ◒</span></div>
+          <div class="phone-island"></div><div class="phone-status"><time>{{ phoneTime }}</time><span class="phone-system-icons" aria-hidden="true"><svg class="phone-signal" viewBox="0 0 16 11"><rect x="0" y="8" width="2.3" height="3" rx="1"/><rect x="4.4" y="6" width="2.3" height="5" rx="1"/><rect x="8.8" y="3" width="2.3" height="8" rx="1"/><rect x="13.2" y="0" width="2.3" height="11" rx="1"/></svg><svg class="phone-wifi" viewBox="0 0 16 12"><path d="M1 3.5C5.2.2 10.8.2 15 3.5M3.6 6.4a7 7 0 0 1 8.8 0M6.3 9a2.8 2.8 0 0 1 3.4 0"/><circle cx="8" cy="11" r="1"/></svg><span class="phone-battery"><i></i></span></span></div>
           <div class="phone-screen customer-app-screen">
             <header class="phone-app-header"><span class="phone-mini-logo">LD</span><b>LOOK.<em>DO.</em></b><span>♧</span></header>
             <section class="customer-phone-intro"><strong>{{ tr('customerAppTitle') }}</strong><small>{{ tr('customerAppText') }}</small></section>
@@ -68,7 +81,7 @@ function showDemo(){
           </div>
         </div>
         <div class="app-phone list-phone">
-          <div class="phone-island"></div><div class="phone-status">9:41 <span>● ◒</span></div>
+          <div class="phone-island"></div><div class="phone-status"><time>{{ phoneTime }}</time><span class="phone-system-icons" aria-hidden="true"><svg class="phone-signal" viewBox="0 0 16 11"><rect x="0" y="8" width="2.3" height="3" rx="1"/><rect x="4.4" y="6" width="2.3" height="5" rx="1"/><rect x="8.8" y="3" width="2.3" height="8" rx="1"/><rect x="13.2" y="0" width="2.3" height="11" rx="1"/></svg><svg class="phone-wifi" viewBox="0 0 16 12"><path d="M1 3.5C5.2.2 10.8.2 15 3.5M3.6 6.4a7 7 0 0 1 8.8 0M6.3 9a2.8 2.8 0 0 1 3.4 0"/><circle cx="8" cy="11" r="1"/></svg><span class="phone-battery"><i></i></span></span></div>
           <div class="phone-screen master-app-screen">
             <header class="master-phone-head"><strong>{{ tr('masterWorkspace') }}</strong><span>♧</span></header>
             <div class="master-stats"><span><b>12</b><small>{{ tr('newRequests') }}</small></span><span><b>7</b><small>{{ tr('inProgress') }}</small></span><span><b>24</b><small>{{ tr('completed') }}</small></span></div>
