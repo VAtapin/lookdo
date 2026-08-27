@@ -1,0 +1,15 @@
+export default {
+    home:'Start', works:'Arbeiten', action:'Anfrage', book:'Termin', activity:'Nachrichten', profile:'Profil',
+    featured:'Vorher / Nachher', recent:'Neueste Arbeiten', all:'Alle ansehen', how:'So funktioniert es',
+    step1:'Foto oder Video senden', step2:'Der Meister prüft alles', step3:'Antwort erhalten',
+    requestTitle:'Zeigen Sie die Aufgabe', requestHint:'Fügen Sie mindestens ein klares Foto hinzu. Weitere Aufnahmen helfen dem Meister.',
+    camera:'Foto aufnehmen', gallery:'Aus Galerie wählen', continue:'Weiter', back:'Zurück', remove:'Entfernen', optional:'Optional', required:'Erforderlich',
+    details:'Details zur Aufgabe', contact:'Wie erreichen wir Sie?', name:'Name', phone:'Telefon', email:'E-Mail (optional)', summary:'Kurze Beschreibung',
+    send:'Anfrage senden', sending:'Wird gesendet…', sent:'Anfrage gesendet', requestNumber:'Anfragenummer', notifications:'Über Antworten benachrichtigen', notificationEnabled:'Benachrichtigungen sind aktiviert.', notificationDenied:'Benachrichtigungen wurden nicht erlaubt.', later:'Später',
+    noActivity:'Noch keine Anfragen oder Termine', noActivityText:'Ihre Anfragen, Antworten und Termine erscheinen hier auf diesem Gerät.',
+    messages:'Nachrichten', messagePlaceholder:'Nachricht schreiben…', sendMessage:'Senden', statusNew:'Neu', statusPending:'Wartet', statusDone:'Erledigt',
+    services:'Leistung wählen', selectDate:'Datum wählen', selectTime:'Uhrzeit wählen', appointmentDetails:'Kontaktdaten', bookNow:'Termin buchen', booking:'Wird gebucht…', booked:'Termin reserviert',
+    duration:'Min.', from:'ab', businessInfo:'Kontakt', call:'Anrufen', write:'Schreiben', address:'Adresse', language:'Sprache', navigation:'App-Navigation', share:'App teilen', install:'Zum Startbildschirm',
+    powered:'Erstellt mit LOOKDO', desktopTitle:'Eine echte App für Ihre Kunden', desktopText:'Fotos, klare Anfragen, Antworten und Termine an einem Ort.',
+    unavailable:'Diese Anwendung ist noch nicht verfügbar.', retry:'Erneut versuchen', other:'Weitere Aufnahme', profileEmpty:'Kontaktdaten werden vom Betrieb ergänzt.', today:'Heute', tomorrow:'Morgen',
+} as const;

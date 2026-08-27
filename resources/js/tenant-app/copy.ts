@@ -1,35 +1,12 @@
+import de from './locales/de';
+import en from './locales/en';
+import ru from './locales/ru';
+import uk from './locales/uk';
+
 export type TenantLocale = 'de' | 'en' | 'ru' | 'uk';
 
-const copy = {
-  de: {
-    home:'Start', works:'Arbeiten', action:'Anfrage', book:'Termin', activity:'Nachrichten', profile:'Profil',
-    featured:'Vorher / Nachher', recent:'Neueste Arbeiten', all:'Alle ansehen', how:'So funktioniert es',
-    step1:'Foto oder Video senden', step2:'Der Meister prüft alles', step3:'Antwort erhalten',
-    requestTitle:'Zeigen Sie die Aufgabe', requestHint:'Fügen Sie mindestens ein klares Foto hinzu. Weitere Aufnahmen helfen dem Meister.',
-    camera:'Foto aufnehmen', gallery:'Aus Galerie wählen', continue:'Weiter', back:'Zurück', remove:'Entfernen', optional:'Optional', required:'Erforderlich',
-    details:'Details zur Aufgabe', contact:'Wie erreichen wir Sie?', name:'Name', phone:'Telefon', email:'E-Mail (optional)', summary:'Kurze Beschreibung',
-    send:'Anfrage senden', sending:'Wird gesendet…', sent:'Anfrage gesendet', requestNumber:'Anfragenummer', notifications:'Über Antworten benachrichtigen', notificationEnabled:'Benachrichtigungen sind aktiviert.', notificationDenied:'Benachrichtigungen wurden nicht erlaubt.', later:'Später',
-    noActivity:'Noch keine Anfragen oder Termine', noActivityText:'Ihre Anfragen, Antworten und Termine erscheinen hier auf diesem Gerät.',
-    messages:'Nachrichten', messagePlaceholder:'Nachricht schreiben…', sendMessage:'Senden', statusNew:'Neu', statusPending:'Wartet', statusDone:'Erledigt',
-    services:'Leistung wählen', selectDate:'Datum wählen', selectTime:'Uhrzeit wählen', appointmentDetails:'Kontaktdaten', bookNow:'Termin buchen', booking:'Wird gebucht…', booked:'Termin reserviert',
-    duration:'Min.', from:'ab', businessInfo:'Kontakt', call:'Anrufen', write:'Schreiben', address:'Adresse', language:'Sprache', share:'App teilen', install:'Zum Startbildschirm',
-    powered:'Erstellt mit LOOKDO', desktopTitle:'Eine echte App für Ihre Kunden', desktopText:'Fotos, klare Anfragen, Antworten und Termine an einem Ort.',
-    unavailable:'Diese Anwendung ist noch nicht verfügbar.', retry:'Erneut versuchen', other:'Weitere Aufnahme', profileEmpty:'Kontaktdaten werden vom Betrieb ergänzt.', today:'Heute', tomorrow:'Morgen',
-  },
-  en: {
-    home:'Home', works:'Works', action:'Request', book:'Book', activity:'Messages', profile:'Profile', featured:'Before / After', recent:'Recent work', all:'View all', how:'How it works',
-    step1:'Send a photo or video', step2:'The specialist reviews it', step3:'Receive a reply', requestTitle:'Show the task', requestHint:'Add at least one clear photo. More views help the specialist.',
-    camera:'Take a photo', gallery:'Choose from gallery', continue:'Continue', back:'Back', remove:'Remove', optional:'Optional', required:'Required', details:'Task details', contact:'How can we contact you?', name:'Name', phone:'Phone', email:'Email (optional)', summary:'Short description', send:'Send request', sending:'Sending…', sent:'Request sent', requestNumber:'Request number', notifications:'Notify me about replies', notificationEnabled:'Notifications are enabled.', notificationDenied:'Notifications were not allowed.', later:'Later', noActivity:'No requests or appointments yet', noActivityText:'Your requests, replies and appointments will appear here on this device.', messages:'Messages', messagePlaceholder:'Write a message…', sendMessage:'Send', statusNew:'New', statusPending:'Pending', statusDone:'Completed', services:'Choose a service', selectDate:'Choose a date', selectTime:'Choose a time', appointmentDetails:'Contact details', bookNow:'Book appointment', booking:'Booking…', booked:'Appointment reserved', duration:'min', from:'from', businessInfo:'Contact', call:'Call', write:'Message', address:'Address', language:'Language', share:'Share app', install:'Add to home screen', powered:'Created with LOOKDO', desktopTitle:'A real app for your customers', desktopText:'Photos, clear requests, replies and appointments in one place.', unavailable:'This application is not available yet.', retry:'Try again', other:'Another photo', profileEmpty:'The business will add contact details.', today:'Today', tomorrow:'Tomorrow',
-  },
-  ru: {
-    home:'Главная', works:'Работы', action:'Заявка', book:'Запись', activity:'Сообщения', profile:'Профиль', featured:'До / После', recent:'Недавние работы', all:'Смотреть все', how:'Как это работает',
-    step1:'Отправьте фото или видео', step2:'Мастер всё изучит', step3:'Получите ответ', requestTitle:'Покажите задачу', requestHint:'Добавьте хотя бы одну понятную фотографию. Дополнительные ракурсы помогут мастеру.',
-    camera:'Сфотографировать', gallery:'Выбрать из галереи', continue:'Продолжить', back:'Назад', remove:'Удалить', optional:'Необязательно', required:'Обязательно', details:'Подробности задачи', contact:'Как с вами связаться?', name:'Имя', phone:'Телефон', email:'E-mail (необязательно)', summary:'Коротко опишите задачу', send:'Отправить мастеру', sending:'Отправляем…', sent:'Заявка отправлена', requestNumber:'Номер заявки', notifications:'Сообщать мне об ответах', notificationEnabled:'Уведомления включены.', notificationDenied:'Разрешение на уведомления не получено.', later:'Не сейчас', noActivity:'Пока нет заявок или записей', noActivityText:'На этом устройстве здесь появятся ваши заявки, ответы мастера и записи.', messages:'Сообщения', messagePlaceholder:'Написать сообщение…', sendMessage:'Отправить', statusNew:'Новая', statusPending:'Ожидает', statusDone:'Готово', services:'Выберите услугу', selectDate:'Выберите дату', selectTime:'Выберите время', appointmentDetails:'Ваши контакты', bookNow:'Записаться', booking:'Записываем…', booked:'Вы записаны', duration:'мин.', from:'от', businessInfo:'Контакты', call:'Позвонить', write:'Написать', address:'Адрес', language:'Язык', share:'Поделиться приложением', install:'Добавить на главный экран', powered:'Создано на LOOKDO', desktopTitle:'Настоящее приложение для клиентов', desktopText:'Фото, понятные заявки, ответы и запись — в одном месте.', unavailable:'Это приложение пока недоступно.', retry:'Повторить', other:'Другой ракурс', profileEmpty:'Владелец дополнит контактные данные.', today:'Сегодня', tomorrow:'Завтра',
-  },
-  uk: {
-    home:'Головна', works:'Роботи', action:'Запит', book:'Запис', activity:'Повідомлення', profile:'Профіль', featured:'До / Після', recent:'Останні роботи', all:'Переглянути всі', how:'Як це працює',
-    step1:'Надішліть фото або відео', step2:'Майстер усе перегляне', step3:'Отримайте відповідь', requestTitle:'Покажіть завдання', requestHint:'Додайте хоча б одну чітку фотографію. Додаткові ракурси допоможуть майстру.', camera:'Сфотографувати', gallery:'Обрати з галереї', continue:'Продовжити', back:'Назад', remove:'Видалити', optional:'Необов’язково', required:'Обов’язково', details:'Подробиці завдання', contact:'Як з вами зв’язатися?', name:'Ім’я', phone:'Телефон', email:'E-mail (необов’язково)', summary:'Коротко опишіть завдання', send:'Надіслати майстру', sending:'Надсилаємо…', sent:'Запит надіслано', requestNumber:'Номер запиту', notifications:'Повідомляти про відповіді', notificationEnabled:'Сповіщення ввімкнено.', notificationDenied:'Дозвіл на сповіщення не надано.', later:'Не зараз', noActivity:'Поки немає запитів або записів', noActivityText:'На цьому пристрої тут з’являться ваші запити, відповіді майстра й записи.', messages:'Повідомлення', messagePlaceholder:'Написати повідомлення…', sendMessage:'Надіслати', statusNew:'Новий', statusPending:'Очікує', statusDone:'Готово', services:'Оберіть послугу', selectDate:'Оберіть дату', selectTime:'Оберіть час', appointmentDetails:'Ваші контакти', bookNow:'Записатися', booking:'Записуємо…', booked:'Вас записано', duration:'хв.', from:'від', businessInfo:'Контакти', call:'Зателефонувати', write:'Написати', address:'Адреса', language:'Мова', share:'Поділитися застосунком', install:'Додати на головний екран', powered:'Створено на LOOKDO', desktopTitle:'Справжній застосунок для клієнтів', desktopText:'Фото, зрозумілі запити, відповіді та запис — в одному місці.', unavailable:'Цей застосунок поки недоступний.', retry:'Повторити', other:'Інший ракурс', profileEmpty:'Власник доповнить контактні дані.', today:'Сьогодні', tomorrow:'Завтра',
-  },
-} as const;
+const copy = { de, en, ru, uk } as const;
 
-export function appCopy(locale: TenantLocale) { return copy[locale] || copy.de; }
+export function appCopy(locale: TenantLocale) {
+  return copy[locale] || copy.de;
+}

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { api } from '../api';
+import { ApiError, api } from '../api';
 import { setLocale } from '../i18n';
 import AppIcon from '../tenant-app/AppIcon.vue';
 import RequestFlow from '../tenant-app/RequestFlow.vue';
@@ -13,6 +13,8 @@ const tokenKey=`lookdo-client:${location.hostname}`; const clientToken=ref(local
 const localeKey=`lookdo-client-locale:${location.hostname}`; const savedTenantLocale=localStorage.getItem(localeKey); const hasSelectedLocale=ref(['de','en','ru','uk'].includes(savedTenantLocale||''));
 const locale=ref<TenantLocale>((hasSelectedLocale.value?savedTenantLocale:'de') as TenantLocale);
 const copy=computed(()=>appCopy(locale.value));
+function tenantLocale(value: unknown): TenantLocale | null { return typeof value==='string'&&['de','en','ru','uk'].includes(value)?value as TenantLocale:null; }
+function applyTenantLocale(value: unknown){const next=tenantLocale(value);if(!next)return;locale.value=next;setLocale(next);}
 const screen=computed(()=>{const parts=route.path.split('/').filter(Boolean).filter(part=>!['de','en','ru','uk'].includes(part));return parts[0]||'home';});
 const theme=computed(()=>({'--ta-primary':app.value?.tenant?.colors?.primary||'#ff6b00','--ta-secondary':app.value?.tenant?.colors?.secondary||'#111318'}));
 const actionScreen=computed(()=>app.value?.template?.engine==='booking'?'book':'request');
@@ -21,7 +23,7 @@ const navItems=computed(()=>[
 ]);
 const address=computed(()=>[app.value?.tenant?.contact?.street,[app.value?.tenant?.contact?.postal_code,app.value?.tenant?.contact?.city].filter(Boolean).join(' ')].filter(Boolean).join(', '));
 
-async function load(){loading.value=true;error.value='';try{const headers:any={'X-Locale':hasSelectedLocale.value?locale.value:''};if(clientToken.value)headers['X-Lookdo-Client-Token']=clientToken.value;app.value=await api('/tenant-app/bootstrap',{headers});locale.value=(app.value.tenant.locale||'de') as TenantLocale;setLocale(locale.value);if(screen.value==='activity')await loadActivity();}catch(e:any){error.value=e.message;}finally{loading.value=false;}}
+async function load(){loading.value=true;error.value='';try{const headers:any={'X-Locale':hasSelectedLocale.value?locale.value:''};if(clientToken.value)headers['X-Lookdo-Client-Token']=clientToken.value;app.value=await api('/tenant-app/bootstrap',{headers});applyTenantLocale(app.value.tenant.locale||'de');if(screen.value==='activity')await loadActivity();}catch(e:any){if(e instanceof ApiError)applyTenantLocale(e.payload.locale);error.value=e.message;}finally{loading.value=false;}}
 async function loadActivity(){if(!clientToken.value){activity.value={requests:[],appointments:[]};return;}activityLoading.value=true;try{activity.value=await api('/tenant-app/activity',{headers:{'X-Lookdo-Client-Token':clientToken.value}});if(selectedRequest.value)selectedRequest.value=activity.value.requests.find((item:any)=>item.id===selectedRequest.value.id)||null;}catch(e:any){error.value=e.message;}finally{activityLoading.value=false;}}
 function go(target:string){router.push(target==='home'?'/':`/${target}`);}
 function flowSuccess(payload:any){if(payload.token){clientToken.value=payload.token;localStorage.setItem(tokenKey,payload.token);}loadActivity();}
@@ -47,7 +49,7 @@ onMounted(()=>{window.addEventListener('beforeinstallprompt',beforeInstall);load
       <template v-else>
         <header class="ta-topbar">
           <button class="ta-brand" @click="go('home')"><img :src="app.tenant.logo||'/brand/lookdo-mark.png'" :alt="app.tenant.name"><span>{{ app.tenant.name }}</span></button>
-          <div class="ta-top-actions"><select :value="locale" aria-label="Language" @change="changeLocale(($event.target as HTMLSelectElement).value)"><option value="de">DE</option><option value="en">EN</option><option value="ru">RU</option><option value="uk">UK</option></select><button class="ta-icon-button" @click="go('activity')"><AppIcon name="bell"/></button></div>
+          <div class="ta-top-actions"><select :value="locale" :aria-label="copy.language" @change="changeLocale(($event.target as HTMLSelectElement).value)"><option value="de">DE</option><option value="en">EN</option><option value="ru">RU</option><option value="uk">UK</option></select><button class="ta-icon-button" @click="go('activity')"><AppIcon name="bell"/></button></div>
         </header>
 
         <div class="ta-scroll-area">
@@ -81,7 +83,7 @@ onMounted(()=>{window.addEventListener('beforeinstallprompt',beforeInstall);load
           <section v-else class="ta-page ta-empty"><h1>404</h1><button class="ta-primary" @click="go('home')">{{ copy.home }}</button></section>
         </div>
 
-        <nav class="ta-bottom-nav" aria-label="App navigation"><button v-for="item in navItems" :key="item.key" :class="{active:screen===item.key,central:item.central}" @click="go(item.key)"><span><AppIcon :name="item.icon"/></span><small>{{ item.label }}</small></button></nav>
+        <nav class="ta-bottom-nav" :aria-label="copy.navigation"><button v-for="item in navItems" :key="item.key" :class="{active:screen===item.key,central:item.central}" @click="go(item.key)"><span><AppIcon :name="item.icon"/></span><small>{{ item.label }}</small></button></nav>
       </template>
     </main>
     <aside class="ta-desktop-aside"><img :src="'/brand/lookdo-mark.png'" alt="LOOKDO"><small>{{ app.tenant.name }}</small><h2>{{ copy.desktopTitle }}</h2><p>{{ copy.desktopText }}</p><div><span><AppIcon name="camera"/></span><span><AppIcon name="message"/></span><span><AppIcon name="calendar"/></span></div><button @click="share"><AppIcon name="share"/>{{ copy.share }}</button><em>{{ copy.powered }}</em></aside>

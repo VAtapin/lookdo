@@ -73,7 +73,17 @@ class TenantAppTest extends TestCase
 
         $this->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
             ->assertStatus(402)
+            ->assertHeader('Content-Language', 'ru')
+            ->assertJsonPath('code', 'TENANT_APP_SUBSCRIPTION_INACTIVE')
+            ->assertJsonPath('locale', 'ru')
             ->assertJsonPath('message', 'Тестовый период закончился или подписка не активна.');
+
+        $this->withHeader('X-Locale', 'de')->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
+            ->assertStatus(402)
+            ->assertHeader('Content-Language', 'de')
+            ->assertJsonPath('code', 'TENANT_APP_SUBSCRIPTION_INACTIVE')
+            ->assertJsonPath('locale', 'de')
+            ->assertJsonPath('message', 'Der Testzeitraum ist abgelaufen oder das Abonnement ist nicht aktiv.');
     }
 
     public function test_active_steering_template_bootstraps_as_localized_full_app(): void
@@ -191,6 +201,9 @@ class TenantAppTest extends TestCase
         $this->assertFalse($tenant->fresh()->hasActiveSubscription());
         $this->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
             ->assertStatus(402)
+            ->assertHeader('Content-Language', 'ru')
+            ->assertJsonPath('code', 'TENANT_APP_SUBSCRIPTION_INACTIVE')
+            ->assertJsonPath('locale', 'ru')
             ->assertJsonPath('message', 'Тестовый период закончился или подписка не активна.');
     }
 

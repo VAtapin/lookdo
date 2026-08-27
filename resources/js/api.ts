@@ -1,5 +1,24 @@
 const token = () => document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content || '';
 
+export type ApiErrorPayload = {
+    message?: string;
+    code?: string;
+    locale?: string;
+    errors?: Record<string, string[]>;
+    [key: string]: unknown;
+};
+
+export class ApiError extends Error {
+    constructor(
+        message: string,
+        public readonly status: number,
+        public readonly payload: ApiErrorPayload,
+    ) {
+        super(message);
+        this.name = 'ApiError';
+    }
+}
+
 export async function api<T = any>(path: string, options: RequestInit = {}): Promise<T> {
     const isFormData = options.body instanceof FormData;
     const response = await fetch(`/api${path}`, {
@@ -16,7 +35,7 @@ export async function api<T = any>(path: string, options: RequestInit = {}): Pro
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
         const first = body.errors ? Object.values(body.errors).flat()[0] : null;
-        throw new Error(String(first || body.message || `HTTP ${response.status}`));
+        throw new ApiError(String(first || body.message || `HTTP ${response.status}`), response.status, body);
     }
     return body as T;
 }

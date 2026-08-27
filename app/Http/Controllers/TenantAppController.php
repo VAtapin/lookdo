@@ -13,6 +13,7 @@ use App\Models\TenantRequestValue;
 use App\Models\TenantService;
 use App\Services\EntitlementService;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -28,7 +29,7 @@ class TenantAppController extends Controller
     public function bootstrap(Request $request): JsonResponse
     {
         $tenant = $this->tenant($request);
-        $this->ensureAvailable($tenant);
+        $this->ensureAvailable($request, $tenant);
         $tenant->load(['profile', 'businessProfile.category', 'businessProfile.variation', 'businessProfile.template', 'currentSubscription.plan.entitlements']);
         $configuration = $this->configuration($tenant);
         $this->seedDefaults($tenant, $configuration);
@@ -55,11 +56,13 @@ class TenantAppController extends Controller
     public function createRequest(Request $request): JsonResponse
     {
         $tenant = $this->tenant($request);
-        $this->ensureAvailable($tenant);
-        abort_unless($this->enabled($tenant, 'request_enabled', true), 403, 'Requests are not included in this plan.');
+        $this->ensureAvailable($request, $tenant);
+        if (! $this->enabled($tenant, 'request_enabled', true)) {
+            $this->apiError($request, $tenant, 'TENANT_APP_REQUESTS_DISABLED', 'tenant_app.requests_disabled', 403);
+        }
         $limit = (int) $this->entitlements->get($tenant, 'requests_monthly', 0);
         if ($limit > 0 && $tenant->appRequests()->where('created_at', '>=', now()->startOfMonth())->count() >= $limit) {
-            abort(429, 'The monthly request limit has been reached.');
+            $this->apiError($request, $tenant, 'TENANT_APP_REQUEST_LIMIT_REACHED', 'tenant_app.request_limit_reached', 429);
         }
 
         $data = $request->validate([
@@ -85,7 +88,9 @@ class TenantAppController extends Controller
             }
             foreach ($request->file('media', []) as $index => $file) {
                 $type = str_starts_with((string) $file->getMimeType(), 'video/') ? 'video' : 'image';
-                abort_if($type === 'video' && ! $this->enabled($tenant, 'video_enabled', false), 403, 'Video is not included in this plan.');
+                if ($type === 'video' && ! $this->enabled($tenant, 'video_enabled', false)) {
+                    $this->apiError($request, $tenant, 'TENANT_APP_VIDEO_DISABLED', 'tenant_app.video_disabled', 403);
+                }
                 $path = $file->store("tenant-app/{$tenant->id}/requests/{$appRequest->id}", 'public');
                 $appRequest->media()->create(['tenant_id' => $tenant->id, 'type' => $type, 'role' => 'condition', 'slot_key' => $slots[$index] ?? null, 'sort_order' => $index, 'storage_key' => $path, 'metadata' => ['mime' => $file->getMimeType(), 'size' => $file->getSize()]]);
             }
@@ -100,7 +105,7 @@ class TenantAppController extends Controller
     public function activity(Request $request): JsonResponse
     {
         $tenant = $this->tenant($request);
-        $this->ensureAvailable($tenant);
+        $this->ensureAvailable($request, $tenant);
         $customer = $this->requireCustomer($request, $tenant);
         $requests = $customer->requests()->where('tenant_id', $tenant->id)->with(['media', 'messages'])->latest()->get()->map(fn ($item) => $this->requestPayload($item));
         $appointments = $customer->appointments()->where('tenant_id', $tenant->id)->with('service')->latest('starts_at')->get()->map(fn ($item) => $this->appointmentPayload($item, $customer->locale ?: $tenant->locale));
@@ -111,7 +116,7 @@ class TenantAppController extends Controller
     public function postMessage(Request $request, TenantRequest $tenantRequest): JsonResponse
     {
         $tenant = $this->tenant($request);
-        $this->ensureAvailable($tenant);
+        $this->ensureAvailable($request, $tenant);
         $customer = $this->requireCustomer($request, $tenant);
         abort_unless($tenantRequest->tenant_id === $tenant->id && $tenantRequest->customer_id === $customer->id, 404);
         $data = $request->validate(['body' => 'required|string|max:5000']);
@@ -124,8 +129,10 @@ class TenantAppController extends Controller
     public function availability(Request $request): JsonResponse
     {
         $tenant = $this->tenant($request);
-        $this->ensureAvailable($tenant);
-        abort_unless($this->enabled($tenant, 'booking_enabled', false), 403, 'Booking is not included in this plan.');
+        $this->ensureAvailable($request, $tenant);
+        if (! $this->enabled($tenant, 'booking_enabled', false)) {
+            $this->apiError($request, $tenant, 'TENANT_APP_BOOKING_DISABLED', 'tenant_app.booking_disabled', 403);
+        }
         $data = $request->validate(['service_id' => 'required|integer', 'date' => 'required|date_format:Y-m-d|after_or_equal:today']);
         $service = $tenant->services()->where('active', true)->findOrFail($data['service_id']);
 
@@ -135,8 +142,10 @@ class TenantAppController extends Controller
     public function createAppointment(Request $request): JsonResponse
     {
         $tenant = $this->tenant($request);
-        $this->ensureAvailable($tenant);
-        abort_unless($this->enabled($tenant, 'booking_enabled', false), 403, 'Booking is not included in this plan.');
+        $this->ensureAvailable($request, $tenant);
+        if (! $this->enabled($tenant, 'booking_enabled', false)) {
+            $this->apiError($request, $tenant, 'TENANT_APP_BOOKING_DISABLED', 'tenant_app.booking_disabled', 403);
+        }
         $data = $request->validate([
             'service_id' => 'required|integer', 'starts_at' => 'required|date|after:now', 'name' => 'nullable|string|max:120',
             'phone' => 'required|string|max:50', 'email' => 'nullable|email|max:190', 'comment' => 'nullable|string|max:2000',
@@ -152,7 +161,7 @@ class TenantAppController extends Controller
             $overlap = TenantAppointment::where('tenant_id', $tenant->id)->whereNotIn('status', ['cancelled'])
                 ->where('starts_at', '<', $end)->where('ends_at', '>', $start)->lockForUpdate()->exists();
             if ($overlap) {
-                throw ValidationException::withMessages(['starts_at' => 'This time has just been booked. Please select another one.']);
+                throw ValidationException::withMessages(['starts_at' => trans('tenant_app.slot_unavailable', locale: $locale)]);
             }
 
             return $tenant->appointments()->create([
@@ -168,7 +177,7 @@ class TenantAppController extends Controller
     public function subscribePush(Request $request): JsonResponse
     {
         $tenant = $this->tenant($request);
-        $this->ensureAvailable($tenant);
+        $this->ensureAvailable($request, $tenant);
         $customer = $this->requireCustomer($request, $tenant);
         abort_unless($this->enabled($tenant, 'push_enabled', true), 403);
         $data = $request->validate(['endpoint' => 'required|url|max:2000', 'keys.p256dh' => 'required|string|max:1000', 'keys.auth' => 'required|string|max:500']);
@@ -189,15 +198,35 @@ class TenantAppController extends Controller
         return $tenant;
     }
 
-    private function ensureAvailable(Tenant $tenant): void
+    private function ensureAvailable(Request $request, Tenant $tenant): void
     {
-        abort_unless($tenant->status === 'active', 404);
-        abort_unless($tenant->hasActiveSubscription(), 402, match ($tenant->locale) {
-            'de' => 'Der Testzeitraum ist abgelaufen oder das Abonnement ist nicht aktiv.',
-            'ru' => 'Тестовый период закончился или подписка не активна.',
-            'uk' => 'Тестовий період завершився або підписка не активна.',
-            default => 'The trial has ended or the subscription is not active.',
-        });
+        $locale = $this->locale($request, $tenant);
+
+        if ($tenant->status !== 'active') {
+            $this->unavailable('TENANT_APP_INACTIVE', 'tenant_app.inactive', $locale, 404);
+        }
+        if (! $tenant->hasActiveSubscription()) {
+            $this->unavailable('TENANT_APP_SUBSCRIPTION_INACTIVE', 'tenant_app.subscription_inactive', $locale, 402);
+        }
+    }
+
+    private function unavailable(string $code, string $translationKey, string $locale, int $status): never
+    {
+        $this->localizedError($code, $translationKey, $locale, $status);
+    }
+
+    private function apiError(Request $request, Tenant $tenant, string $code, string $translationKey, int $status): never
+    {
+        $this->localizedError($code, $translationKey, $this->locale($request, $tenant), $status);
+    }
+
+    private function localizedError(string $code, string $translationKey, string $locale, int $status): never
+    {
+        throw new HttpResponseException(response()->json([
+            'code' => $code,
+            'locale' => $locale,
+            'message' => trans($translationKey, locale: $locale),
+        ], $status)->header('Content-Language', $locale));
     }
 
     private function configuration(Tenant $tenant): array
@@ -264,7 +293,12 @@ class TenantAppController extends Controller
 
     private function requireCustomer(Request $request, Tenant $tenant): TenantCustomer
     {
-        return $this->customerFromToken($request, $tenant) ?? abort(401, 'This device is not linked to a request yet.');
+        $customer = $this->customerFromToken($request, $tenant);
+        if (! $customer) {
+            $this->apiError($request, $tenant, 'TENANT_APP_DEVICE_UNLINKED', 'tenant_app.device_unlinked', 401);
+        }
+
+        return $customer;
     }
 
     private function availableSlots(Tenant $tenant, TenantService $service, string $date): array
@@ -324,26 +358,11 @@ class TenantAppController extends Controller
 
     private function localizedSlots(array $slots, string $locale): array
     {
-        $labels = [
-            'overall' => ['de' => 'Lenkrad komplett', 'en' => 'Whole steering wheel', 'ru' => 'Руль целиком', 'uk' => 'Кермо повністю'],
-            'top' => ['de' => 'Oberer Bereich', 'en' => 'Top section', 'ru' => 'Верх руля', 'uk' => 'Верх керма'],
-            'left' => ['de' => 'Linke Seite', 'en' => 'Left side', 'ru' => 'Левая сторона', 'uk' => 'Ліва сторона'],
-            'right' => ['de' => 'Rechte Seite', 'en' => 'Right side', 'ru' => 'Правая сторона', 'uk' => 'Права сторона'],
-            'bottom' => ['de' => 'Unterer Bereich', 'en' => 'Bottom section', 'ru' => 'Нижняя часть', 'uk' => 'Нижня частина'],
-            'damage' => ['de' => 'Schaden im Detail', 'en' => 'Damage detail', 'ru' => 'Повреждение крупно', 'uk' => 'Пошкодження зблизька'],
-            'reference' => ['de' => 'Wunschbeispiel', 'en' => 'Reference example', 'ru' => 'Пример желаемого результата', 'uk' => 'Приклад бажаного результату'],
-            'opening_overall' => ['de' => 'Türöffnung komplett', 'en' => 'Whole doorway', 'ru' => 'Проём целиком', 'uk' => 'Отвір повністю'],
-            'opening_left' => ['de' => 'Linke Seite', 'en' => 'Left side', 'ru' => 'Левая сторона', 'uk' => 'Ліва сторона'],
-            'opening_right' => ['de' => 'Rechte Seite', 'en' => 'Right side', 'ru' => 'Правая сторона', 'uk' => 'Права сторона'],
-            'opening_top' => ['de' => 'Oberer Bereich', 'en' => 'Top section', 'ru' => 'Верх проёма', 'uk' => 'Верх отвору'],
-            'floor_threshold' => ['de' => 'Boden und Schwelle', 'en' => 'Floor and threshold', 'ru' => 'Пол и порог', 'uk' => 'Підлога й поріг'],
-            'existing_door' => ['de' => 'Vorhandene Tür', 'en' => 'Existing door', 'ru' => 'Старая дверь', 'uk' => 'Старі двері'],
-            'problem_detail' => ['de' => 'Problemstelle', 'en' => 'Problem detail', 'ru' => 'Сложное место', 'uk' => 'Складне місце'],
-            'reference_door' => ['de' => 'Gewünschte Tür', 'en' => 'Preferred door', 'ru' => 'Выбранная дверь', 'uk' => 'Обрані двері'],
-        ];
+        $labels = trans('tenant_app.media_slots', locale: $locale);
+        $labels = is_array($labels) ? $labels : [];
 
-        return array_map(function (array $slot) use ($labels, $locale): array {
-            $label = $labels[$slot['key'] ?? ''][$locale] ?? $slot['title'] ?? $slot['label'] ?? null;
+        return array_map(function (array $slot) use ($labels): array {
+            $label = $labels[$slot['key'] ?? ''] ?? $slot['title'] ?? $slot['label'] ?? null;
             $slot['title'] = $label;
             $slot['label'] = $label;
 
@@ -353,20 +372,15 @@ class TenantAppController extends Controller
 
     private function localizedFields(array $fields, string $locale): array
     {
-        $labels = [
-            'vehicle_brand' => ['de' => 'Automarke', 'en' => 'Vehicle brand', 'ru' => 'Марка автомобиля', 'uk' => 'Марка автомобіля'], 'vehicle_model' => ['de' => 'Modell', 'en' => 'Model', 'ru' => 'Модель', 'uk' => 'Модель'], 'vehicle_year' => ['de' => 'Baujahr', 'en' => 'Year', 'ru' => 'Год', 'uk' => 'Рік'],
-            'material_preference' => ['de' => 'Materialwunsch', 'en' => 'Material preference', 'ru' => 'Пожелания по материалу', 'uk' => 'Побажання щодо матеріалу'], 'stitch_preference' => ['de' => 'Nahtwunsch', 'en' => 'Stitch preference', 'ru' => 'Пожелания по строчке', 'uk' => 'Побажання щодо строчки'], 'shape_preference' => ['de' => 'Form oder Dicke ändern?', 'en' => 'Change shape or thickness?', 'ru' => 'Изменить форму или толщину?', 'uk' => 'Змінити форму або товщину?'],
-            'opening_width_mm' => ['de' => 'Breite der Öffnung (mm)', 'en' => 'Opening width (mm)', 'ru' => 'Ширина проёма (мм)', 'uk' => 'Ширина отвору (мм)'], 'opening_height_mm' => ['de' => 'Höhe der Öffnung (mm)', 'en' => 'Opening height (mm)', 'ru' => 'Высота проёма (мм)', 'uk' => 'Висота отвору (мм)'], 'wall_thickness_mm' => ['de' => 'Wandstärke (mm)', 'en' => 'Wall thickness (mm)', 'ru' => 'Толщина стены (мм)', 'uk' => 'Товщина стіни (мм)'], 'door_request_type' => ['de' => 'Was soll gemacht werden?', 'en' => 'What should be done?', 'ru' => 'Что нужно сделать?', 'uk' => 'Що потрібно зробити?'], 'door_type' => ['de' => 'Türart', 'en' => 'Door type', 'ru' => 'Тип двери', 'uk' => 'Тип дверей'], 'comment' => ['de' => 'Ihre Wünsche', 'en' => 'Your notes', 'ru' => 'Ваши пожелания', 'uk' => 'Ваші побажання'], 'phone' => ['de' => 'Telefonnummer', 'en' => 'Phone number', 'ru' => 'Номер телефона', 'uk' => 'Номер телефону'],
-        ];
-        $options = [
-            'Не знаю — посоветует мастер' => ['de' => 'Ich weiß es nicht – der Meister empfiehlt etwas', 'en' => 'Not sure — the specialist will advise', 'uk' => 'Не знаю — майстер порадить'], 'Кожа' => ['de' => 'Leder', 'en' => 'Leather', 'uk' => 'Шкіра'], 'Перфорированная кожа' => ['de' => 'Perforiertes Leder', 'en' => 'Perforated leather', 'uk' => 'Перфорована шкіра'], 'Комбинация' => ['de' => 'Kombination', 'en' => 'Combination', 'uk' => 'Комбінація'], 'Другое' => ['de' => 'Andere', 'en' => 'Other', 'uk' => 'Інше'],
-            'Межкомнатная' => ['de' => 'Innentür', 'en' => 'Interior door', 'uk' => 'Міжкімнатні'], 'Входная' => ['de' => 'Eingangstür', 'en' => 'Entrance door', 'uk' => 'Вхідні'], 'Раздвижная' => ['de' => 'Schiebetür', 'en' => 'Sliding door', 'uk' => 'Розсувні'], 'Ещё не выбрал(а)' => ['de' => 'Noch nicht ausgewählt', 'en' => 'Not chosen yet', 'uk' => 'Ще не обрано'],
-        ];
+        $labels = trans('tenant_app.fields', locale: $locale);
+        $options = trans('tenant_app.options', locale: $locale);
+        $labels = is_array($labels) ? $labels : [];
+        $options = is_array($options) ? $options : [];
 
-        return array_map(function (array $field) use ($labels, $options, $locale): array {
-            $field['label'] = $labels[$field['key'] ?? ''][$locale] ?? $field['label'] ?? $field['key'];
+        return array_map(function (array $field) use ($labels, $options): array {
+            $field['label'] = $labels[$field['key'] ?? ''] ?? $field['label'] ?? $field['key'];
             if (isset($field['options'])) {
-                $field['options'] = array_map(fn ($option) => $options[$option][$locale] ?? $option, $field['options']);
+                $field['options'] = array_map(fn ($option) => $options[$option] ?? $option, $field['options']);
             }
 
             return $field;
@@ -439,8 +453,6 @@ class TenantAppController extends Controller
 
     private function message(string $key, string $locale): string
     {
-        $messages = ['received' => ['de' => 'Ihre Anfrage ist angekommen. Der Meister prüft die Angaben und antwortet hier.', 'en' => 'Your request has arrived. The specialist will review it and reply here.', 'ru' => 'Ваша заявка получена. Мастер изучит её и ответит здесь.', 'uk' => 'Ваш запит отримано. Майстер перегляне його й відповість тут.']];
-
-        return $messages[$key][$locale] ?? $messages[$key]['de'];
+        return trans('tenant_app.'.$key, locale: $locale);
     }
 }
