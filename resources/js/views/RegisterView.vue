@@ -168,7 +168,7 @@ async function register() {
 <template>
   <div class="register-page">
     <aside class="register-aside">
-      <RouterLink class="public-wordmark" :to="`/${locale}`"><img :src="'/brand/lookdo-logo.png'" alt="LOOKDO"></RouterLink>
+      <RouterLink class="public-wordmark" :to="`/${locale}`"><img decoding="async" :src="'/brand/lookdo-logo.png'" alt="LOOKDO"></RouterLink>
       <div class="register-promise"><p class="eyebrow">{{ tr('create') }}</p><h1>{{ tr('registerTitle') }}</h1><p>{{ tr('registerIntro') }}</p></div>
       <div class="register-aside-lower">
         <div class="register-progress">
@@ -177,7 +177,7 @@ async function register() {
         <div class="template-live-phone" :style="previewStyle">
           <div class="template-live-island"></div>
           <div class="template-live-head"><b>{{ form.business_name || 'LOOKDO' }}</b><small>{{ chosen?.variation || tr('templatePreview') }}</small></div>
-          <img :src="preview.image" :alt="chosen?.variation || tr('templatePreview')">
+          <img decoding="async" :src="preview.image" :alt="chosen?.variation || tr('templatePreview')">
           <div class="template-live-copy"><i></i><i></i><i></i></div>
           <button type="button">{{ chosen?.variation || tr('templateReady') }}</button>
         </div>
@@ -200,7 +200,7 @@ async function register() {
         <p class="eyebrow">{{ tr('stepLabel') }} 02</p><h2>{{ tr('whatBusiness') }}</h2><p>{{ tr('describeWork') }}</p>
         <label>{{ tr('yourActivity') }}<textarea v-model="form.business_description" rows="5" required :placeholder="tr('activityPlaceholder')"></textarea></label>
         <div class="activity-analysis-state" :class="{ working: classifying }"><span></span>{{ classifying ? tr('analysing') : (words < 4 ? tr('activityAutoHint') : classification ? tr('templateFound') : tr('activityWaiting')) }}</div>
-        <div v-if="candidates.length" class="candidate-list inline-candidates"><label v-for="candidate in candidates" :key="candidate.variation_id" :class="{ selected: form.variation_id === candidate.variation_id }"><input v-model="form.variation_id" type="radio" :value="candidate.variation_id"><img :src="candidate.preview?.image || '/brand/service-renovation.webp'" alt=""><span><b>{{ candidate.variation }}</b><small>{{ candidate.category }}<template v-if="!candidate.fallback"> · {{ Math.round(candidate.score * 100) }}%</template></small></span></label></div>
+        <div v-if="candidates.length" class="candidate-list inline-candidates"><label v-for="candidate in candidates" :key="candidate.variation_id" :class="{ selected: form.variation_id === candidate.variation_id }"><input v-model="form.variation_id" type="radio" :value="candidate.variation_id"><img loading="lazy" decoding="async" :src="candidate.preview?.image || '/brand/service-renovation.webp'" alt=""><span><b>{{ candidate.variation }}</b><small>{{ candidate.category }}<template v-if="!candidate.fallback"> · {{ Math.round(candidate.score * 100) }}%</template></small></span></label></div>
         <div v-if="classification?.source === 'fallback'" class="alert fallback">{{ tr('noTemplate') }}</div>
         <p v-if="error" class="alert error">{{ error }}</p>
         <div class="form-actions"><button type="button" class="button ghost" @click="step = 1">← {{ tr('back') }}</button><button type="submit" class="button ghost" :disabled="classifying">{{ tr('checkAgain') }}</button><button v-if="form.variation_id" type="button" class="button" @click="confirmActivity">{{ tr('showTemplate') }} →</button></div>
@@ -208,7 +208,7 @@ async function register() {
 
       <form v-if="step === 3" @submit.prevent="step = 4">
         <p class="eyebrow">{{ tr('stepLabel') }} 03</p><h2>{{ tr('yourTemplateReady') }}</h2><p>{{ tr('templateChangesLive') }}</p>
-        <div class="template-confirmation" :style="previewStyle"><img :src="preview.image" :alt="chosen?.variation"><div><small>{{ chosen?.category }}</small><h3>{{ chosen?.variation }}</h3><p>{{ tr('templateConfirmText') }}</p><code>{{ chosen?.template_code }}</code></div></div>
+        <div class="template-confirmation" :style="previewStyle"><img decoding="async" :src="preview.image" :alt="chosen?.variation"><div><small>{{ chosen?.category }}</small><h3>{{ chosen?.variation }}</h3><p>{{ tr('templateConfirmText') }}</p><code>{{ chosen?.template_code }}</code></div></div>
         <div class="form-actions"><button type="button" class="button ghost" @click="step = 2">← {{ tr('changeActivity') }}</button><button class="button">{{ tr('confirm') }} →</button></div>
       </form>
 

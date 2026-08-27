@@ -20,7 +20,7 @@ const form = reactive<any>({
     platform_name: 'LOOKDO', support_email: '', default_locale: 'ru', default_request_template_code: 'general-services.general',
     trial_days_default: 0, upload_base_limit_mb: 100,
     social_share_image_url: '',
-    social_share_images: { de: '/brand/lookdo-social-de.png', en: '/brand/lookdo-social-en.png', ru: '/brand/lookdo-social-ru.png', uk: '/brand/lookdo-social-uk.png' },
+    social_share_images: { de: '/brand/lookdo-social-de.jpg', en: '/brand/lookdo-social-en.jpg', ru: '/brand/lookdo-social-ru.jpg', uk: '/brand/lookdo-social-uk.jpg' },
     demo_video_source: 'none', demo_video_url: '', registration_enabled: true, maintenance: false,
     enabled_locales: ['de', 'en', 'ru', 'uk'], integrations: { stripe: true, openai: true, sms: false },
     sms_provider: 'seven', sms_sender: 'LOOKDO', sms_events: { request_received: true, master_replied: true, work_ready: true, agreement_reminder: true },
@@ -31,7 +31,7 @@ const form = reactive<any>({
 function hydrate() {
     const settings = props.data?.settings || {};
     Object.assign(form, settings, {
-        social_share_images: { de: '/brand/lookdo-social-de.png', en: '/brand/lookdo-social-en.png', ru: '/brand/lookdo-social-ru.png', uk: '/brand/lookdo-social-uk.png', ...(settings.social_share_images || {}) },
+        social_share_images: { de: '/brand/lookdo-social-de.jpg', en: '/brand/lookdo-social-en.jpg', ru: '/brand/lookdo-social-ru.jpg', uk: '/brand/lookdo-social-uk.jpg', ...(settings.social_share_images || {}) },
         integrations: { stripe: true, openai: true, sms: false, ...(settings.integrations || {}) },
         sms_events: { request_received: true, master_replied: true, work_ready: true, agreement_reminder: true, ...(settings.sms_events || {}) },
         sms_seven_api_key: '', sms_seven_signing_key: '', sms_clear_api_key: false, sms_clear_signing_key: false,
@@ -127,7 +127,7 @@ async function testSms() {
         <section v-if="group === 'media'" class="settings-panel media-settings">
             <div class="settings-panel-head"><p class="eyebrow">FREIGABE & DEMO</p><h2>Vorschaubilder und Demo-Video</h2><p>Für jede Sprache wird ein eigenes Bild beim Teilen von lookdo.app verwendet.</p></div>
             <div class="platform-media-grid">
-                <article class="social-preview-settings"><h3>Social-Media-Vorschaubilder</h3><p>Empfohlen: Querformat 1200 × 630 Pixel, JPG, PNG oder WebP.</p><div class="platform-social-grid"><figure v-for="item in locales" :key="item[0]"><figcaption>{{ item[1] }}</figcaption><img :src="form.social_share_images[item[0]]" :alt="`Vorschaubild ${item[1]}`"><label class="media-file-button"><input type="file" accept="image/jpeg,image/png,image/webp" :disabled="busy" @change="uploadMedia($event, 'image', item[0])"><span>{{ busy ? 'Wird hochgeladen…' : 'Bild ersetzen' }}</span></label></figure></div></article>
+                <article class="social-preview-settings"><h3>Social-Media-Vorschaubilder</h3><p>Empfohlen: Querformat 1200 × 630 Pixel, JPG, PNG oder WebP.</p><div class="platform-social-grid"><figure v-for="item in locales" :key="item[0]"><figcaption>{{ item[1] }}</figcaption><img loading="lazy" decoding="async" :src="form.social_share_images[item[0]]" :alt="`Vorschaubild ${item[1]}`"><label class="media-file-button"><input type="file" accept="image/jpeg,image/png,image/webp" :disabled="busy" @change="uploadMedia($event, 'image', item[0])"><span>{{ busy ? 'Wird hochgeladen…' : 'Bild ersetzen' }}</span></label></figure></div></article>
                 <article><h3>Demo-Video</h3><label>Quelle<select v-model="form.demo_video_source"><option value="none">Kein Video</option><option value="upload">Hochgeladene Datei</option><option value="youtube">YouTube</option></select></label><label v-if="form.demo_video_source === 'youtube'">YouTube-URL<input v-model="form.demo_video_url" placeholder="https://www.youtube.com/watch?v=…"></label><template v-if="form.demo_video_source === 'upload'"><video v-if="form.demo_video_url" :src="form.demo_video_url" controls preload="metadata"></video><label class="media-file-button"><input type="file" accept="video/mp4,video/webm,video/quicktime" :disabled="busy" @change="uploadMedia($event, 'video')"><span>{{ busy ? 'Wird hochgeladen…' : 'Video hochladen' }}</span></label></template></article>
             </div>
         </section>

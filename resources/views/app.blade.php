@@ -16,18 +16,26 @@
         ];
         $socialDescription = $socialTenant?->business_description ?: ($platformDescriptions[$socialLocaleCode] ?? $platformDescriptions['de']);
         $defaultSocialImages = [
-            'de' => '/brand/lookdo-social-de.png',
-            'en' => '/brand/lookdo-social-en.png',
-            'ru' => '/brand/lookdo-social-ru.png',
-            'uk' => '/brand/lookdo-social-uk.png',
+            'de' => '/brand/lookdo-social-de.jpg',
+            'en' => '/brand/lookdo-social-en.jpg',
+            'ru' => '/brand/lookdo-social-ru.jpg',
+            'uk' => '/brand/lookdo-social-uk.jpg',
         ];
         $platformSocialImages = \App\Models\SystemSetting::read('social_share_images', $defaultSocialImages);
-        $legacySocialImage = \App\Models\SystemSetting::read('social_share_image_url', '');
+        $configuredSocialImage = \App\Models\SystemSetting::read('social_share_image_url', '');
+        if (is_array($platformSocialImages)) {
+            foreach ($defaultSocialImages as $imageLocale => $currentDefault) {
+                if (($platformSocialImages[$imageLocale] ?? null) === "/brand/lookdo-social-{$imageLocale}.png") {
+                    $platformSocialImages[$imageLocale] = $currentDefault;
+                }
+            }
+        }
         $platformSocialImage = is_array($platformSocialImages)
             ? ($platformSocialImages[$socialLocaleCode] ?? $defaultSocialImages[$socialLocaleCode] ?? $defaultSocialImages['de'])
             : ($defaultSocialImages[$socialLocaleCode] ?? $defaultSocialImages['de']);
-        if (filled($legacySocialImage) && $legacySocialImage !== '/brand/lookdo-service-workspace.png') {
-            $platformSocialImage = $legacySocialImage;
+        $standardWorkspaceImages = ['/brand/lookdo-service-workspace.png', '/brand/lookdo-service-workspace.webp'];
+        if (filled($configuredSocialImage) && ! in_array($configuredSocialImage, $standardWorkspaceImages, true)) {
+            $platformSocialImage = $configuredSocialImage;
         }
         $socialImageValue = $socialTenant?->profile?->social_image_path
             ? '/storage/'.ltrim($socialTenant->profile->social_image_path, '/')
@@ -84,7 +92,11 @@
         'operatingSystem' => 'Web',
         'url' => rtrim(config('app.url'), '/'),
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
-    @vite(['resources/css/app.css','resources/js/app.ts'])
+    @if($socialTenant)
+        @vite('resources/js/app.ts')
+    @else
+        @vite(['resources/css/app.css', 'resources/js/app.ts'])
+    @endif
 </head>
 <body><div id="app"></div></body>
 </html>

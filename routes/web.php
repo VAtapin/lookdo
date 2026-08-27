@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminTenantController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PlatformController;
 use App\Http\Controllers\SevenSmsWebhookController;
@@ -50,16 +51,21 @@ Route::prefix('api')->middleware('locale')->group(function () {
 
         Route::prefix('control')->middleware('superadmin')->group(function () {
             Route::get('/dashboard', [AdminController::class, 'dashboard']);
-            Route::get('/tenants', [AdminController::class, 'tenants']);
-            Route::post('/tenants', [AdminController::class, 'createTenant']);
-            Route::get('/tenants/{tenant}', [AdminController::class, 'tenant']);
-            Route::put('/tenants/{tenant}', [AdminController::class, 'updateTenant']);
-            Route::post('/tenants/{tenant}/grant-access', [AdminController::class, 'grantTenantAccess']);
-            Route::put('/tenants/{tenant}/entitlement', [AdminController::class, 'setOverride']);
-            Route::post('/tenants/{tenant}/impersonate', [AdminController::class, 'impersonate']);
+            Route::get('/tenants', [AdminTenantController::class, 'index']);
+            Route::post('/tenants', [AdminTenantController::class, 'store']);
+            Route::get('/tenants/{tenant}', [AdminTenantController::class, 'show']);
+            Route::put('/tenants/{tenant}', [AdminTenantController::class, 'update']);
+            Route::delete('/tenants/{tenant}', [AdminTenantController::class, 'destroy']);
+            Route::put('/tenants/{tenant}/owner', [AdminTenantController::class, 'updateOwner']);
+            Route::post('/tenants/{tenant}/owner/password-reset', [AdminTenantController::class, 'sendOwnerPasswordReset']);
+            Route::post('/tenants/{tenant}/domains/{domain}/verify', [AdminTenantController::class, 'verifyDomain']);
+            Route::post('/tenants/{tenant}/domains/{domain}/activate', [AdminTenantController::class, 'activateDomain']);
+            Route::post('/tenants/{tenant}/domains/{domain}/disable', [AdminTenantController::class, 'disableDomain']);
+            Route::delete('/tenants/{tenant}/domains/{domain}', [AdminTenantController::class, 'deleteDomain']);
+            Route::post('/tenants/{tenant}/grant-access', [AdminTenantController::class, 'grantAccess']);
+            Route::put('/tenants/{tenant}/entitlement', [AdminTenantController::class, 'setOverride']);
+            Route::post('/tenants/{tenant}/impersonate', [AdminTenantController::class, 'impersonate']);
             Route::get('/administrators', [AdminController::class, 'administrators']);
-            Route::put('/users/{user}', [AdminController::class, 'updateUser']);
-            Route::post('/users/{user}/password-reset', [AdminController::class, 'sendPasswordReset']);
             Route::get('/subscriptions', [AdminController::class, 'subscriptions']);
             Route::get('/plans', [AdminController::class, 'plans']);
             Route::get('/plan-entitlements', [AdminController::class, 'planEntitlements']);
@@ -77,10 +83,6 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::post('/backups', [AdminController::class, 'createBackup']);
             Route::post('/backups/{name}/verify', [AdminController::class, 'verifyBackup']);
             Route::delete('/backups/{name}', [AdminController::class, 'deleteBackup']);
-            Route::post('/domains/{domain}/verify', [AdminController::class, 'verifyDomain']);
-            Route::post('/domains/{domain}/activate', [AdminController::class, 'activateDomain']);
-            Route::post('/domains/{domain}/disable', [AdminController::class, 'disableDomain']);
-            Route::delete('/domains/{domain}', [AdminController::class, 'deleteDomain']);
             Route::get('/taxonomy', [AdminController::class, 'taxonomy']);
             Route::post('/categories', [AdminController::class, 'saveCategory']);
             Route::put('/categories/{category}', [AdminController::class, 'saveCategory']);

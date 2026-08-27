@@ -34,5 +34,4 @@ class SetupStripe extends Command
             return self::FAILURE;
         }
     }
-
 }

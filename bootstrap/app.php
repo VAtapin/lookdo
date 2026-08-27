@@ -1,8 +1,8 @@
 <?php
 
+use App\Http\Middleware\EnforcePlatformMaintenance;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureUserIsActive;
-use App\Http\Middleware\EnforcePlatformMaintenance;
 use App\Http\Middleware\ResolveTenant;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;

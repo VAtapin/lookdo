@@ -88,7 +88,7 @@ async function submit(){
       <div class="ta-flow-intro"><h1>{{ app.template.hero.action }}</h1><p>{{ copy.requestHint }}</p></div>
       <div class="ta-capture-list">
         <article v-for="slot in slots" :key="slot.key" class="ta-capture-card" :class="{filled:existing(slot.key)}">
-          <div v-if="existing(slot.key)" class="ta-capture-preview"><img v-if="existing(slot.key)?.file.type.startsWith('image/')" :src="existing(slot.key)?.url"><video v-else :src="existing(slot.key)?.url" muted playsinline/></div>
+          <div v-if="existing(slot.key)" class="ta-capture-preview"><img decoding="async" v-if="existing(slot.key)?.file.type.startsWith('image/')" :src="existing(slot.key)?.url"><video v-else :src="existing(slot.key)?.url" muted playsinline/></div>
           <div class="ta-capture-copy"><small>{{ slot.required ? copy.required : copy.optional }}</small><h3>{{ slotText(slot).title }}</h3><p>{{ slotText(slot).hint }}</p></div>
           <div class="ta-capture-actions">
             <button v-if="existing(slot.key)" class="ta-link" @click="remove(slot.key)">{{ copy.remove }}</button>

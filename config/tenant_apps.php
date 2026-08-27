@@ -7,7 +7,7 @@ return [
             'layout' => 'steering',
             'navigation' => ['home', 'works', 'action', 'activity', 'profile'],
             'hero' => [
-                'image' => '/brand/leonid-demo.png',
+                'image' => '/brand/leonid-demo.webp',
                 'eyebrow' => ['de' => 'LENKRADBEZUG', 'en' => 'STEERING WHEEL UPHOLSTERY', 'ru' => 'ПЕРЕТЯЖКА РУЛЕЙ', 'uk' => 'ПЕРЕТЯЖКА КЕРМА'],
                 'title' => ['de' => 'Ihr Lenkrad kann wieder wie neu aussehen', 'en' => 'Your steering wheel can look new again', 'ru' => 'Ваш руль снова может выглядеть как новый', 'uk' => 'Ваше кермо знову може виглядати як нове'],
                 'text' => ['de' => 'Zeigen Sie den Zustand mit Fotos. Der Meister prüft alles und antwortet persönlich.', 'en' => 'Show its condition with photos. The specialist will review everything and reply personally.', 'ru' => 'Покажите состояние на фото. Мастер всё изучит и ответит лично.', 'uk' => 'Покажіть стан на фото. Майстер усе перегляне й відповість особисто.'],
@@ -20,9 +20,9 @@ return [
                 ['icon' => 'clock', 'label' => ['de' => 'Klare Termine', 'en' => 'Clear timing', 'ru' => 'Понятные сроки', 'uk' => 'Зрозумілі строки']],
             ],
             'starter_portfolio' => [
-                ['title' => ['de' => 'BMW X5', 'en' => 'BMW X5', 'ru' => 'BMW X5', 'uk' => 'BMW X5'], 'image' => '/brand/leonid-demo.png', 'featured' => true],
-                ['title' => ['de' => 'Mercedes C-Klasse', 'en' => 'Mercedes C-Class', 'ru' => 'Mercedes C-Class', 'uk' => 'Mercedes C-Class'], 'image' => '/brand/leonid-demo.png'],
-                ['title' => ['de' => 'Audi A6', 'en' => 'Audi A6', 'ru' => 'Audi A6', 'uk' => 'Audi A6'], 'image' => '/brand/leonid-demo.png'],
+                ['title' => ['de' => 'BMW X5', 'en' => 'BMW X5', 'ru' => 'BMW X5', 'uk' => 'BMW X5'], 'image' => '/brand/leonid-demo.webp', 'featured' => true],
+                ['title' => ['de' => 'Mercedes C-Klasse', 'en' => 'Mercedes C-Class', 'ru' => 'Mercedes C-Class', 'uk' => 'Mercedes C-Class'], 'image' => '/brand/leonid-demo.webp'],
+                ['title' => ['de' => 'Audi A6', 'en' => 'Audi A6', 'ru' => 'Audi A6', 'uk' => 'Audi A6'], 'image' => '/brand/leonid-demo.webp'],
             ],
         ],
         'repair-finishing-installation.door-installation' => [
@@ -80,7 +80,7 @@ return [
             'layout' => 'general',
             'navigation' => ['home', 'works', 'action', 'activity', 'profile'],
             'hero' => [
-                'image' => '/brand/lookdo-service-workspace.png',
+                'image' => '/brand/lookdo-service-workspace.webp',
                 'eyebrow' => ['de' => 'SERVICE', 'en' => 'SERVICE', 'ru' => 'УСЛУГИ', 'uk' => 'ПОСЛУГИ'],
                 'title' => ['de' => 'Zeigen Sie, wobei Sie Hilfe brauchen', 'en' => 'Show what you need help with', 'ru' => 'Покажите, что нужно сделать', 'uk' => 'Покажіть, що потрібно зробити'],
                 'text' => ['de' => 'Senden Sie Fotos oder ein kurzes Video und erhalten Sie eine persönliche Antwort.', 'en' => 'Send photos or a short video and receive a personal reply.', 'ru' => 'Отправьте фото или короткое видео и получите личный ответ.', 'uk' => 'Надішліть фото або коротке відео й отримайте особисту відповідь.'],

@@ -8,6 +8,7 @@ use App\Models\TenantDomain;
 use App\Services\AuditService;
 use App\Services\DomainService;
 use App\Services\EntitlementService;
+use App\Services\ImageStorageService;
 use App\Services\OpenAiBudgetService;
 use App\Services\OpenAiService;
 use App\Services\StripeService;
@@ -77,13 +78,13 @@ class TenantController extends Controller
         return response()->json(['tenant' => $tenant->fresh('profile')]);
     }
 
-    public function uploadSocialImage(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
+    public function uploadSocialImage(Request $request, Tenant $tenant, AuditService $audit, ImageStorageService $images): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
         $data = $request->validate(['image' => 'required|image|mimes:jpg,jpeg,png,webp|max:10240']);
         $profile = $tenant->profile()->firstOrCreate();
         $before = $profile->only(['social_image_path', 'social_image_source']);
-        $path = $data['image']->store('tenant-social/'.$tenant->id, 'public');
+        $path = $images->storeUploaded($data['image'], 'tenant-social/'.$tenant->id, 'public', 1600, 1200);
         $this->replaceSocialImage($profile->social_image_path, $path);
         $profile->update(['social_image_path' => $path, 'social_image_source' => 'upload']);
         $audit->log('tenant.social_image.uploaded', $profile, $before, ['social_image_path' => $path, 'social_image_source' => 'upload'], $tenant->id);
@@ -143,7 +144,7 @@ class TenantController extends Controller
         return response()->json(['prompt' => $prompt, 'context' => $context, 'image_generation' => $imageGenerations->status($tenant)]);
     }
 
-    public function generateSocialImage(Request $request, Tenant $tenant, OpenAiService $openAi, OpenAiBudgetService $budget, AuditService $audit, TenantImageGenerationService $imageGenerations): JsonResponse
+    public function generateSocialImage(Request $request, Tenant $tenant, OpenAiService $openAi, OpenAiBudgetService $budget, AuditService $audit, TenantImageGenerationService $imageGenerations, ImageStorageService $images): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
         $this->requireActiveSubscription($tenant);
@@ -168,8 +169,7 @@ class TenantController extends Controller
             return response()->json(['message' => 'Das Bild konnte nicht erstellt werden: '.$exception->getMessage(), 'image_generation' => $imageGenerations->status($tenant)], 422);
         }
 
-        $path = 'tenant-social/'.$tenant->id.'/social-'.Str::uuid().'.'.$result['format'];
-        Storage::disk('public')->put($path, $result['contents']);
+        $path = $images->storeBytes($result['contents'], 'tenant-social/'.$tenant->id, $result['format'], 'public', 1600, 1200);
         $before = $profile->only(['social_image_path', 'social_image_source']);
         $this->replaceSocialImage($profile->social_image_path, $path);
         $profile->update(['social_image_path' => $path, 'social_image_source' => 'ai']);

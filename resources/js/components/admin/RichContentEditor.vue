@@ -29,7 +29,7 @@ async function upload(event: Event) {
         const media = await api<any>('/control/content-media', { method: 'POST', body });
         const html = media.mime?.startsWith('video/')
             ? `<video controls src="${media.url}"></video>`
-            : `<img src="${media.url}" alt="${media.name || ''}">`;
+            : `<img decoding="async" src="${media.url}" alt="${media.name || ''}">`;
         editor.value?.focus(); document.execCommand('insertHTML', false, html);
         emit('update:modelValue', editor.value?.innerHTML || '');
     } finally { uploading.value = false; input.value = ''; }

@@ -72,7 +72,7 @@ class SaasFoundationTest extends TestCase
             ->assertOk()->assertJsonPath('source', 'fuzzy');
         $variationId = $response->json('candidates.0.variation_id');
         $this->assertDatabaseHas('business_variations', ['id' => $variationId, 'code' => 'automotive.steering-wheel-upholstery']);
-        $this->assertSame('/brand/leonid-demo.png', $response->json('candidates.0.preview.image'));
+        $this->assertSame('/brand/leonid-demo.webp', $response->json('candidates.0.preview.image'));
     }
 
     public function test_registration_availability_reports_existing_email_and_slug_before_submit(): void
@@ -265,7 +265,7 @@ class SaasFoundationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('name', 'Leonid Deluxe')
             ->assertJsonPath('locale', 'ru')
-            ->assertJsonPath('template.preview.image', '/brand/leonid-demo.png');
+            ->assertJsonPath('template.preview.image', '/brand/leonid-demo.webp');
         $this->assertArrayNotHasKey('contact', $site->json());
         $this->assertArrayNotHasKey('current_subscription', $site->json());
         $this->get('http://leonid-deluxe.lookdo.app/')
@@ -675,10 +675,10 @@ class SaasFoundationTest extends TestCase
         $admin = User::factory()->create(['is_super_admin' => true]);
         $response = $this->actingAs($admin)->getJson('/api/control/settings')->assertOk();
 
-        $response->assertJsonPath('settings.social_share_images.de', '/brand/lookdo-social-de.png')
-            ->assertJsonPath('settings.social_share_images.en', '/brand/lookdo-social-en.png')
-            ->assertJsonPath('settings.social_share_images.ru', '/brand/lookdo-social-ru.png')
-            ->assertJsonPath('settings.social_share_images.uk', '/brand/lookdo-social-uk.png');
+        $response->assertJsonPath('settings.social_share_images.de', '/brand/lookdo-social-de.jpg')
+            ->assertJsonPath('settings.social_share_images.en', '/brand/lookdo-social-en.jpg')
+            ->assertJsonPath('settings.social_share_images.ru', '/brand/lookdo-social-ru.jpg')
+            ->assertJsonPath('settings.social_share_images.uk', '/brand/lookdo-social-uk.jpg');
         $this->actingAs($admin)->get('/control/settings/media')->assertOk();
     }
 
@@ -973,17 +973,17 @@ class SaasFoundationTest extends TestCase
 
     public function test_public_and_tenant_pages_render_server_side_social_metadata(): void
     {
-        SystemSetting::updateOrCreate(['key' => 'social_share_image_url'], ['value' => '/brand/lookdo-service-workspace.png']);
+        SystemSetting::updateOrCreate(['key' => 'social_share_image_url'], ['value' => '/brand/lookdo-service-workspace.webp']);
         SystemSetting::updateOrCreate(['key' => 'social_share_images'], ['value' => [
-            'de' => '/brand/lookdo-social-de.png',
-            'en' => '/brand/lookdo-social-en.png',
-            'ru' => '/brand/lookdo-social-ru.png',
-            'uk' => '/brand/lookdo-social-uk.png',
+            'de' => '/brand/lookdo-social-de.jpg',
+            'en' => '/brand/lookdo-social-en.jpg',
+            'ru' => '/brand/lookdo-social-ru.jpg',
+            'uk' => '/brand/lookdo-social-uk.jpg',
         ]]);
         foreach (['de', 'en', 'ru', 'uk'] as $locale) {
             $this->get('/'.$locale)->assertOk()
                 ->assertSee('property="og:image"', false)
-                ->assertSee('/brand/lookdo-social-'.$locale.'.png', false)
+                ->assertSee('/brand/lookdo-social-'.$locale.'.jpg', false)
                 ->assertSee('name="twitter:card" content="summary_large_image"', false);
         }
 

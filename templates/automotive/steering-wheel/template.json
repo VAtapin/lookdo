@@ -10,7 +10,7 @@
     "rule": "Tenant App must follow approved UI images strictly. Do not replace the app-like flow, bottom navigation, camera/upload states, cards, modals or screen composition with a different generic interface."
   },
   "preview": {
-    "image": "/brand/leonid-demo.png",
+    "image": "/brand/leonid-demo.webp",
     "primary_color": "#d6a552",
     "secondary_color": "#101114"
   },

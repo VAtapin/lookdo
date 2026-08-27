@@ -87,7 +87,7 @@ class DatabaseSeeder extends Seeder
             'general-services.general' => 'templates/BASE_REQUEST_TEMPLATE.md',
         ];
         $templatePreviews = [
-            'automotive.general' => ['/brand/leonid-demo.png', '#f6a928', '#101114'],
+            'automotive.general' => ['/brand/leonid-demo.webp', '#f6a928', '#101114'],
             'repair-finishing-installation.general' => ['/brand/service-renovation.webp', '#ff6b00', '#262a30'],
             'beauty.general' => ['/brand/service-brows.webp', '#b96d55', '#f7eee9'],
             'appliance-repair.general' => ['/brand/service-appliance.webp', '#ff6b00', '#252a31'],
@@ -162,10 +162,58 @@ class DatabaseSeeder extends Seeder
             }
             $page->fill(['title' => $titles, 'content' => $contents, 'is_published' => $page->exists ? $page->is_published : true])->save();
         }
-        foreach (['platform_name' => 'LOOKDO', 'default_locale' => 'ru', 'default_request_template_code' => 'general-services.general', 'registration_enabled' => true, 'enabled_locales' => ['de', 'en', 'ru', 'uk'], 'support_email' => 'support@lookdo.app', 'trial_days_default' => 0, 'upload_base_limit_mb' => 100, 'social_share_image_url' => '/brand/lookdo-service-workspace.png', 'social_share_images' => ['de' => '/brand/lookdo-social-de.png', 'en' => '/brand/lookdo-social-en.png', 'ru' => '/brand/lookdo-social-ru.png', 'uk' => '/brand/lookdo-social-uk.png'], 'demo_video_source' => 'none', 'demo_video_url' => '', 'integrations' => ['stripe' => true, 'openai' => true, 'sms' => false], 'sms_provider' => 'seven', 'sms_sender' => 'LOOKDO', 'sms_events' => ['request_received' => true, 'master_replied' => true, 'work_ready' => true, 'agreement_reminder' => true], 'maintenance' => false] as $key => $value) {
+        $defaultSocialImages = [
+            'de' => '/brand/lookdo-social-de.jpg',
+            'en' => '/brand/lookdo-social-en.jpg',
+            'ru' => '/brand/lookdo-social-ru.jpg',
+            'uk' => '/brand/lookdo-social-uk.jpg',
+        ];
+        $systemDefaults = [
+            'platform_name' => 'LOOKDO',
+            'default_locale' => 'ru',
+            'default_request_template_code' => 'general-services.general',
+            'registration_enabled' => true,
+            'enabled_locales' => ['de', 'en', 'ru', 'uk'],
+            'support_email' => 'support@lookdo.app',
+            'trial_days_default' => 0,
+            'upload_base_limit_mb' => 100,
+            'social_share_image_url' => '/brand/lookdo-service-workspace.webp',
+            'social_share_images' => $defaultSocialImages,
+            'demo_video_source' => 'none',
+            'demo_video_url' => '',
+            'integrations' => ['stripe' => true, 'openai' => true, 'sms' => false],
+            'sms_provider' => 'seven',
+            'sms_sender' => 'LOOKDO',
+            'sms_events' => [
+                'request_received' => true,
+                'master_replied' => true,
+                'work_ready' => true,
+                'agreement_reminder' => true,
+            ],
+            'maintenance' => false,
+        ];
+        foreach ($systemDefaults as $key => $value) {
             SystemSetting::firstOrCreate(['key' => $key], ['value' => $value]);
         }
-        foreach (config('legal_pages.operator_settings', []) as $key => $value) {
+
+        $defaultAssetUpgrades = [
+            'social_share_image_url' => [
+                '/brand/lookdo-service-workspace.png',
+                '/brand/lookdo-service-workspace.webp',
+            ],
+            'social_share_images' => [[
+                'de' => '/brand/lookdo-social-de.png',
+                'en' => '/brand/lookdo-social-en.png',
+                'ru' => '/brand/lookdo-social-ru.png',
+                'uk' => '/brand/lookdo-social-uk.png',
+            ], $defaultSocialImages],
+        ];
+        foreach ($defaultAssetUpgrades as $key => [$previousDefault, $currentDefault]) {
+            $setting = SystemSetting::query()->where('key', $key)->first();
+            if ($setting?->value === $previousDefault) {
+                $setting->update(['value' => $currentDefault]);
+            }
+        }        foreach (config('legal_pages.operator_settings', []) as $key => $value) {
             SystemSetting::firstOrCreate(['key' => $key], ['value' => $value]);
         }
     }

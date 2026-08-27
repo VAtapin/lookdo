@@ -12,6 +12,7 @@ use App\Models\TenantRequest;
 use App\Models\TenantRequestValue;
 use App\Models\TenantService;
 use App\Services\EntitlementService;
+use App\Services\ImageStorageService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
@@ -53,7 +54,7 @@ class TenantAppController extends Controller
         ]);
     }
 
-    public function createRequest(Request $request): JsonResponse
+    public function createRequest(Request $request, ImageStorageService $images): JsonResponse
     {
         $tenant = $this->tenant($request);
         $this->ensureAvailable($request, $tenant);
@@ -76,7 +77,7 @@ class TenantAppController extends Controller
         $locale = $this->locale($request, $tenant);
         [$customer, $rawToken] = $this->customerAndToken($tenant, $data, $locale);
 
-        $tenantRequest = DB::transaction(function () use ($tenant, $customer, $data, $fields, $slots, $locale, $request) {
+        $tenantRequest = DB::transaction(function () use ($tenant, $customer, $data, $fields, $slots, $locale, $request, $images) {
             $appRequest = $tenant->appRequests()->create([
                 'customer_id' => $customer->id,
                 'request_template_id' => $tenant->businessProfile?->request_template_id,
@@ -91,8 +92,21 @@ class TenantAppController extends Controller
                 if ($type === 'video' && ! $this->enabled($tenant, 'video_enabled', false)) {
                     $this->apiError($request, $tenant, 'TENANT_APP_VIDEO_DISABLED', 'tenant_app.video_disabled', 403);
                 }
-                $path = $file->store("tenant-app/{$tenant->id}/requests/{$appRequest->id}", 'public');
-                $appRequest->media()->create(['tenant_id' => $tenant->id, 'type' => $type, 'role' => 'condition', 'slot_key' => $slots[$index] ?? null, 'sort_order' => $index, 'storage_key' => $path, 'metadata' => ['mime' => $file->getMimeType(), 'size' => $file->getSize()]]);
+                if ($type === 'image' && $file->getSize() > 25 * 1024 * 1024) {
+                    throw ValidationException::withMessages(['media.'.$index => 'Images may not be larger than 25 MB.']);
+                }
+                $directory = "tenant-app/{$tenant->id}/requests/{$appRequest->id}";
+                $path = $type === 'image'
+                    ? $images->storeUploaded($file, $directory, 'public', 2048, 2048)
+                    : $file->store($directory, 'public');
+                $appRequest->media()->create([
+                    'tenant_id' => $tenant->id, 'type' => $type, 'role' => 'condition',
+                    'slot_key' => $slots[$index] ?? null, 'sort_order' => $index, 'storage_key' => $path,
+                    'metadata' => [
+                        'mime' => Storage::disk('public')->mimeType($path) ?: $file->getMimeType(),
+                        'size' => Storage::disk('public')->size($path),
+                    ],
+                ]);
             }
             $appRequest->messages()->create(['tenant_id' => $tenant->id, 'customer_id' => $customer->id, 'sender_type' => 'system', 'body' => $this->message('received', $locale)]);
 

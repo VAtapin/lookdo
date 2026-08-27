@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '../../css/tenant-app.css';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ApiError, api } from '../api';
@@ -40,34 +41,34 @@ onMounted(()=>{window.addEventListener('beforeinstallprompt',beforeInstall);load
 
 <template>
 <div class="tenant-app-viewport" :style="theme">
-  <div v-if="loading" class="ta-splash"><img :src="'/brand/lookdo-mark.png'" alt=""><span>LOOKDO</span></div>
-  <div v-else-if="error&&!app" class="ta-unavailable"><img :src="'/brand/lookdo-mark.png'" alt=""><h1>{{ copy.unavailable }}</h1><p>{{ error }}</p><button class="ta-primary" @click="load">{{ copy.retry }}</button></div>
+  <div v-if="loading" class="ta-splash"><img decoding="async" :src="'/brand/lookdo-mark.png'" alt=""><span>LOOKDO</span></div>
+  <div v-else-if="error&&!app" class="ta-unavailable"><img decoding="async" :src="'/brand/lookdo-mark.png'" alt=""><h1>{{ copy.unavailable }}</h1><p>{{ error }}</p><button class="ta-primary" @click="load">{{ copy.retry }}</button></div>
   <div v-else-if="app" class="tenant-app-desktop">
     <main class="tenant-app-shell">
       <RequestFlow v-if="screen==='request'" :app="app" :copy="copy" :locale="locale" :token="clientToken" @close="go('home')" @success="flowSuccess"/>
       <BookingFlow v-else-if="screen==='book'" :app="app" :copy="copy" :locale="locale" :token="clientToken" @close="go('home')" @success="flowSuccess"/>
       <template v-else>
         <header class="ta-topbar">
-          <button class="ta-brand" @click="go('home')"><img :src="app.tenant.logo||'/brand/lookdo-mark.png'" :alt="app.tenant.name"><span>{{ app.tenant.name }}</span></button>
+          <button class="ta-brand" @click="go('home')"><img decoding="async" :src="app.tenant.logo||'/brand/lookdo-mark.png'" :alt="app.tenant.name"><span>{{ app.tenant.name }}</span></button>
           <div class="ta-top-actions"><select :value="locale" :aria-label="copy.language" @change="changeLocale(($event.target as HTMLSelectElement).value)"><option value="de">DE</option><option value="en">EN</option><option value="ru">RU</option><option value="uk">UK</option></select><button class="ta-icon-button" @click="go('activity')"><AppIcon name="bell"/></button></div>
         </header>
 
         <div class="ta-scroll-area">
           <section v-if="screen==='home'" class="ta-home-screen">
             <article class="ta-hero" :class="`layout-${app.template.layout}`">
-              <img class="ta-hero-image" :src="app.template.hero.image" :alt="app.template.hero.title">
+              <img decoding="async" class="ta-hero-image" :src="app.template.hero.image" :alt="app.template.hero.title">
               <div class="ta-hero-shade"></div><div class="ta-hero-content"><small>{{ app.template.hero.eyebrow }}</small><h1>{{ app.template.hero.title }}</h1><p>{{ app.template.hero.text }}</p><button class="ta-hero-action" @click="go(actionScreen)"><AppIcon :name="app.template.engine==='booking'?'calendar':'camera'"/>{{ app.template.hero.action }}</button></div>
             </article>
 
-            <section v-if="app.portfolio.length" class="ta-section"><div class="ta-section-head"><h2>{{ copy.featured }}</h2><button @click="go('works')">{{ copy.all }} <AppIcon name="arrow" :size="17"/></button></div><div class="ta-work-strip"><button v-for="item in app.portfolio.slice(0,4)" :key="item.id" @click="go('works')"><img :src="item.image" :alt="item.title"><span>{{ item.title }}</span></button></div></section>
+            <section v-if="app.portfolio.length" class="ta-section"><div class="ta-section-head"><h2>{{ copy.featured }}</h2><button @click="go('works')">{{ copy.all }} <AppIcon name="arrow" :size="17"/></button></div><div class="ta-work-strip"><button v-for="item in app.portfolio.slice(0,4)" :key="item.id" @click="go('works')"><img loading="lazy" decoding="async" :src="item.image" :alt="item.title"><span>{{ item.title }}</span></button></div></section>
 
             <section class="ta-how"><h2>{{ copy.how }}</h2><div><article><span><AppIcon name="camera"/></span><b>1</b><p>{{ copy.step1 }}</p></article><i></i><article><span><AppIcon name="user"/></span><b>2</b><p>{{ copy.step2 }}</p></article><i></i><article><span><AppIcon name="check"/></span><b>3</b><p>{{ copy.step3 }}</p></article></div></section>
 
             <section v-if="app.template.trust.length" class="ta-trust"><article v-for="item in app.template.trust" :key="item.label"><span><AppIcon :name="item.icon"/></span><p>{{ item.label }}</p></article></section>
-            <section v-if="app.portfolio.length" class="ta-section ta-recent"><div class="ta-section-head"><h2>{{ copy.recent }}</h2><button @click="go('works')">{{ copy.all }} <AppIcon name="arrow" :size="17"/></button></div><div class="ta-work-grid"><article v-for="item in app.portfolio" :key="item.id"><img :src="item.image" :alt="item.title"><h3>{{ item.title }}</h3><p>{{ item.description }}</p></article></div></section>
+            <section v-if="app.portfolio.length" class="ta-section ta-recent"><div class="ta-section-head"><h2>{{ copy.recent }}</h2><button @click="go('works')">{{ copy.all }} <AppIcon name="arrow" :size="17"/></button></div><div class="ta-work-grid"><article v-for="item in app.portfolio" :key="item.id"><img loading="lazy" decoding="async" :src="item.image" :alt="item.title"><h3>{{ item.title }}</h3><p>{{ item.description }}</p></article></div></section>
           </section>
 
-          <section v-else-if="screen==='works'" class="ta-page"><div class="ta-page-title"><small>{{ app.template.name }}</small><h1>{{ copy.works }}</h1><p>{{ app.tenant.description }}</p></div><div v-if="app.portfolio.length" class="ta-portfolio-grid"><article v-for="item in app.portfolio" :key="item.id" :class="{featured:item.featured}"><div class="ta-before-after" v-if="item.before_image&&item.after_image"><img :src="item.before_image"><img :src="item.after_image"></div><img v-else :src="item.image"><div><h2>{{ item.title }}</h2><p>{{ item.description }}</p></div></article></div><div v-else class="ta-empty"><AppIcon name="works" :size="40"/><p>{{ copy.noActivity }}</p></div><button class="ta-floating-cta" @click="go(actionScreen)"><AppIcon :name="app.template.engine==='booking'?'calendar':'camera'"/>{{ app.template.hero.action }}</button></section>
+          <section v-else-if="screen==='works'" class="ta-page"><div class="ta-page-title"><small>{{ app.template.name }}</small><h1>{{ copy.works }}</h1><p>{{ app.tenant.description }}</p></div><div v-if="app.portfolio.length" class="ta-portfolio-grid"><article v-for="item in app.portfolio" :key="item.id" :class="{featured:item.featured}"><div class="ta-before-after" v-if="item.before_image&&item.after_image"><img loading="lazy" decoding="async" :src="item.before_image" alt=""><img loading="lazy" decoding="async" :src="item.after_image" alt=""></div><img loading="lazy" decoding="async" v-else :src="item.image" alt=""><div><h2>{{ item.title }}</h2><p>{{ item.description }}</p></div></article></div><div v-else class="ta-empty"><AppIcon name="works" :size="40"/><p>{{ copy.noActivity }}</p></div><button class="ta-floating-cta" @click="go(actionScreen)"><AppIcon :name="app.template.engine==='booking'?'calendar':'camera'"/>{{ app.template.hero.action }}</button></section>
 
           <section v-else-if="screen==='activity'" class="ta-page ta-activity-page">
             <div class="ta-page-title"><small>{{ app.tenant.name }}</small><h1>{{ copy.activity }}</h1></div>
@@ -79,14 +80,14 @@ onMounted(()=>{window.addEventListener('beforeinstallprompt',beforeInstall);load
             </template>
           </section>
 
-          <section v-else-if="screen==='profile'" class="ta-page"><div class="ta-profile-hero"><img :src="app.tenant.logo||'/brand/lookdo-mark.png'" :alt="app.tenant.name"><div><small>{{ app.template.name }}</small><h1>{{ app.tenant.name }}</h1><p>{{ app.tenant.description }}</p></div></div><div class="ta-profile-actions"><a v-if="app.tenant.contact.phone" :href="`tel:${app.tenant.contact.phone}`"><AppIcon name="phone"/><span>{{ copy.call }}</span></a><a v-if="app.tenant.contact.email" :href="`mailto:${app.tenant.contact.email}`"><AppIcon name="message"/><span>{{ copy.write }}</span></a><button @click="share"><AppIcon name="share"/><span>{{ copy.share }}</span></button></div><section class="ta-profile-card"><h2>{{ copy.businessInfo }}</h2><p v-if="address"><AppIcon name="home"/><span><b>{{ copy.address }}</b>{{ address }}</span></p><p v-if="app.tenant.contact.phone"><AppIcon name="phone"/><span><b>{{ copy.phone }}</b>{{ app.tenant.contact.phone }}</span></p><p v-if="app.tenant.contact.email"><AppIcon name="message"/><span><b>{{ copy.email }}</b>{{ app.tenant.contact.email }}</span></p><p v-if="!address&&!app.tenant.contact.phone&&!app.tenant.contact.email">{{ copy.profileEmpty }}</p></section><button class="ta-install" @click="install"><img :src="'/brand/lookdo-mark.png'" alt=""><span><b>{{ copy.install }}</b><small>{{ copy.powered }}</small></span><AppIcon name="arrow"/></button></section>
+          <section v-else-if="screen==='profile'" class="ta-page"><div class="ta-profile-hero"><img decoding="async" :src="app.tenant.logo||'/brand/lookdo-mark.png'" :alt="app.tenant.name"><div><small>{{ app.template.name }}</small><h1>{{ app.tenant.name }}</h1><p>{{ app.tenant.description }}</p></div></div><div class="ta-profile-actions"><a v-if="app.tenant.contact.phone" :href="`tel:${app.tenant.contact.phone}`"><AppIcon name="phone"/><span>{{ copy.call }}</span></a><a v-if="app.tenant.contact.email" :href="`mailto:${app.tenant.contact.email}`"><AppIcon name="message"/><span>{{ copy.write }}</span></a><button @click="share"><AppIcon name="share"/><span>{{ copy.share }}</span></button></div><section class="ta-profile-card"><h2>{{ copy.businessInfo }}</h2><p v-if="address"><AppIcon name="home"/><span><b>{{ copy.address }}</b>{{ address }}</span></p><p v-if="app.tenant.contact.phone"><AppIcon name="phone"/><span><b>{{ copy.phone }}</b>{{ app.tenant.contact.phone }}</span></p><p v-if="app.tenant.contact.email"><AppIcon name="message"/><span><b>{{ copy.email }}</b>{{ app.tenant.contact.email }}</span></p><p v-if="!address&&!app.tenant.contact.phone&&!app.tenant.contact.email">{{ copy.profileEmpty }}</p></section><button class="ta-install" @click="install"><img decoding="async" :src="'/brand/lookdo-mark.png'" alt=""><span><b>{{ copy.install }}</b><small>{{ copy.powered }}</small></span><AppIcon name="arrow"/></button></section>
           <section v-else class="ta-page ta-empty"><h1>404</h1><button class="ta-primary" @click="go('home')">{{ copy.home }}</button></section>
         </div>
 
         <nav class="ta-bottom-nav" :aria-label="copy.navigation"><button v-for="item in navItems" :key="item.key" :class="{active:screen===item.key,central:item.central}" @click="go(item.key)"><span><AppIcon :name="item.icon"/></span><small>{{ item.label }}</small></button></nav>
       </template>
     </main>
-    <aside class="ta-desktop-aside"><img :src="'/brand/lookdo-mark.png'" alt="LOOKDO"><small>{{ app.tenant.name }}</small><h2>{{ copy.desktopTitle }}</h2><p>{{ copy.desktopText }}</p><div><span><AppIcon name="camera"/></span><span><AppIcon name="message"/></span><span><AppIcon name="calendar"/></span></div><button @click="share"><AppIcon name="share"/>{{ copy.share }}</button><em>{{ copy.powered }}</em></aside>
+    <aside class="ta-desktop-aside"><img decoding="async" :src="'/brand/lookdo-mark.png'" alt="LOOKDO"><small>{{ app.tenant.name }}</small><h2>{{ copy.desktopTitle }}</h2><p>{{ copy.desktopText }}</p><div><span><AppIcon name="camera"/></span><span><AppIcon name="message"/></span><span><AppIcon name="calendar"/></span></div><button @click="share"><AppIcon name="share"/>{{ copy.share }}</button><em>{{ copy.powered }}</em></aside>
   </div>
 </div>
 </template>

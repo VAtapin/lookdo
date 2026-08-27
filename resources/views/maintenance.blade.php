@@ -13,7 +13,7 @@
 </head>
 <body>
 <main>
-    <div class="brand"><img src="/brand/lookdo-logo.png" alt="LOOKDO"><small>LOOK. DO.</small></div>
+    <div class="brand"><img decoding="async" src="/brand/lookdo-logo.png" alt="LOOKDO"><small>LOOK. DO.</small></div>
     <div class="eyebrow">{{ $copy['eyebrow'] }}</div>
     <h1>{{ $copy['title'] }}</h1>
     <p>{{ $copy['text'] }}</p>

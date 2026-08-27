@@ -108,6 +108,10 @@ Object.assign(messages.ru, { trialAccessTitle:'Включён полный те�
 Object.assign(messages.de, { trialAccessTitle:'Voller Testzugang ist aktiv', trialAccessText:'Alle LOOKDO Funktionen sind noch :days Tage verfügbar. Wählen Sie vor Ablauf des Tests den passenden Tarif.', trialStatus:'Test: :days Tg.', choosePlan:'Tarif wählen' });
 Object.assign(messages.en, { trialAccessTitle:'Full trial access is active', trialAccessText:'All LOOKDO features are available for :days more days. Choose the right plan before the trial ends.', trialStatus:'Trial: :days days', choosePlan:'Choose plan' });
 Object.assign(messages.uk, { trialAccessTitle:'Увімкнено повний тестовий доступ', trialAccessText:'Усі функції LOOKDO доступні ще :days дн. Оберіть відповідний тариф до завершення тесту.', trialStatus:'Тест: :days дн.', choosePlan:'Обрати тариф' });
+Object.assign(messages.de, { pageNotFound:'Diese Seite wurde nicht gefunden.', returnHome:'Zur Startseite' });
+Object.assign(messages.en, { pageNotFound:'This page could not be found.', returnHome:'Back to home' });
+Object.assign(messages.ru, { pageNotFound:'Эта страница не найдена.', returnHome:'На главную' });
+Object.assign(messages.uk, { pageNotFound:'Цю сторінку не знайдено.', returnHome:'На головну' });
 export const t = (key: string) => computed(() => messages[locale.value][key] || key);
 export function tr(key: string): string { return messages[locale.value][key] || key; }
 export function setLocale(value: Locale) { locale.value=value;localStorage.setItem('lookdo-locale',value);document.documentElement.lang=value; }
