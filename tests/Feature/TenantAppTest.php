@@ -9,6 +9,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -20,6 +21,18 @@ class TenantAppTest extends TestCase
     {
         parent::setUp();
         $this->seed(DatabaseSeeder::class);
+    }
+
+    public function test_tenant_app_core_migration_resumes_after_partial_mysql_ddl(): void
+    {
+        Schema::drop('tenant_push_subscriptions');
+        Schema::drop('tenant_appointments');
+
+        $migration = require database_path('migrations/2026_08_27_000001_create_tenant_app_core.php');
+        $migration->up();
+
+        $this->assertTrue(Schema::hasTable('tenant_appointments'));
+        $this->assertTrue(Schema::hasTable('tenant_push_subscriptions'));
     }
 
     public function test_unpaid_tenant_app_is_not_publicly_usable(): void
