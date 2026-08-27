@@ -7,6 +7,7 @@ use App\Models\TenantAppointment;
 use App\Models\TenantClientToken;
 use App\Models\TenantCustomer;
 use App\Models\TenantMessage;
+use App\Models\TenantPushSubscription;
 use App\Models\TenantRequest;
 use App\Models\TenantRequestValue;
 use App\Models\TenantService;
@@ -172,9 +173,9 @@ class TenantAppController extends Controller
         abort_unless($this->enabled($tenant, 'push_enabled', true), 403);
         $data = $request->validate(['endpoint' => 'required|url|max:2000', 'keys.p256dh' => 'required|string|max:1000', 'keys.auth' => 'required|string|max:500']);
         $endpointHash = hash('sha256', $data['endpoint']);
-        DB::table('tenant_push_subscriptions')->updateOrInsert(
+        TenantPushSubscription::updateOrCreate(
             ['tenant_id' => $tenant->id, 'endpoint_hash' => $endpointHash],
-            ['customer_id' => $customer->id, 'endpoint' => $data['endpoint'], 'public_key' => $data['keys']['p256dh'], 'auth_token' => $data['keys']['auth'], 'locale' => $customer->locale, 'updated_at' => now(), 'created_at' => now()],
+            ['customer_id' => $customer->id, 'endpoint' => $data['endpoint'], 'public_key' => $data['keys']['p256dh'], 'auth_token' => $data['keys']['auth'], 'locale' => $customer->locale],
         );
 
         return response()->json(['subscribed' => true]);

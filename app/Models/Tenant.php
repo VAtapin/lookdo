@@ -92,6 +92,11 @@ class Tenant extends Model
         return $this->hasMany(TenantAppointment::class);
     }
 
+    public function pushSubscriptions(): HasMany
+    {
+        return $this->hasMany(TenantPushSubscription::class);
+    }
+
     public function hasActiveSubscription(): bool
     {
         $subscription = $this->currentSubscription;

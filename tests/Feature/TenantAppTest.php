@@ -2,13 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendTenantMessagePush;
 use App\Models\Plan;
 use App\Models\RequestTemplate;
 use App\Models\Tenant;
+use App\Models\TenantMessage;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -33,6 +36,35 @@ class TenantAppTest extends TestCase
 
         $this->assertTrue(Schema::hasTable('tenant_appointments'));
         $this->assertTrue(Schema::hasTable('tenant_push_subscriptions'));
+    }
+
+    public function test_master_message_dispatches_web_push_job_after_commit(): void
+    {
+        Bus::fake([SendTenantMessagePush::class]);
+        $tenant = $this->tenant('push-message', 'automotive.steering-wheel-upholstery');
+        $customer = $tenant->customers()->create(['name' => 'Иван', 'phone' => '+4915112345678', 'locale' => 'ru']);
+
+        $message = TenantMessage::create([
+            'tenant_id' => $tenant->id,
+            'customer_id' => $customer->id,
+            'sender_type' => 'master',
+            'body' => 'Мастер ответил на вашу заявку.',
+        ]);
+
+        Bus::assertDispatched(SendTenantMessagePush::class, fn ($job) => $job->tenantMessageId === $message->id);
+    }
+
+    public function test_vapid_command_checks_configuration_without_external_mutation(): void
+    {
+        config([
+            'services.webpush.vapid_public_key' => 'public-key',
+            'services.webpush.vapid_private_key' => 'private-key',
+            'services.webpush.subject' => 'mailto:support@lookdo.app',
+        ]);
+
+        $this->artisan('lookdo:webpush:keys', ['--check' => true])
+            ->expectsOutput('Web Push configuration is complete.')
+            ->assertSuccessful();
     }
 
     public function test_unpaid_tenant_app_is_not_publicly_usable(): void

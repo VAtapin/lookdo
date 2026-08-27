@@ -39,4 +39,9 @@ class TenantCustomer extends Model
     {
         return $this->hasMany(TenantMessage::class, 'customer_id');
     }
+
+    public function pushSubscriptions(): HasMany
+    {
+        return $this->hasMany(TenantPushSubscription::class, 'customer_id');
+    }
 }

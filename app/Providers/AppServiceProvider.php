@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\TenantMessage;
+use App\Observers\TenantMessageObserver;
 use App\Support\CurrentTenant;
 use Illuminate\Support\ServiceProvider;
 
@@ -20,6 +22,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        TenantMessage::observe(TenantMessageObserver::class);
     }
 }
