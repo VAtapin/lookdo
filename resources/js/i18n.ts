@@ -104,6 +104,10 @@ Object.assign(messages.de, { aiRequiresPayment:'Bezahlen Sie zuerst Ihren Tarif.
 Object.assign(messages.en, { aiRequiresPayment:'Pay for your plan first. AI image generation is unlocked after activation.' });
 Object.assign(messages.ru, { aiRequiresPayment:'Сначала оплатите тариф. Генерация изображений с помощью ИИ станет доступна после активации подписки.' });
 Object.assign(messages.uk, { aiRequiresPayment:'Спочатку оплатіть тариф. Генерація зображень за допомогою ШІ стане доступною після активації підписки.' });
+Object.assign(messages.ru, { trialAccessTitle:'Включён полный тестовый доступ', trialAccessText:'Все функции LOOKDO доступны ещё :days дн. Выберите подходящий тариф до окончания теста.', trialStatus:'Тест: :days дн.', choosePlan:'Выбрать тариф' });
+Object.assign(messages.de, { trialAccessTitle:'Voller Testzugang ist aktiv', trialAccessText:'Alle LOOKDO Funktionen sind noch :days Tage verfügbar. Wählen Sie vor Ablauf des Tests den passenden Tarif.', trialStatus:'Test: :days Tg.', choosePlan:'Tarif wählen' });
+Object.assign(messages.en, { trialAccessTitle:'Full trial access is active', trialAccessText:'All LOOKDO features are available for :days more days. Choose the right plan before the trial ends.', trialStatus:'Trial: :days days', choosePlan:'Choose plan' });
+Object.assign(messages.uk, { trialAccessTitle:'Увімкнено повний тестовий доступ', trialAccessText:'Усі функції LOOKDO доступні ще :days дн. Оберіть відповідний тариф до завершення тесту.', trialStatus:'Тест: :days дн.', choosePlan:'Обрати тариф' });
 export const t = (key: string) => computed(() => messages[locale.value][key] || key);
 export function tr(key: string): string { return messages[locale.value][key] || key; }
 export function setLocale(value: Locale) { locale.value=value;localStorage.setItem('lookdo-locale',value);document.documentElement.lang=value; }

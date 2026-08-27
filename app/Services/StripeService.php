@@ -51,7 +51,7 @@ class StripeService
             'automatic_tax' => ['enabled' => $this->formBoolean(config('services.stripe.automatic_tax'))],
             'metadata' => ['tenant_id' => (string) $tenant->id, 'subscription_id' => (string) $subscription->id, 'currency' => $currency, 'billing_cycle' => $cycle],
             'subscription_data' => ['metadata' => ['tenant_id' => (string) $tenant->id, 'subscription_id' => (string) $subscription->id, 'currency' => $currency, 'billing_cycle' => $cycle]],
-        ], 'lookdo-subscription-'.$subscription->id.'-'.$cycle.'-'.strtolower($currency));
+        ], 'lookdo-subscription-'.$subscription->id.'-plan-'.$plan->id.'-'.$cycle.'-'.strtolower($currency));
         if (! $response->json('url')) {
             throw new RuntimeException('Stripe Checkout returned no URL.');
         }

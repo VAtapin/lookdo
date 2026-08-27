@@ -192,7 +192,12 @@ class TenantAppController extends Controller
     private function ensureAvailable(Tenant $tenant): void
     {
         abort_unless($tenant->status === 'active', 404);
-        abort_unless($tenant->hasActiveSubscription(), 402, 'This application is not active yet.');
+        abort_unless($tenant->hasActiveSubscription(), 402, match ($tenant->locale) {
+            'de' => 'Der Testzeitraum ist abgelaufen oder das Abonnement ist nicht aktiv.',
+            'ru' => 'Тестовый период закончился или подписка не активна.',
+            'uk' => 'Тестовий період завершився або підписка не активна.',
+            default => 'The trial has ended or the subscription is not active.',
+        });
     }
 
     private function configuration(Tenant $tenant): array

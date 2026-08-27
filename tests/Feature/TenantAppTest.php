@@ -73,7 +73,7 @@ class TenantAppTest extends TestCase
 
         $this->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
             ->assertStatus(402)
-            ->assertJsonPath('message', 'This application is not active yet.');
+            ->assertJsonPath('message', 'Тестовый период закончился или подписка не активна.');
     }
 
     public function test_active_steering_template_bootstraps_as_localized_full_app(): void
@@ -156,6 +156,42 @@ class TenantAppTest extends TestCase
         $this->postJson($this->url($tenant, '/api/tenant-app/appointments'), [
             'service_id' => $serviceId, 'starts_at' => $startsAt, 'name' => 'Марія', 'phone' => '+380671111111',
         ])->assertUnprocessable()->assertJsonValidationErrors('starts_at');
+    }
+
+    public function test_recent_unpaid_subscription_is_activated_as_full_trial(): void
+    {
+        $plan = Plan::where('code', 'start')->firstOrFail();
+        $plan->update(['trial_days' => 14]);
+        $tenant = $this->tenant('full-trial', 'automotive.steering-wheel-upholstery', false);
+
+        $migration = require database_path('migrations/2026_08_27_000003_activate_existing_plan_trials.php');
+        $migration->up();
+
+        $subscription = $tenant->fresh()->currentSubscription;
+        $this->assertSame('trialing', $subscription->status);
+        $this->assertTrue($subscription->isTrialActive());
+        $this->assertGreaterThanOrEqual(13, $subscription->trial_days_remaining);
+        $this->assertTrue($tenant->fresh()->hasActiveSubscription());
+
+        $this->withHeader('X-Locale', 'ru')->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('entitlements.video', true)
+            ->assertJsonPath('entitlements.booking', true);
+    }
+
+    public function test_expired_trial_no_longer_grants_application_access(): void
+    {
+        $tenant = $this->tenant('expired-trial', 'automotive.steering-wheel-upholstery', false);
+        $tenant->currentSubscription()->update([
+            'status' => 'trialing',
+            'current_period_start' => now()->subDays(15),
+            'current_period_end' => now()->subDay(),
+        ]);
+
+        $this->assertFalse($tenant->fresh()->hasActiveSubscription());
+        $this->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
+            ->assertStatus(402)
+            ->assertJsonPath('message', 'Тестовый период закончился или подписка не активна.');
     }
 
     private function tenant(string $slug, string $templateCode, bool $active = true): Tenant

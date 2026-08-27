@@ -297,6 +297,39 @@ class SaasFoundationTest extends TestCase
         ]);
     }
 
+    public function test_registration_with_test_days_starts_full_trial_without_payment(): void
+    {
+        $variation = BusinessVariation::where('code', 'automotive.steering-wheel-upholstery')->firstOrFail();
+        $classification = BusinessClassification::create(['original_text' => 'перетяжка рулей', 'normalized_text' => 'перетяжка рулей', 'category_id' => $variation->category_id, 'variation_id' => $variation->id, 'confidence' => 1, 'source' => 'exact']);
+        $plan = Plan::where('code', 'start')->firstOrFail();
+        $plan->update(['trial_days' => 14]);
+
+        $this->postJson('/api/register', [
+            'name' => 'Trial Owner', 'email' => 'trial@example.test', 'password' => 'SecurePass123', 'password_confirmation' => 'SecurePass123',
+            'business_name' => 'Trial Workshop', 'country' => 'DE', 'locale' => 'ru', 'business_description' => 'Перетяжка рулей',
+            'classification_id' => $classification->id, 'variation_id' => $variation->id, 'plan_id' => $plan->id, 'billing_cycle' => 'monthly',
+            'currency' => 'RUB', 'confirm_business_customer' => true, 'accept_terms' => true, 'accept_privacy' => true,
+        ])->assertCreated()
+            ->assertJsonPath('payment_required', false)
+            ->assertJsonPath('checkout_url', null);
+
+        $tenant = Tenant::where('slug', 'trial-workshop')->firstOrFail();
+        $subscription = $tenant->currentSubscription;
+        $this->assertSame('trialing', $subscription->status);
+        $this->assertTrue($subscription->isTrialActive());
+        $this->assertSame('lookdo', $subscription->provider);
+
+        $this->getJson('/api/tenant/'.$tenant->id)
+            ->assertOk()
+            ->assertJsonPath('access.active', true)
+            ->assertJsonPath('access.paid', false)
+            ->assertJsonPath('access.trial', true)
+            ->assertJsonPath('access.trial_days_remaining', 14)
+            ->assertJsonPath('entitlements.custom_domain', '1')
+            ->assertJsonPath('entitlements.app_languages', '4')
+            ->assertJsonPath('entitlements.requests_monthly', '0');
+    }
+
     public function test_registration_requires_business_customer_confirmation(): void
     {
         $plan = Plan::where('code', 'start')->firstOrFail();
@@ -681,6 +714,49 @@ class SaasFoundationTest extends TestCase
             && data_get($request->data(), 'automatic_tax.enabled') === 'true');
     }
 
+    public function test_checkout_during_trial_keeps_application_active_until_stripe_confirms_payment(): void
+    {
+        config(['services.stripe.secret' => 'sk_live_example']);
+        Http::fake([
+            'api.stripe.com/v1/checkout/sessions' => Http::response([
+                'id' => 'cs_live_trial_upgrade',
+                'url' => 'https://checkout.stripe.test/trial-upgrade',
+            ]),
+        ]);
+        $owner = User::factory()->create();
+        $tenant = Tenant::create(['name' => 'Trial Upgrade', 'slug' => 'trial-upgrade', 'country' => 'DE', 'locale' => 'ru', 'status' => 'active']);
+        $tenant->users()->attach($owner, ['role' => 'owner']);
+        $start = Plan::where('code', 'start')->firstOrFail();
+        $pro = Plan::where('code', 'pro')->firstOrFail();
+        $pro->forceFill(['stripe_product_id' => 'prod_pro', 'stripe_monthly_price_id' => 'price_pro_monthly', 'stripe_currency' => 'EUR'])->save();
+        $subscription = $tenant->subscriptions()->create([
+            'plan_id' => $start->id,
+            'provider' => 'lookdo',
+            'status' => 'trialing',
+            'billing_cycle' => 'monthly',
+            'currency' => 'EUR',
+            'unit_amount' => $start->priceFor('EUR', 'monthly'),
+            'started_at' => now(),
+            'current_period_start' => now(),
+            'current_period_end' => now()->addDays(14),
+        ]);
+
+        $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/checkout', [
+            'plan_id' => $pro->id,
+            'cycle' => 'monthly',
+            'currency' => 'EUR',
+        ])->assertOk()->assertJsonPath('checkout_url', 'https://checkout.stripe.test/trial-upgrade');
+
+        $this->assertSame(1, $tenant->subscriptions()->count());
+        $subscription->refresh();
+        $this->assertSame($pro->id, $subscription->plan_id);
+        $this->assertSame('trialing', $subscription->status);
+        $this->assertTrue($tenant->fresh()->hasActiveSubscription());
+        Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://api.stripe.com/v1/checkout/sessions'
+            && data_get($request->data(), 'metadata.subscription_id') === (string) $subscription->id
+            && data_get($request->data(), 'line_items.0.price') === 'price_pro_monthly');
+    }
+
     public function test_stripe_connection_mode_is_derived_from_the_configured_key(): void
     {
         Http::fake(['api.stripe.com/v1/account' => Http::response(['id' => 'acct_live', 'country' => 'DE'])]);
@@ -859,6 +935,7 @@ class SaasFoundationTest extends TestCase
 
         Http::assertNothingSent();
     }
+
     public function test_tenant_reviews_an_ai_prompt_before_social_image_generation(): void
     {
         Storage::fake('public');

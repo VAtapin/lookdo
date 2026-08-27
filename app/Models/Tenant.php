@@ -101,9 +101,6 @@ class Tenant extends Model
     {
         $subscription = $this->currentSubscription;
 
-        return (bool) $subscription && (
-            $subscription->complimentary
-            || in_array($subscription->status, ['active', 'trialing', 'complimentary'], true)
-        );
+        return (bool) $subscription?->grantsAccess();
     }
 }

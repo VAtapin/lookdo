@@ -41,7 +41,22 @@ class TenantController extends Controller
             $tenant->profile->setAttribute('social_image_url', Storage::disk('public')->url($tenant->profile->social_image_path));
         }
 
-        return response()->json(['tenant' => $tenant, 'entitlements' => $entitlements->all($tenant), 'image_generation' => $imageGenerations->status($tenant), 'platform_url' => 'https://'.$tenant->slug.'.'.config('tenancy.platform_domain')]);
+        $subscription = $tenant->currentSubscription;
+        $trialActive = (bool) $subscription?->isTrialActive();
+
+        return response()->json([
+            'tenant' => $tenant,
+            'access' => [
+                'active' => $tenant->hasActiveSubscription(),
+                'paid' => (bool) $subscription?->isPaidAccess(),
+                'trial' => $trialActive,
+                'trial_ends_at' => $trialActive ? $subscription?->trialEndsAt()?->toIso8601String() : null,
+                'trial_days_remaining' => $trialActive ? ($subscription?->trial_days_remaining ?? 0) : 0,
+            ],
+            'entitlements' => $entitlements->all($tenant),
+            'image_generation' => $imageGenerations->status($tenant),
+            'platform_url' => 'https://'.$tenant->slug.'.'.config('tenancy.platform_domain'),
+        ]);
     }
 
     public function updateProfile(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
@@ -186,6 +201,7 @@ class TenantController extends Controller
 
         return response()->json(['checkout_url' => $checkout['url']]);
     }
+
     private function replaceSocialImage(?string $oldPath, string $newPath): void
     {
         if ($oldPath && $oldPath !== $newPath && str_starts_with($oldPath, 'tenant-social/')) {
@@ -262,7 +278,14 @@ class TenantController extends Controller
             && $subscription->plan_id === $plan->id
             && $subscription->billing_cycle === $data['cycle']
             && $subscription->currency === $currency;
-        if (! $reuseIncomplete) {
+        if ($subscription?->isTrialActive()) {
+            $subscription->update([
+                'plan_id' => $plan->id,
+                'billing_cycle' => $data['cycle'],
+                'currency' => $currency,
+                'unit_amount' => $amount,
+            ]);
+        } elseif (! $reuseIncomplete) {
             $subscription = $tenant->subscriptions()->create(['plan_id' => $plan->id, 'provider' => 'stripe', 'status' => 'incomplete', 'billing_cycle' => $data['cycle'], 'currency' => $currency, 'unit_amount' => $amount, 'started_at' => now()]);
         }
         try {
