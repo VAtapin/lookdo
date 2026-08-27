@@ -12,7 +12,7 @@ class Subscription extends Model
 {
     protected $guarded = [];
 
-    protected $appends = ['access_active', 'trial_active', 'trial_days_remaining'];
+    protected $appends = ['access_active', 'access_state', 'access_days_remaining', 'access_expires_at', 'trial_active', 'trial_days_remaining'];
 
     protected function casts(): array
     {
@@ -47,12 +47,57 @@ class Subscription extends Model
 
     public function isPaidAccess(): bool
     {
-        return $this->complimentary || in_array($this->status, ['active', 'complimentary'], true);
+        return ! $this->complimentary && $this->status === 'active';
+    }
+
+    public function isComplimentaryAccess(): bool
+    {
+        if (! $this->complimentary && $this->status !== 'complimentary') {
+            return false;
+        }
+
+        return $this->current_period_end === null || $this->current_period_end->isFuture();
     }
 
     public function grantsAccess(): bool
     {
-        return $this->isPaidAccess() || $this->isTrialActive();
+        return $this->isPaidAccess() || $this->isComplimentaryAccess() || $this->isTrialActive();
+    }
+
+    public function accessState(): string
+    {
+        if ($this->isTrialActive()) {
+            return 'trialing';
+        }
+
+        if ($this->isComplimentaryAccess()) {
+            return 'complimentary';
+        }
+
+        if ($this->isPaidAccess()) {
+            return 'paid';
+        }
+
+        if (in_array($this->status, ['trialing', 'complimentary'], true)) {
+            return 'expired';
+        }
+
+        return match ($this->status) {
+            'past_due' => 'past_due',
+            'canceled' => 'canceled',
+            default => 'unpaid',
+        };
+    }
+
+    public function accessEndsAt(): ?CarbonInterface
+    {
+        if ($this->status === 'trialing') {
+            return $this->trialEndsAt();
+        }
+
+        return $this->complimentary || $this->status === 'complimentary'
+            ? $this->current_period_end
+            : null;
     }
 
     public function trialEndsAt(): ?CarbonInterface
@@ -73,6 +118,26 @@ class Subscription extends Model
     protected function accessActive(): Attribute
     {
         return Attribute::get(fn (): bool => $this->grantsAccess());
+    }
+
+    public function getAccessStateAttribute(): string
+    {
+        return $this->accessState();
+    }
+
+    public function getAccessDaysRemainingAttribute(): int
+    {
+        $endsAt = $this->accessEndsAt();
+        if (! $endsAt || ! $endsAt->isFuture()) {
+            return 0;
+        }
+
+        return max(1, (int) ceil(now()->diffInSeconds($endsAt) / 86400));
+    }
+
+    public function getAccessExpiresAtAttribute(): ?CarbonInterface
+    {
+        return $this->accessEndsAt();
     }
 
     protected function trialActive(): Attribute

@@ -128,8 +128,10 @@ class AdminController extends Controller
             'country' => 'nullable|string|size:2', 'locale' => ['nullable', Rule::in(['de', 'en', 'ru', 'uk'])],
             'business_description' => 'nullable|string|max:1000', 'variation_id' => 'nullable|exists:business_variations,id',
             'plan_id' => 'required|exists:plans,id', 'complimentary' => 'nullable|boolean',
+            'complimentary_days' => 'nullable|integer|min:1|max:3650',
         ]);
-        $tenant = DB::transaction(function () use ($data) {
+        $plan = Plan::findOrFail($data['plan_id']);
+        $tenant = DB::transaction(function () use ($data, $plan) {
             $slug = $this->uniqueTenantSlug($data['slug'] ?? $data['name']);
             $user = User::create(['name' => $data['owner_name'], 'email' => $data['owner_email'], 'password' => $data['owner_password'], 'locale' => $data['locale'] ?? 'ru', 'is_active' => true]);
             $tenant = Tenant::create(['name' => $data['name'], 'slug' => $slug, 'status' => 'active', 'country' => strtoupper($data['country'] ?? 'DE'), 'locale' => $data['locale'] ?? 'ru', 'business_description' => $data['business_description'] ?? null]);
@@ -137,7 +139,21 @@ class AdminController extends Controller
             $tenant->profile()->create(['contact_name' => $user->name, 'email' => $user->email]);
             $domain = $tenant->domains()->create(['domain' => $slug.'.'.config('tenancy.platform_domain'), 'type' => 'platform', 'is_primary' => true, 'status' => 'active', 'verified_at' => now(), 'ssl_status' => 'active', 'ssl_issued_at' => now()]);
             $tenant->update(['primary_domain_id' => $domain->id]);
-            $tenant->subscriptions()->create(['plan_id' => $data['plan_id'], 'provider' => 'manual', 'status' => ($data['complimentary'] ?? false) ? 'complimentary' : 'active', 'complimentary' => $data['complimentary'] ?? false, 'started_at' => now()]);
+            $complimentary = (bool) ($data['complimentary'] ?? false);
+            $trial = ! $complimentary && $plan->trial_days > 0;
+            $accessDays = $complimentary ? (int) ($data['complimentary_days'] ?? 14) : (int) $plan->trial_days;
+            $tenant->subscriptions()->create([
+                'plan_id' => $plan->id,
+                'provider' => $complimentary ? 'manual' : ($trial ? 'lookdo' : 'stripe'),
+                'status' => $complimentary ? 'complimentary' : ($trial ? 'trialing' : 'incomplete'),
+                'complimentary' => $complimentary,
+                'billing_cycle' => 'monthly',
+                'currency' => $plan->currency,
+                'unit_amount' => $plan->priceFor($plan->currency, 'monthly'),
+                'started_at' => now(),
+                'current_period_start' => ($complimentary || $trial) ? now() : null,
+                'current_period_end' => ($complimentary || $trial) ? now()->addDays($accessDays) : null,
+            ]);
             if (! empty($data['variation_id'])) {
                 $variation = BusinessVariation::findOrFail($data['variation_id']);
                 $template = RequestTemplate::where('code', $variation->template_code)->first();
@@ -168,7 +184,7 @@ class AdminController extends Controller
             'owner_name' => 'nullable|string|max:120',
             'owner_email' => ['nullable', 'email', 'max:255', Rule::unique('users', 'email')->ignore($owner->id)],
             'status' => ['nullable', Rule::in(['active', 'suspended', 'archived'])],
-            'plan_id' => 'nullable|exists:plans,id', 'complimentary' => 'nullable|boolean', 'discount_percent' => 'nullable|integer|min:0|max:100',
+            'plan_id' => 'nullable|exists:plans,id', 'discount_percent' => 'nullable|integer|min:0|max:100',
         ]);
         $before = ['tenant' => $tenant->load('currentSubscription')->toArray(), 'owner' => $owner->toArray()];
         DB::transaction(function () use ($tenant, $owner, $data) {
@@ -179,13 +195,51 @@ class AdminController extends Controller
             }
             if (isset($data['plan_id'])) {
                 $sub = $tenant->currentSubscription;
-                $payload = ['plan_id' => $data['plan_id'], 'complimentary' => $data['complimentary'] ?? false, 'discount_percent' => $data['discount_percent'] ?? 0, 'status' => ($data['complimentary'] ?? false) ? 'complimentary' : 'active', 'provider' => ($data['complimentary'] ?? false) ? 'manual' : ($sub?->provider ?? 'manual'), 'started_at' => $sub?->started_at ?? now()];
+                $payload = ['plan_id' => $data['plan_id'], 'discount_percent' => $data['discount_percent'] ?? ($sub?->discount_percent ?? 0)];
                 $sub ? $sub->update($payload) : $tenant->subscriptions()->create($payload);
             }
         });
         $audit->log('tenant.updated', $tenant, $before, ['tenant' => $tenant->fresh('currentSubscription')->toArray(), 'owner' => $owner->fresh()->toArray()], $tenant->id);
 
         return response()->json($tenant->fresh(['currentSubscription.plan']));
+    }
+
+    public function grantTenantAccess(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
+    {
+        $data = $request->validate(['days' => 'required|integer|min:1|max:3650']);
+        $current = $tenant->currentSubscription()->with('plan')->firstOrFail();
+        $before = $current->toArray();
+
+        $subscription = DB::transaction(function () use ($tenant, $current, $data): Subscription {
+            $payload = [
+                'plan_id' => $current->plan_id,
+                'provider' => 'manual',
+                'status' => 'complimentary',
+                'complimentary' => true,
+                'billing_cycle' => $current->billing_cycle ?: 'monthly',
+                'currency' => $current->currency ?: ($current->plan?->currency ?? 'EUR'),
+                'unit_amount' => $current->unit_amount ?? $current->plan?->priceFor($current->plan?->currency ?? 'EUR', 'monthly'),
+                'started_at' => now(),
+                'current_period_start' => now(),
+                'current_period_end' => now()->addDays((int) $data['days']),
+                'cancel_at_period_end' => false,
+            ];
+
+            if ($current->provider === 'manual' && $current->complimentary) {
+                $current->update($payload);
+
+                return $current->fresh('plan');
+            }
+
+            return $tenant->subscriptions()->create($payload)->load('plan');
+        });
+
+        $audit->log('tenant.access.granted', $subscription, $before, $subscription->toArray(), $tenant->id);
+
+        return response()->json([
+            'subscription' => $subscription,
+            'tenant' => $tenant->fresh(['currentSubscription.plan']),
+        ]);
     }
 
     public function setOverride(Request $request, Tenant $tenant, AuditService $audit): JsonResponse

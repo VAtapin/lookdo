@@ -48,7 +48,11 @@ class TenantController extends Controller
             'tenant' => $tenant,
             'access' => [
                 'active' => $tenant->hasActiveSubscription(),
+                'state' => $subscription?->accessState() ?? 'unpaid',
                 'paid' => (bool) $subscription?->isPaidAccess(),
+                'complimentary' => (bool) $subscription?->isComplimentaryAccess(),
+                'expires_at' => $subscription?->accessEndsAt()?->toIso8601String(),
+                'days_remaining' => $subscription?->access_days_remaining ?? 0,
                 'trial' => $trialActive,
                 'trial_ends_at' => $trialActive ? $subscription?->trialEndsAt()?->toIso8601String() : null,
                 'trial_days_remaining' => $trialActive ? ($subscription?->trial_days_remaining ?? 0) : 0,

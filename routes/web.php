@@ -54,6 +54,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::post('/tenants', [AdminController::class, 'createTenant']);
             Route::get('/tenants/{tenant}', [AdminController::class, 'tenant']);
             Route::put('/tenants/{tenant}', [AdminController::class, 'updateTenant']);
+            Route::post('/tenants/{tenant}/grant-access', [AdminController::class, 'grantTenantAccess']);
             Route::put('/tenants/{tenant}/entitlement', [AdminController::class, 'setOverride']);
             Route::post('/tenants/{tenant}/impersonate', [AdminController::class, 'impersonate']);
             Route::get('/administrators', [AdminController::class, 'administrators']);

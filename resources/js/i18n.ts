@@ -49,25 +49,25 @@ Object.assign(messages.ru, {
     poweredBy:'Работает на LOOKDO', tenantAppPreparing:'Приложение бизнеса доступно по собственному адресу', tenantAppPreparingText:'Приём заявок и рабочие разделы будут подключены на следующем этапе.',
     active:'Активно', paymentRequired:'Тариф ещё не оплачен', paymentRequiredText:'Оплатите выбранный тариф, чтобы активировать подписку и приложение.', payNow:'Оплатить тариф', openApp:'Открыть приложение',
     setupNext:'Что нужно сделать дальше', profileStep:'Заполнить профиль', domainStep:'Проверить адрес', paymentStep:'Оплатить подписку', done:'Готово', paid:'Оплачено', unpaid:'Не оплачено',
-    complimentaryStatus:'Бесплатно', paymentProcessing:'Оплата принята в обработку. Статус обновится автоматически.', checkoutUnavailable:'Не удалось открыть страницу оплаты. Повторите попытку.', date:'Дата', amount:'Сумма', status:'Статус', payment:'Платёж'
+    complimentaryStatus:'Бесплатно', manualAccessStatus:'Доступ предоставлен вручную · осталось :days дн.', paymentProcessing:'Оплата принята в обработку. Статус обновится автоматически.', checkoutUnavailable:'Не удалось открыть страницу оплаты. Повторите попытку.', date:'Дата', amount:'Сумма', status:'Статус', payment:'Платёж'
 });
 Object.assign(messages.de, {
     poweredBy:'Bereitgestellt von LOOKDO', tenantAppPreparing:'Die App des Betriebs ist unter der eigenen Adresse erreichbar', tenantAppPreparingText:'Anfragen und Arbeitsbereiche werden in der nächsten Phase aktiviert.',
     active:'Aktiv', paymentRequired:'Der Tarif ist noch nicht bezahlt', paymentRequiredText:'Bezahlen Sie den gewählten Tarif, um Abonnement und App zu aktivieren.', payNow:'Tarif bezahlen', openApp:'App öffnen',
     setupNext:'Nächste Schritte', profileStep:'Profil ausfüllen', domainStep:'Adresse prüfen', paymentStep:'Abonnement bezahlen', done:'Erledigt', paid:'Bezahlt', unpaid:'Nicht bezahlt',
-    complimentaryStatus:'Kostenlos', paymentProcessing:'Die Zahlung wird verarbeitet. Der Status wird automatisch aktualisiert.', checkoutUnavailable:'Die Zahlungsseite konnte nicht geöffnet werden. Bitte erneut versuchen.', date:'Datum', amount:'Betrag', status:'Status', payment:'Zahlung'
+    complimentaryStatus:'Kostenlos', manualAccessStatus:'Manuell freigeschaltet · noch :days Tage', paymentProcessing:'Die Zahlung wird verarbeitet. Der Status wird automatisch aktualisiert.', checkoutUnavailable:'Die Zahlungsseite konnte nicht geöffnet werden. Bitte erneut versuchen.', date:'Datum', amount:'Betrag', status:'Status', payment:'Zahlung'
 });
 Object.assign(messages.en, {
     poweredBy:'Powered by LOOKDO', tenantAppPreparing:'This business app is available at its own address', tenantAppPreparingText:'Requests and workspace sections will be enabled in the next stage.',
     active:'Active', paymentRequired:'Your plan has not been paid yet', paymentRequiredText:'Pay for the selected plan to activate the subscription and app.', payNow:'Pay for plan', openApp:'Open app',
     setupNext:'What to do next', profileStep:'Complete profile', domainStep:'Check address', paymentStep:'Pay subscription', done:'Done', paid:'Paid', unpaid:'Not paid',
-    complimentaryStatus:'Complimentary', paymentProcessing:'Payment is being processed. The status will update automatically.', checkoutUnavailable:'The payment page could not be opened. Please try again.', date:'Date', amount:'Amount', status:'Status', payment:'Payment'
+    complimentaryStatus:'Complimentary', manualAccessStatus:'Manually enabled · :days days left', paymentProcessing:'Payment is being processed. The status will update automatically.', checkoutUnavailable:'The payment page could not be opened. Please try again.', date:'Date', amount:'Amount', status:'Status', payment:'Payment'
 });
 Object.assign(messages.uk, {
     poweredBy:'Працює на LOOKDO', tenantAppPreparing:'Застосунок бізнесу доступний за власною адресою', tenantAppPreparingText:'Заявки й робочі розділи буде підключено на наступному етапі.',
     active:'Активно', paymentRequired:'Тариф ще не оплачено', paymentRequiredText:'Оплатіть вибраний тариф, щоб активувати підписку та застосунок.', payNow:'Оплатити тариф', openApp:'Відкрити застосунок',
     setupNext:'Що зробити далі', profileStep:'Заповнити профіль', domainStep:'Перевірити адресу', paymentStep:'Оплатити підписку', done:'Готово', paid:'Оплачено', unpaid:'Не оплачено',
-    complimentaryStatus:'Безкоштовно', paymentProcessing:'Платіж обробляється. Статус оновиться автоматично.', checkoutUnavailable:'Не вдалося відкрити сторінку оплати. Спробуйте ще раз.', date:'Дата', amount:'Сума', status:'Статус', payment:'Платіж'
+    complimentaryStatus:'Безкоштовно', manualAccessStatus:'Доступ надано вручну · залишилося :days дн.', paymentProcessing:'Платіж обробляється. Статус оновиться автоматично.', checkoutUnavailable:'Не вдалося відкрити сторінку оплати. Спробуйте ще раз.', date:'Дата', amount:'Сума', status:'Статус', payment:'Платіж'
 });
 
 messages.ru.whyTitle = 'Получайте заявки, ведите запись и общайтесь с клиентами — в одном приложении';

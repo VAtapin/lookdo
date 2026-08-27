@@ -476,6 +476,89 @@ class SaasFoundationTest extends TestCase
         $this->assertDatabaseHas('tenant_business_profiles', ['tenant_id' => $tenant->id, 'variation_id' => $variation->id]);
     }
 
+    public function test_super_admin_can_grant_temporary_access_without_marking_it_as_paid(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $owner = User::factory()->create();
+        $tenant = Tenant::create(['name' => 'Manual Access', 'slug' => 'manual-access', 'country' => 'DE', 'locale' => 'ru', 'status' => 'active']);
+        $tenant->users()->attach($owner, ['role' => 'owner']);
+        $plan = Plan::where('code', 'start')->firstOrFail();
+        $tenant->subscriptions()->create([
+            'plan_id' => $plan->id,
+            'provider' => 'stripe',
+            'status' => 'incomplete',
+            'billing_cycle' => 'monthly',
+            'currency' => 'EUR',
+            'unit_amount' => $plan->priceFor('EUR', 'monthly'),
+            'started_at' => now(),
+        ]);
+
+        $this->actingAs($admin)->postJson('/api/control/tenants/'.$tenant->id.'/grant-access', ['days' => 30])
+            ->assertOk()
+            ->assertJsonPath('subscription.provider', 'manual')
+            ->assertJsonPath('subscription.status', 'complimentary')
+            ->assertJsonPath('subscription.access_state', 'complimentary')
+            ->assertJsonPath('subscription.access_active', true);
+
+        $subscription = $tenant->fresh()->currentSubscription;
+        $this->assertTrue($subscription->complimentary);
+        $this->assertFalse($subscription->isPaidAccess());
+        $this->assertTrue($subscription->isComplimentaryAccess());
+        $this->assertTrue($tenant->fresh()->hasActiveSubscription());
+        $this->assertGreaterThanOrEqual(29, $subscription->access_days_remaining);
+
+        $this->actingAs($admin)->getJson('/api/control/tenants?search=Manual%20Access')
+            ->assertOk()
+            ->assertJsonPath('data.0.status', 'active')
+            ->assertJsonPath('data.0.current_subscription.access_state', 'complimentary');
+    }
+
+    public function test_changing_a_clients_plan_does_not_fake_a_payment(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $owner = User::factory()->create();
+        $tenant = Tenant::create(['name' => 'Unpaid Client', 'slug' => 'unpaid-client', 'country' => 'DE', 'locale' => 'de', 'status' => 'active']);
+        $tenant->users()->attach($owner, ['role' => 'owner']);
+        $start = Plan::where('code', 'start')->firstOrFail();
+        $pro = Plan::where('code', 'pro')->firstOrFail();
+        $subscription = $tenant->subscriptions()->create(['plan_id' => $start->id, 'provider' => 'stripe', 'status' => 'incomplete', 'started_at' => now()]);
+
+        $this->actingAs($admin)->putJson('/api/control/tenants/'.$tenant->id, ['plan_id' => $pro->id])
+            ->assertOk()
+            ->assertJsonPath('current_subscription.plan_id', $pro->id)
+            ->assertJsonPath('current_subscription.access_state', 'unpaid');
+
+        $subscription->refresh();
+        $this->assertSame('incomplete', $subscription->status);
+        $this->assertSame('stripe', $subscription->provider);
+        $this->assertFalse($subscription->grantsAccess());
+    }
+
+    public function test_reconciliation_restores_recent_existing_plan_trials(): void
+    {
+        $plan = Plan::where('code', 'start')->firstOrFail();
+        $plan->update(['trial_days' => 14]);
+        $tenant = Tenant::create(['name' => 'Yesterday Client', 'slug' => 'yesterday-client', 'country' => 'DE', 'locale' => 'ru', 'status' => 'active']);
+        $subscription = $tenant->subscriptions()->create([
+            'plan_id' => $plan->id,
+            'provider' => 'stripe',
+            'status' => 'incomplete',
+            'started_at' => now()->subDay(),
+            'created_at' => now()->subDay(),
+            'updated_at' => now()->subDay(),
+        ]);
+
+        $migration = require database_path('migrations/2026_08_27_000004_reconcile_existing_plan_trials.php');
+        $migration->up();
+
+        $subscription->refresh();
+        $this->assertSame('lookdo', $subscription->provider);
+        $this->assertSame('trialing', $subscription->status);
+        $this->assertTrue($subscription->isTrialActive());
+        $this->assertTrue($tenant->fresh()->hasActiveSubscription());
+        $this->assertGreaterThanOrEqual(12, $subscription->access_days_remaining);
+    }
+
     public function test_super_admin_can_open_backup_control_without_creating_a_dump(): void
     {
         config(['backup.path' => storage_path('framework/testing/lookdo-backups')]);
