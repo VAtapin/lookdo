@@ -469,7 +469,9 @@ class SaasFoundationTest extends TestCase
             'owner_password' => 'SecureOwner123', 'country' => 'DE', 'locale' => 'ru',
             'business_description' => 'Перетяжка рулей', 'variation_id' => $variation->id,
             'plan_id' => $plan->id, 'complimentary' => true,
-        ])->assertCreated()->assertJsonPath('current_subscription.status', 'complimentary');
+        ])->assertCreated()
+            ->assertJsonPath('manual_access_active', true)
+            ->assertJsonPath('current_subscription.status', 'incomplete');
 
         $tenant = Tenant::where('name', 'Golden Wheel')->firstOrFail();
         $this->assertDatabaseHas('tenant_domains', ['tenant_id' => $tenant->id, 'domain' => 'golden-wheel.lookdo.app']);
@@ -495,22 +497,24 @@ class SaasFoundationTest extends TestCase
 
         $this->actingAs($admin)->postJson('/api/control/tenants/'.$tenant->id.'/grant-access', ['days' => 30])
             ->assertOk()
-            ->assertJsonPath('subscription.provider', 'manual')
-            ->assertJsonPath('subscription.status', 'complimentary')
-            ->assertJsonPath('subscription.access_state', 'complimentary')
-            ->assertJsonPath('subscription.access_active', true);
+            ->assertJsonPath('subscription.provider', 'stripe')
+            ->assertJsonPath('subscription.status', 'incomplete')
+            ->assertJsonPath('tenant.manual_access_active', true);
 
-        $subscription = $tenant->fresh()->currentSubscription;
-        $this->assertTrue($subscription->complimentary);
+        $tenant = $tenant->fresh();
+        $subscription = $tenant->currentSubscription;
+        $this->assertFalse($subscription->complimentary);
         $this->assertFalse($subscription->isPaidAccess());
-        $this->assertTrue($subscription->isComplimentaryAccess());
-        $this->assertTrue($tenant->fresh()->hasActiveSubscription());
-        $this->assertGreaterThanOrEqual(29, $subscription->access_days_remaining);
+        $this->assertFalse($subscription->isComplimentaryAccess());
+        $this->assertTrue($tenant->hasManualAccess());
+        $this->assertTrue($tenant->hasActiveSubscription());
+        $this->assertGreaterThanOrEqual(29, $tenant->manual_access_days_remaining);
+        $this->assertSame(1, $tenant->subscriptions()->count());
 
         $this->actingAs($admin)->getJson('/api/control/tenants?search=Manual%20Access')
             ->assertOk()
             ->assertJsonPath('data.0.status', 'active')
-            ->assertJsonPath('data.0.current_subscription.access_state', 'complimentary');
+            ->assertJsonPath('data.0.manual_access_active', true);
     }
 
     public function test_changing_a_clients_plan_does_not_fake_a_payment(): void

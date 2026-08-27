@@ -44,7 +44,7 @@ class AdminController extends Controller
             'active_tenants' => Tenant::where('status', 'active')->count(),
             'trialing' => Subscription::where('status', 'trialing')->count(),
             'paid' => Subscription::where('status', 'active')->where('complimentary', false)->count(),
-            'complimentary' => Subscription::where('complimentary', true)->count(),
+            'complimentary' => Tenant::where('manual_access_until', '>', now())->count(),
             'domains_attention' => TenantDomain::whereIn('status', ['failed', 'verifying', 'ssl_pending'])->count(),
             'classifications_30d' => BusinessClassification::where('created_at', '>=', now()->subDays(30))->count(),
             'ai_spend_month' => (float) AiUsageRecord::where('created_at', '>=', now()->startOfMonth())->sum('cost'),
@@ -142,17 +142,20 @@ class AdminController extends Controller
             $complimentary = (bool) ($data['complimentary'] ?? false);
             $trial = ! $complimentary && $plan->trial_days > 0;
             $accessDays = $complimentary ? (int) ($data['complimentary_days'] ?? 14) : (int) $plan->trial_days;
+            if ($complimentary) {
+                $tenant->update(['manual_access_until' => now()->addDays($accessDays)]);
+            }
             $tenant->subscriptions()->create([
                 'plan_id' => $plan->id,
-                'provider' => $complimentary ? 'manual' : ($trial ? 'lookdo' : 'stripe'),
-                'status' => $complimentary ? 'complimentary' : ($trial ? 'trialing' : 'incomplete'),
-                'complimentary' => $complimentary,
+                'provider' => $trial ? 'lookdo' : 'stripe',
+                'status' => $trial ? 'trialing' : 'incomplete',
+                'complimentary' => false,
                 'billing_cycle' => 'monthly',
                 'currency' => $plan->currency,
                 'unit_amount' => $plan->priceFor($plan->currency, 'monthly'),
                 'started_at' => now(),
-                'current_period_start' => ($complimentary || $trial) ? now() : null,
-                'current_period_end' => ($complimentary || $trial) ? now()->addDays($accessDays) : null,
+                'current_period_start' => $trial ? now() : null,
+                'current_period_end' => $trial ? now()->addDays($accessDays) : null,
             ]);
             if (! empty($data['variation_id'])) {
                 $variation = BusinessVariation::findOrFail($data['variation_id']);
@@ -208,37 +211,18 @@ class AdminController extends Controller
     {
         $data = $request->validate(['days' => 'required|integer|min:1|max:3650']);
         $current = $tenant->currentSubscription()->with('plan')->firstOrFail();
-        $before = $current->toArray();
+        $before = $tenant->toArray();
+        $base = $tenant->manual_access_until?->isFuture()
+            ? $tenant->manual_access_until->copy()
+            : now();
+        $tenant->update(['manual_access_until' => $base->addDays((int) $data['days'])]);
+        $tenant = $tenant->fresh(['currentSubscription.plan']);
 
-        $subscription = DB::transaction(function () use ($tenant, $current, $data): Subscription {
-            $payload = [
-                'plan_id' => $current->plan_id,
-                'provider' => 'manual',
-                'status' => 'complimentary',
-                'complimentary' => true,
-                'billing_cycle' => $current->billing_cycle ?: 'monthly',
-                'currency' => $current->currency ?: ($current->plan?->currency ?? 'EUR'),
-                'unit_amount' => $current->unit_amount ?? $current->plan?->priceFor($current->plan?->currency ?? 'EUR', 'monthly'),
-                'started_at' => now(),
-                'current_period_start' => now(),
-                'current_period_end' => now()->addDays((int) $data['days']),
-                'cancel_at_period_end' => false,
-            ];
-
-            if ($current->provider === 'manual' && $current->complimentary) {
-                $current->update($payload);
-
-                return $current->fresh('plan');
-            }
-
-            return $tenant->subscriptions()->create($payload)->load('plan');
-        });
-
-        $audit->log('tenant.access.granted', $subscription, $before, $subscription->toArray(), $tenant->id);
+        $audit->log('tenant.access.granted', $tenant, $before, $tenant->toArray(), $tenant->id);
 
         return response()->json([
-            'subscription' => $subscription,
-            'tenant' => $tenant->fresh(['currentSubscription.plan']),
+            'subscription' => $current->fresh('plan'),
+            'tenant' => $tenant,
         ]);
     }
 
@@ -287,7 +271,7 @@ class AdminController extends Controller
 
     public function subscriptions(Request $request): JsonResponse
     {
-        $query = Subscription::with(['tenant:id,name,slug', 'plan:id,code,name']);
+        $query = Subscription::with(['tenant:id,name,slug', 'plan:id,code,name'])->where('status', '!=', 'superseded');
         if ($status = $request->string('status')->toString()) {
             $query->where('status', $status);
         }

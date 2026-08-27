@@ -12,9 +12,15 @@ class Tenant extends Model
 {
     protected $guarded = [];
 
+    protected $appends = ['manual_access_active', 'manual_access_days_remaining'];
+
     protected function casts(): array
     {
-        return ['onboarding_completed_at' => 'datetime', 'last_activity_at' => 'datetime'];
+        return [
+            'onboarding_completed_at' => 'datetime',
+            'last_activity_at' => 'datetime',
+            'manual_access_until' => 'datetime',
+        ];
     }
 
     public function users(): BelongsToMany
@@ -44,7 +50,7 @@ class Tenant extends Model
 
     public function currentSubscription(): HasOne
     {
-        return $this->hasOne(Subscription::class)->latestOfMany();
+        return $this->hasOne(Subscription::class)->ofMany(['id' => 'max'], fn ($query) => $query->where('status', '!=', 'superseded'));
     }
 
     public function businessProfile(): HasOne
@@ -99,8 +105,31 @@ class Tenant extends Model
 
     public function hasActiveSubscription(): bool
     {
+        if ($this->hasManualAccess()) {
+            return true;
+        }
+
         $subscription = $this->currentSubscription;
 
         return (bool) $subscription?->grantsAccess();
+    }
+
+    public function hasManualAccess(): bool
+    {
+        return $this->manual_access_until !== null && $this->manual_access_until->isFuture();
+    }
+
+    public function getManualAccessActiveAttribute(): bool
+    {
+        return $this->hasManualAccess();
+    }
+
+    public function getManualAccessDaysRemainingAttribute(): int
+    {
+        if (! $this->hasManualAccess()) {
+            return 0;
+        }
+
+        return max(1, (int) ceil(now()->diffInSeconds($this->manual_access_until) / 86400));
     }
 }

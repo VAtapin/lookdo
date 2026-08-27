@@ -7,6 +7,7 @@ use App\Models\Plan;
 use App\Models\RequestTemplate;
 use App\Models\Tenant;
 use App\Models\TenantMessage;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -187,6 +188,56 @@ class TenantAppTest extends TestCase
             ->assertOk()
             ->assertJsonPath('entitlements.video', true)
             ->assertJsonPath('entitlements.booking', true);
+    }
+
+    public function test_manual_access_repairs_the_duplicate_subscription_and_opens_the_public_app(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $tenant = $this->tenant('manual-trial', 'automotive.steering-wheel-upholstery', false);
+        $trial = $tenant->currentSubscription;
+        $trial->update([
+            'provider' => 'lookdo',
+            'status' => 'trialing',
+            'current_period_start' => now()->subDay(),
+            'current_period_end' => now()->addDays(13),
+        ]);
+        $manual = $tenant->subscriptions()->create([
+            'plan_id' => $trial->plan_id,
+            'provider' => 'manual',
+            'status' => 'complimentary',
+            'complimentary' => true,
+            'billing_cycle' => 'monthly',
+            'currency' => 'EUR',
+            'started_at' => now(),
+            'current_period_start' => now(),
+            'current_period_end' => now()->addDays(14),
+        ]);
+
+        $migration = require database_path('migrations/2026_08_27_000005_separate_manual_access_from_subscriptions.php');
+        $migration->up();
+
+        $tenant->refresh();
+        $this->assertTrue($tenant->hasManualAccess());
+        $this->assertTrue($tenant->hasActiveSubscription());
+        $this->assertSame($trial->id, $tenant->currentSubscription->id);
+        $this->assertSame('superseded', $manual->fresh()->status);
+
+        $this->withHeader('X-Locale', 'ru')->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
+            ->assertOk();
+        $this->actingAs($admin)->getJson('/api/control/subscriptions?search=manual-trial')
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.id', $trial->id);
+
+        $firstUntil = $tenant->manual_access_until->copy();
+        $this->actingAs($admin)->postJson('/api/control/tenants/'.$tenant->id.'/grant-access', ['days' => 14])
+            ->assertOk()
+            ->assertJsonPath('tenant.manual_access_active', true);
+
+        $tenant->refresh();
+        $this->assertSame(2, $tenant->subscriptions()->count());
+        $this->assertSame(1, $tenant->subscriptions()->where('status', '!=', 'superseded')->count());
+        $this->assertTrue($tenant->manual_access_until->greaterThanOrEqualTo($firstUntil->addDays(14)));
     }
 
     public function test_expired_trial_no_longer_grants_application_access(): void

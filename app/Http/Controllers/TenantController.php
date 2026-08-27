@@ -42,17 +42,18 @@ class TenantController extends Controller
         }
 
         $subscription = $tenant->currentSubscription;
-        $trialActive = (bool) $subscription?->isTrialActive();
+        $manualAccessActive = $tenant->hasManualAccess();
+        $trialActive = ! $manualAccessActive && (bool) $subscription?->isTrialActive();
 
         return response()->json([
             'tenant' => $tenant,
             'access' => [
                 'active' => $tenant->hasActiveSubscription(),
-                'state' => $subscription?->accessState() ?? 'unpaid',
+                'state' => $manualAccessActive ? 'complimentary' : ($subscription?->accessState() ?? 'unpaid'),
                 'paid' => (bool) $subscription?->isPaidAccess(),
-                'complimentary' => (bool) $subscription?->isComplimentaryAccess(),
-                'expires_at' => $subscription?->accessEndsAt()?->toIso8601String(),
-                'days_remaining' => $subscription?->access_days_remaining ?? 0,
+                'complimentary' => $manualAccessActive || (bool) $subscription?->isComplimentaryAccess(),
+                'expires_at' => $manualAccessActive ? $tenant->manual_access_until?->toIso8601String() : $subscription?->accessEndsAt()?->toIso8601String(),
+                'days_remaining' => $manualAccessActive ? $tenant->manual_access_days_remaining : ($subscription?->access_days_remaining ?? 0),
                 'trial' => $trialActive,
                 'trial_ends_at' => $trialActive ? $subscription?->trialEndsAt()?->toIso8601String() : null,
                 'trial_days_remaining' => $trialActive ? ($subscription?->trial_days_remaining ?? 0) : 0,

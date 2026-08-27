@@ -40,6 +40,7 @@ const metricLabels: Record<string, string> = { tenants: 'Kunden', active_tenants
 const smsEventLabels: Record<string, string> = { request_received: 'Anfrage erhalten', master_replied: 'Meister hat geantwortet', work_ready: 'Arbeit fertig', agreement_reminder: 'Vereinbarung erinnern' };
 const smsStatusLabels: Record<string, string> = { queued: 'Warteschlange', sending: 'Wird gesendet', accepted: 'Angenommen', delivered: 'Zugestellt', failed: 'Fehlgeschlagen' };
 function tenantAccessLabel(tenant: any): string {
+    if (tenant?.manual_access_active) return `Manuell freigeschaltet · noch ${Number(tenant.manual_access_days_remaining || 0)} Tage`;
     const subscription = tenant?.current_subscription;
     const days = Number(subscription?.access_days_remaining || 0);
     switch (subscription?.access_state) {
@@ -52,7 +53,7 @@ function tenantAccessLabel(tenant: any): string {
         default: return 'Nicht bezahlt';
     }
 }
-function tenantAccessClass(tenant: any): string { return tenant?.current_subscription?.access_state || 'unpaid'; }
+function tenantAccessClass(tenant: any): string { return tenant?.manual_access_active ? 'complimentary' : (tenant?.current_subscription?.access_state || 'unpaid'); }
 function subscriptionAccessLabel(subscription: any): string { return tenantAccessLabel({ current_subscription: subscription }); }
 function subscriptionAccessClass(subscription: any): string { return subscription?.access_state || 'unpaid'; }
 const sortOptions: Record<string, Array<[string, string]>> = {
@@ -64,7 +65,7 @@ const sortOptions: Record<string, Array<[string, string]>> = {
 };
 const statusOptions: Record<string, Array<[string, string]>> = {
     tenants: [['active', 'Aktiv'], ['suspended', 'Gesperrt'], ['archived', 'Archiviert']], administrators: [['active', 'Aktiv'], ['inactive', 'Gesperrt']],
-    subscriptions: [['active', 'Aktiv'], ['trialing', 'Testphase'], ['complimentary', 'Kostenlos'], ['incomplete', 'Unvollständig'], ['past_due', 'Überfällig'], ['canceled', 'Gekündigt']],
+    subscriptions: [['active', 'Aktiv'], ['trialing', 'Testphase'], ['incomplete', 'Unvollständig'], ['past_due', 'Überfällig'], ['canceled', 'Gekündigt']],
     plans: [['active', 'Aktiv'], ['inactive', 'Archiviert']],
     templates: [['active', 'Aktiv'], ['inactive', 'Inaktiv']], sms: [['queued', 'Warteschlange'], ['sending', 'Wird gesendet'], ['accepted', 'Angenommen'], ['delivered', 'Zugestellt'], ['failed', 'Fehlgeschlagen']], ai: [['active', 'Aktiv'], ['inactive', 'Inaktiv']], content: [['active', 'Veröffentlicht'], ['inactive', 'Entwurf']],
 };
@@ -289,7 +290,7 @@ function formatDate(value: string | null) { return value ? new Intl.DateTimeForm
 <section v-else-if="section === 'stripe'" class="stripe-status"><article><p class="eyebrow">VERBINDUNG</p><h2>{{ data.configured ? 'Stripe verbunden' : 'Stripe nicht konfiguriert' }}</h2><p v-if="data.account">{{ data.account.id }} · {{ data.account.livemode ? 'Live-Modus' : 'Testmodus' }} · {{ data.account.country }}</p></article><article><p class="eyebrow">WEBHOOK</p><h2>{{ data.webhook_configured ? 'Bereit' : 'Fehlt' }}</h2><p>{{ data.plans_pending }} Tarife warten auf Synchronisierung.</p></article><button class="button" :disabled="busy || !data.configured" @click="syncAllPlans">Tarife synchronisieren</button></section>
 <section v-else class="admin-section registry-page"><div v-if="section === 'sms'" class="sms-summary"><article><span>Versendet im Monat</span><strong>{{ data.summary?.sent || 0 }}</strong></article><article><span>Zugestellt</span><strong>{{ data.summary?.delivered || 0 }}</strong></article><article><span>Fehlgeschlagen</span><strong>{{ data.summary?.failed || 0 }}</strong></article><article><span>Kosten im Monat</span><strong>{{ Number(data.summary?.cost || 0).toFixed(2) }} {{ data.summary?.currency || 'EUR' }}</strong></article></div><RegistryToolbar v-model:search="filters.search" :total="pager.total" :add-label="addLabels[section]" :busy="busy" @add="openAdd" @refresh="load">
 <select v-if="section === 'templates'" v-model="filters.secondary"><option value="">Alle Typen</option><option value="category">Kategorien</option><option value="variation">Varianten</option><option value="template">Vorlagen</option></select>
-<select v-else-if="section === 'subscriptions'" v-model="filters.secondary"><option value="">Alle Anbieter</option><option value="stripe">Stripe</option><option value="manual">Manuell</option></select><select v-else-if="section === 'ai'" v-model="filters.secondary"><option value="">Alle Sprachen</option><option value="de">Deutsch</option><option value="en">Englisch</option><option value="ru">Russisch</option><option value="uk">Ukrainisch</option></select><select v-else-if="section === 'classifications'" v-model="filters.secondary"><option value="">Alle Quellen</option><option value="dictionary">Wörterbuch</option><option value="fuzzy">Ähnlichkeit</option><option value="ai">KI</option><option value="fallback">Standard</option></select>
+<select v-else-if="section === 'subscriptions'" v-model="filters.secondary"><option value="">Alle Anbieter</option><option value="stripe">Stripe</option><option value="lookdo">LOOKDO-Testphase</option></select><select v-else-if="section === 'ai'" v-model="filters.secondary"><option value="">Alle Sprachen</option><option value="de">Deutsch</option><option value="en">Englisch</option><option value="ru">Russisch</option><option value="uk">Ukrainisch</option></select><select v-else-if="section === 'classifications'" v-model="filters.secondary"><option value="">Alle Quellen</option><option value="dictionary">Wörterbuch</option><option value="fuzzy">Ähnlichkeit</option><option value="ai">KI</option><option value="fallback">Standard</option></select>
 <select v-if="statusOptions[section]" v-model="filters.status"><option value="">Alle Status</option><option v-for="option in statusOptions[section]" :key="option[0]" :value="option[0]">{{ option[1] }}</option></select><select v-model="filters.sort"><option v-for="option in sortOptions[section] || []" :key="option[0]" :value="option[0]">{{ option[1] }}</option></select><button type="button" class="sort-direction" @click="filters.direction = filters.direction === 'asc' ? 'desc' : 'asc'">{{ filters.direction === 'asc' ? '↑' : '↓' }}</button><select v-model.number="filters.per_page"><option :value="10">10</option><option :value="25">25</option><option :value="50">50</option><option :value="100">100</option></select></RegistryToolbar>
 <div class="admin-table-wrap"><table><thead v-if="section === 'tenants'"><tr><th>Kunde</th><th>Inhaber</th><th>Vorlage</th><th>Domain</th><th>Tarif</th><th>Zugang</th><th>Konto</th></tr></thead><tbody v-if="section === 'tenants'"><tr v-for="item in rows" :key="item.id" class="clickable" @click="openTenant(item)"><td><b>{{ item.name }}</b><small>{{ item.slug }}</small></td><td><b>{{ item.users?.[0]?.name || '—' }}</b><small>{{ item.users?.[0]?.email || '—' }}</small></td><td>{{ item.business_profile?.variation?.name?.de || item.business_profile?.variation?.code || 'Standard' }}</td><td>{{ item.primary_domain?.domain || '—' }}</td><td>{{ item.current_subscription?.plan?.name?.de || item.current_subscription?.plan?.code || '—' }}</td><td><span class="table-status" :class="tenantAccessClass(item)">{{ tenantAccessLabel(item) }}</span></td><td><span class="table-status" :class="item.status">{{ item.status === 'active' ? 'technisch aktiv' : item.status }}</span></td></tr></tbody>
 
@@ -336,7 +337,7 @@ function formatDate(value: string | null) { return value ? new Intl.DateTimeForm
 <div class="tenant-access-summary">
 <span>Aktueller Zugang</span>
 <strong>{{ tenantAccessLabel(selectedTenant) }}</strong>
-<small v-if="selectedTenant.current_subscription.access_expires_at">Bis {{ formatDate(selectedTenant.current_subscription.access_expires_at) }}</small>
+<small v-if="selectedTenant.manual_access_until || selectedTenant.current_subscription.access_expires_at">Bis {{ formatDate(selectedTenant.manual_access_until || selectedTenant.current_subscription.access_expires_at) }}</small>
 </div>
 <label>Tarif<select v-model.number="selectedTenant.current_subscription.plan_id"><option v-for="plan in lookups.plans" :key="plan.id" :value="plan.id">{{ plan.name.de || plan.code }}</option></select></label>
 <button class="button ghost small" @click="updateTenant({ plan_id: selectedTenant.current_subscription.plan_id, discount_percent: selectedTenant.current_subscription.discount_percent })">Tarif speichern</button>
