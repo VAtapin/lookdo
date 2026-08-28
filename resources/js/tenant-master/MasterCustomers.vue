@@ -128,7 +128,7 @@ onMounted(load);
                 <label>{{ t('email') }}<input v-model="selected.email" type="email"></label>
                 <label>{{ t('channel') }}
                     <select v-model="selected.preferred_channel">
-                        <option v-for="channel in ['phone','push','whatsapp','sms','email']" :key="channel" :value="channel">{{ t(channel === 'phone' ? 'phoneChannel' : channel === 'email' ? 'emailChannel' : channel) }}</option>
+                        <option v-for="channel in ['phone','push','vk','whatsapp','sms','email']" :key="channel" :value="channel">{{ channel === 'vk' ? 'VK' : t(channel === 'phone' ? 'phoneChannel' : channel === 'email' ? 'emailChannel' : channel) }}</option>
                     </select>
                 </label>
                 <label>{{ t('tags') }}<input :value="(selected.tags || []).join(', ')" @input="selected.tags = ($event.target as HTMLInputElement).value.split(',').map((value) => value.trim()).filter(Boolean)"></label>

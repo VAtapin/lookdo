@@ -33,7 +33,7 @@ class OpenAiService
     }
 
     /** @return array{contents:string,model:string,format:string,quality:string} */
-    public function image(string $prompt, string $quality = 'medium'): array
+    public function image(string $prompt, string $quality = 'medium', string $size = '1536x1024'): array
     {
         if (! $this->configured()) {
             throw new RuntimeException('OPENAI_API_KEY is not configured.');
@@ -44,7 +44,7 @@ class OpenAiService
             ->post('https://api.openai.com/v1/images/generations', [
                 'model' => config('services.openai.image_model'),
                 'prompt' => $prompt,
-                'size' => '1536x1024',
+                'size' => $size,
                 'quality' => $quality,
                 'output_format' => 'webp',
                 'n' => 1,

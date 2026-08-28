@@ -10,7 +10,7 @@ const entitlementEnabled=(key:string,fallback=false)=>String(props.account?.enti
 const hasDomain=computed(()=>entitlementEnabled('custom_domain'));
 const hasSms=computed(()=>entitlementEnabled('sms_enabled'));
 const hasPush=computed(()=>Boolean(props.workspace?.push?.enabled&&props.workspace?.push?.public_key));
-const moreItems=computed(()=>[['customers','user'],['work','photo'],['services','tools'],['business','briefcase'],['billing','card'],['team','user'],['settings','grid'],...(hasDomain.value?[['domain','globe']]:[])]);
+const moreItems=computed(()=>[['customers','user'],['work','photo'],['services','tools'],['business','briefcase'],['branding','photo'],['billing','card'],['team','user'],['settings','grid'],...(hasDomain.value?[['domain','globe']]:[])]);
 watch(()=>props.account,v=>{if(v)Object.assign(profile,{name:v.tenant.name,locale:v.tenant.locale,...(v.tenant.profile||{}),notification_preferences:{push:true,sms:false,email:false,...(v.tenant.profile?.content?.notifications||{})}})},{immediate:true});
 watch(()=>props.section,s=>{if(s==='team')loadTeam()},{immediate:true});
 async function saveProfile(){busy.value=true;error.value='';pushStatus.value='';try{await api(`/tenant/${props.tenantId}/profile`,{method:'PUT',body:JSON.stringify(profile)});if(hasPush.value)await syncPush(Boolean(profile.notification_preferences.push));emit('reload')}catch(e:any){error.value=e.message}finally{busy.value=false}}

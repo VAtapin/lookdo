@@ -153,7 +153,7 @@ class TenantWorkspaceController extends Controller
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($customer->tenant_id === $tenant->id, 404);
-        $data = $request->validate(['name' => 'nullable|string|max:120', 'phone' => 'nullable|string|max:50', 'email' => 'nullable|email|max:190', 'preferred_channel' => 'nullable|in:phone,whatsapp,sms,email,push', 'notes' => 'nullable|string|max:5000', 'tags' => 'nullable|array', 'marketing_consent' => 'nullable|boolean', 'publication_consent' => 'nullable|boolean']);
+        $data = $request->validate(['name' => 'nullable|string|max:120', 'phone' => 'nullable|string|max:50', 'email' => 'nullable|email|max:190', 'preferred_channel' => 'nullable|in:phone,whatsapp,sms,email,push,vk', 'notes' => 'nullable|string|max:5000', 'tags' => 'nullable|array', 'marketing_consent' => 'nullable|boolean', 'publication_consent' => 'nullable|boolean']);
         if (array_key_exists('phone', $data)) {
             $data['phone_normalized'] = preg_replace('/\D+/', '', (string) $data['phone']);
         }

@@ -1,128 +1,233 @@
 <script setup lang="ts">
-import { computed, nextTick, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { api } from '../api';
 import AppIcon from './AppIcon.vue';
 
-const props = defineProps<{ app: any; copy: any; locale: string; token: string }>();
-const emit = defineEmits<{ close: []; success: [payload:any] }>();
-const stage = ref<'media'|'details'|'success'>('media');
-const files = ref<{ file:File; slot:string; url:string }[]>([]);
-const currentSlot = ref('overall');
-const cameraInput = ref<HTMLInputElement|null>(null);
-const galleryInput = ref<HTMLInputElement|null>(null);
-const busy = ref(false);
-const error = ref('');
-const result = ref<any>(null);
-const notifying = ref(false);
-const notificationStatus = ref('');
-const form = reactive<any>({ name:'', phone:'', email:'', summary:'', preferred_channel:'phone', fields:{} });
+type Stage = 'capture'|'details'|'success'|'notifications';
+type MediaItem = { file:File; slot:string; url:string };
 
-const rawSlots = computed(() => props.app.template.media_slots || []);
-const slots = computed(() => rawSlots.value.length ? rawSlots.value : [{key:'overall', required:true}]);
-const accent = computed(() => props.app.tenant.colors.primary);
-const mediaAccept = computed(() => props.app.entitlements?.video ? 'image/*,video/*' : 'image/*');
-const canNotify = computed(() => Boolean(props.app.push?.enabled && props.app.push?.public_key && 'Notification' in window && 'serviceWorker' in navigator));
-const slotCopy:any = {
-  overall:{de:['Lenkrad komplett','Fotografieren Sie das Lenkrad gerade von vorn.'],en:['Whole steering wheel','Photograph the full steering wheel from the front.'],ru:['Руль целиком','Сфотографируйте руль прямо спереди.'],uk:['Кермо повністю','Сфотографуйте кермо прямо спереду.']},
-  top:{de:['Oberer Bereich','Zeigen Sie Material und Nähte näher.'],en:['Top section','Show the material and stitching close up.'],ru:['Верх руля','Покажите материал и швы крупно.'],uk:['Верх керма','Покажіть матеріал і шви зблизька.']},
-  left:{de:['Linke Seite','Zeigen Sie Griffbereich und Speiche.'],en:['Left side','Show the grip and spoke.'],ru:['Левая сторона','Покажите место хвата и спицу.'],uk:['Ліва сторона','Покажіть місце хвату та спицю.']},
-  right:{de:['Rechte Seite','Zeigen Sie Griffbereich und Speiche.'],en:['Right side','Show the grip and spoke.'],ru:['Правая сторона','Покажите место хвата и спицу.'],uk:['Права сторона','Покажіть місце хвату та спицю.']},
-  damage:{de:['Schaden im Detail','Zeigen Sie Risse oder Abrieb näher.'],en:['Damage detail','Show cracks or wear close up.'],ru:['Повреждение крупно','Покажите трещины или потёртости.'],uk:['Пошкодження зблизька','Покажіть тріщини або потертості.']},
-  opening_overall:{de:['Öffnung komplett','Fotografieren Sie die ganze Öffnung gerade von vorn.'],en:['Whole doorway','Photograph the whole doorway from the front.'],ru:['Проём целиком','Сфотографируйте проём прямо спереди.'],uk:['Отвір повністю','Сфотографуйте отвір прямо спереду.']},
-  opening_left:{de:['Linke Seite','Zeigen Sie die linke Kante von Boden bis oben.'],en:['Left side','Show the left edge from floor to top.'],ru:['Левая сторона','Покажите левый край от пола доверху.'],uk:['Ліва сторона','Покажіть лівий край від підлоги догори.']},
-  opening_right:{de:['Rechte Seite','Zeigen Sie die rechte Kante von Boden bis oben.'],en:['Right side','Show the right edge from floor to top.'],ru:['Правая сторона','Покажите правый край от пола доверху.'],uk:['Права сторона','Покажіть правий край від підлоги догори.']},
-  opening_top:{de:['Oberer Bereich','Zeigen Sie beide oberen Ecken.'],en:['Top section','Show both top corners.'],ru:['Верх проёма','Покажите оба верхних угла.'],uk:['Верх отвору','Покажіть обидва верхні кути.']},
-  floor_threshold:{de:['Boden und Schwelle','Zeigen Sie Bodenhöhen und Schwelle.'],en:['Floor and threshold','Show floor levels and threshold.'],ru:['Пол и порог','Покажите уровни пола и порог.'],uk:['Підлога й поріг','Покажіть рівні підлоги та поріг.']},
-};
-const fieldCopy:any = {
-  vehicle_brand:{de:'Automarke',en:'Vehicle brand',ru:'Марка автомобиля',uk:'Марка автомобіля'}, vehicle_model:{de:'Modell',en:'Model',ru:'Модель',uk:'Модель'}, vehicle_year:{de:'Baujahr',en:'Year',ru:'Год',uk:'Рік'},
-  material_preference:{de:'Materialwunsch',en:'Material preference',ru:'Пожелания по материалу',uk:'Побажання щодо матеріалу'}, stitch_preference:{de:'Nahtwunsch',en:'Stitch preference',ru:'Пожелания по строчке',uk:'Побажання щодо строчки'}, shape_preference:{de:'Form oder Dicke ändern?',en:'Change shape or thickness?',ru:'Изменить форму или толщину?',uk:'Змінити форму або товщину?'},
-  opening_width_mm:{de:'Breite der Öffnung (mm)',en:'Opening width (mm)',ru:'Ширина проёма (мм)',uk:'Ширина отвору (мм)'}, opening_height_mm:{de:'Höhe der Öffnung (mm)',en:'Opening height (mm)',ru:'Высота проёма (мм)',uk:'Висота отвору (мм)'}, wall_thickness_mm:{de:'Wandstärke (mm)',en:'Wall thickness (mm)',ru:'Толщина стены (мм)',uk:'Товщина стіни (мм)'}, door_request_type:{de:'Was soll gemacht werden?',en:'What should be done?',ru:'Что нужно сделать?',uk:'Що потрібно зробити?'}, door_type:{de:'Türart',en:'Door type',ru:'Тип двери',uk:'Тип дверей'}, comment:{de:'Ihre Wünsche',en:'Your notes',ru:'Ваши пожелания',uk:'Ваші побажання'},
-};
-function slotText(slot:any){ const hit=slotCopy[slot.key]?.[props.locale]; return { title:hit?.[0] || slot.title || slot.label || props.copy.other, hint:hit?.[1] || slot.instruction || slot.hint || '' }; }
-function label(field:any){ return fieldCopy[field.key]?.[props.locale] || field.label || field.key; }
-function existing(slot:string){ return files.value.find(item=>item.slot===slot); }
-function choose(slot:string, camera:boolean){ currentSlot.value=slot; nextTick(()=> (camera ? cameraInput.value : galleryInput.value)?.click()); }
-function selected(event:Event){ const input=event.target as HTMLInputElement; const file=input.files?.[0]; if(!file)return; const old=existing(currentSlot.value); if(old) URL.revokeObjectURL(old.url); files.value=files.value.filter(item=>item.slot!==currentSlot.value); files.value.push({file,slot:currentSlot.value,url:URL.createObjectURL(file)}); input.value=''; }
-function remove(slot:string){ const item=existing(slot); if(item)URL.revokeObjectURL(item.url); files.value=files.value.filter(value=>value.slot!==slot); }
-function applicationServerKey(value:string):Uint8Array {
-  const padding='='.repeat((4-value.length%4)%4); const base64=(value+padding).replace(/-/g,'+').replace(/_/g,'/'); const raw=atob(base64);
+const props = defineProps<{ app:any; copy:any; locale:string; token:string }>();
+const emit = defineEmits<{ close:[]; success:[payload:any] }>();
+const stage=ref<Stage>('capture');
+const files=ref<MediaItem[]>([]);
+const activeIndex=ref(0);
+const fileInput=ref<HTMLInputElement|null>(null);
+const busy=ref(false);
+const error=ref('');
+const result=ref<any>(null);
+const notifying=ref(false);
+const notificationStatus=ref('');
+const now=ref(new Date());
+let clock:number|undefined;
+const form=reactive<any>({name:'',phone:'',email:'',summary:'',preferred_channel:'push',fields:{}});
+
+const configuredSlots=computed<any[]>(()=>props.app.template.media_slots||[]);
+const slots=computed(()=>Array.from({length:4},(_,index)=>configuredSlots.value[index]||{key:['overall','left','right','back'][index],required:index===0}));
+const current=computed(()=>files.value[activeIndex.value]||files.value.at(-1)||null);
+const canNotify=computed(()=>Boolean(props.app.push?.enabled&&props.app.push?.public_key&&'Notification' in window&&'serviceWorker' in navigator));
+const address=computed(()=>[props.app.tenant.contact.street,[props.app.tenant.contact.postal_code,props.app.tenant.contact.city].filter(Boolean).join(' ')].filter(Boolean).join(', '));
+const contactName=computed(()=>props.app.tenant.contact.name||props.app.tenant.name);
+const fields=computed<any[]>(()=>props.app.template.fields||[]);
+const vehicleModelField=computed(()=>fields.value.find(item=>item.key==='vehicle_model'||item.key==='vehicle_brand'));
+const vehicleYearField=computed(()=>fields.value.find(item=>item.key==='vehicle_year'));
+const extraFields=computed(()=>fields.value.filter(item=>!['phone','vehicle_brand','vehicle_model','vehicle_year'].includes(item.key)));
+const progress=computed(()=>stage.value==='capture'?1:stage.value==='details'?2:stage.value==='success'?3:4);
+
+function back(){
+  if(stage.value==='details')stage.value='capture';
+  else if(stage.value==='notifications')stage.value='success';
+  else emit('close');
+}
+function choose(index:number){activeIndex.value=index;fileInput.value?.click();}
+function selected(event:Event){
+  const input=event.target as HTMLInputElement; const file=input.files?.[0]; if(!file)return;
+  const slot=slots.value[activeIndex.value]?.key||'overall';
+  const existing=files.value.find(item=>item.slot===slot); if(existing)URL.revokeObjectURL(existing.url);
+  files.value=files.value.filter(item=>item.slot!==slot);
+  files.value.push({file,slot,url:URL.createObjectURL(file)});
+  activeIndex.value=Math.min(files.value.length,3); input.value='';
+}
+function remove(item:MediaItem){URL.revokeObjectURL(item.url);files.value=files.value.filter(value=>value!==item);activeIndex.value=0;}
+function slotItem(index:number){const slot=slots.value[index]?.key;return files.value.find(item=>item.slot===slot);}
+function fieldLabel(field:any){return field.label||field.key;}
+function applicationServerKey(value:string):Uint8Array{
+  const padding='='.repeat((4-value.length%4)%4);const raw=atob((value+padding).replace(/-/g,'+').replace(/_/g,'/'));
   return Uint8Array.from([...raw].map(char=>char.charCodeAt(0)));
 }
 async function enableNotifications(){
-  if(!canNotify.value || !result.value?.token)return;
-  notifying.value=true; notificationStatus.value='';
+  if(!canNotify.value||!result.value?.token){notificationStatus.value=props.copy.notificationDenied;return;}
+  notifying.value=true;notificationStatus.value='';
   try{
     const permission=await Notification.requestPermission();
-    if(permission!=='granted'){ notificationStatus.value=props.copy.notificationDenied; return; }
+    if(permission!=='granted'){notificationStatus.value=props.copy.notificationDenied;return;}
     const registration=await navigator.serviceWorker.ready;
-    const subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:applicationServerKey(props.app.push.public_key) as BufferSource});
+    let subscription=await registration.pushManager.getSubscription();
+    if(!subscription)subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:applicationServerKey(props.app.push.public_key) as BufferSource});
     const value=subscription.toJSON();
     await api('/tenant-app/push-subscriptions',{method:'POST',headers:{'X-Lookdo-Client-Token':result.value.token},body:JSON.stringify({endpoint:value.endpoint,keys:value.keys})});
     notificationStatus.value=props.copy.notificationEnabled;
-  }catch(e:any){ notificationStatus.value=e.message; }finally{ notifying.value=false; }
+    window.setTimeout(()=>emit('close'),700);
+  }catch(e:any){notificationStatus.value=e.message;}finally{notifying.value=false;}
 }
 async function submit(){
-  if(!form.phone){ error.value=props.copy.phone; return; }
-  busy.value=true; error.value='';
+  if(!form.phone.trim()){error.value=props.copy.phone;return;}
+  if(!files.value.length){stage.value='capture';error.value=props.copy.requestHint;return;}
+  busy.value=true;error.value='';
   try{
     const body=new FormData();
-    for(const key of ['name','phone','email','summary','preferred_channel']) body.append(key,form[key] || '');
-    body.append('fields',JSON.stringify(form.fields)); body.append('media_slots',JSON.stringify(files.value.map(item=>item.slot)));
+    for(const key of ['name','phone','email','summary','preferred_channel'])body.append(key,form[key]||'');
+    body.append('fields',JSON.stringify(form.fields));
+    body.append('media_slots',JSON.stringify(files.value.map(item=>item.slot)));
     files.value.forEach(item=>body.append('media[]',item.file));
     result.value=await api('/tenant-app/requests',{method:'POST',body,headers:props.token?{'X-Lookdo-Client-Token':props.token}:{}});
-    stage.value='success'; emit('success',result.value);
-  }catch(e:any){ error.value=e.message; }finally{busy.value=false;}
+    stage.value='success';emit('success',result.value);
+  }catch(e:any){error.value=e.message;}finally{busy.value=false;}
 }
+async function shareRequest(){
+  const data={title:props.copy.sent,text:(result.value?.request?.number?props.copy.requestNumber+' '+result.value.request.number:'')+' — '+props.app.tenant.name,url:location.origin+'/activity'};
+  if(navigator.share)await navigator.share(data);else await navigator.clipboard.writeText(data.url);
+}
+function finishSuccess(){
+  if(canNotify.value){
+    stage.value='notifications';
+    return;
+  }
+  emit('close');
+}
+onMounted(()=>{clock=window.setInterval(()=>now.value=new Date(),30000);});
+onBeforeUnmount(()=>{if(clock)window.clearInterval(clock);files.value.forEach(item=>URL.revokeObjectURL(item.url));});
 </script>
 
 <template>
-  <section class="ta-flow">
-    <header class="ta-flow-head">
-      <button class="ta-icon-button" @click="stage==='details' ? stage='media' : emit('close')"><AppIcon name="back" /></button>
-      <div><span>{{ app.template.name }}</span><b>{{ stage==='media' ? copy.requestTitle : stage==='details' ? copy.details : copy.sent }}</b></div>
-      <button class="ta-icon-button" @click="emit('close')"><AppIcon name="close" /></button>
-    </header>
+  <section class="ta-flow ta-dark-flow">
+    <div class="ta-statusbar"><b>{{now.toLocaleTimeString(locale,{hour:'2-digit',minute:'2-digit'})}}</b><span class="ta-device-icons"><i class="signal"></i><i class="wifi"></i><i class="battery"></i></span></div>
 
-    <div v-if="stage==='media'" class="ta-flow-body">
-      <div class="ta-flow-intro"><h1>{{ app.template.hero.action }}</h1><p>{{ copy.requestHint }}</p></div>
-      <div class="ta-capture-list">
-        <article v-for="slot in slots" :key="slot.key" class="ta-capture-card" :class="{filled:existing(slot.key)}">
-          <div v-if="existing(slot.key)" class="ta-capture-preview"><img decoding="async" v-if="existing(slot.key)?.file.type.startsWith('image/')" :src="existing(slot.key)?.url"><video v-else :src="existing(slot.key)?.url" muted playsinline/></div>
-          <div class="ta-capture-copy"><small>{{ slot.required ? copy.required : copy.optional }}</small><h3>{{ slotText(slot).title }}</h3><p>{{ slotText(slot).hint }}</p></div>
-          <div class="ta-capture-actions">
-            <button v-if="existing(slot.key)" class="ta-link" @click="remove(slot.key)">{{ copy.remove }}</button>
-            <template v-else><button class="ta-mini-action" @click="choose(slot.key,true)"><AppIcon name="camera" :size="20"/>{{ copy.camera }}</button><button class="ta-mini-action secondary" @click="choose(slot.key,false)"><AppIcon name="grid" :size="20"/>{{ copy.gallery }}</button></template>
-          </div>
+    <template v-if="stage==='capture'">
+      <header class="ta-flow-title">
+        <button class="ta-back" @click="back"><AppIcon name="back"/><span>{{copy.back}}</span></button>
+        <div><h1>{{copy.requestTitle}}</h1><p>{{copy.requestSubtitle}}</p></div>
+        <div class="ta-contact-shortcuts"><a v-if="app.tenant.contact.phone" :href="'tel:'+app.tenant.contact.phone"><AppIcon name="phone"/></a><a v-if="app.tenant.contact.vk_url" :href="app.tenant.contact.vk_url" target="_blank">VK</a></div>
+      </header>
+      <div class="ta-flow-steps"><span v-for="number in 4" :key="number" :class="{active:number===1}">{{number}}</span></div>
+      <div class="ta-flow-scroll">
+        <article class="ta-capture-instructions">
+          <span class="ta-round-icon"><AppIcon name="steering" :size="36"/></span>
+          <div><h2>{{copy.captureTitle}}</h2><p>{{copy.captureList}}</p></div>
+          <div class="ta-wheel-map"><AppIcon name="steering" :size="74"/><b v-for="n in 4" :key="n">{{n}}</b></div>
         </article>
+        <button class="ta-live-camera" @click="choose(Math.min(files.length,3))">
+          <img v-if="current" :src="current.url" alt="">
+          <div v-else><AppIcon name="camera" :size="62"/><strong>{{copy.camera}}</strong><span>{{copy.requestHint}}</span></div>
+          <small>1×</small>
+        </button>
+        <p class="ta-camera-hint">{{copy.requestHint}}</p>
+        <div class="ta-camera-controls">
+          <div><img v-if="files.length" :src="files[files.length-1].url" alt=""><AppIcon v-else name="image"/><small>{{copy.lastPhoto}}</small></div>
+          <button @click="choose(Math.min(files.length,3))"><AppIcon name="camera" :size="34"/></button>
+          <div><AppIcon name="rotate"/><small>{{copy.turnCamera}}</small></div>
+        </div>
+        <h2 class="ta-added-title">{{copy.addedPhotos}} ({{files.length}} / 4)</h2>
+        <div class="ta-photo-slots">
+          <button v-for="(_,index) in slots" :key="index" :class="{filled:slotItem(index)}" @click="choose(index)">
+            <img v-if="slotItem(index)" :src="slotItem(index)?.url" alt="">
+            <template v-else><AppIcon name="plus"/><span>{{copy.photos}} {{index+1}}</span></template>
+            <i v-if="slotItem(index)" @click.stop="remove(slotItem(index)!)"><AppIcon name="close" :size="14"/></i>
+          </button>
+        </div>
+        <button class="ta-gold-button" :disabled="!files.length" @click="stage='details'">{{copy.usePhoto}}</button>
+        <button class="ta-outline-button" @click="choose(Math.min(files.length,3))"><AppIcon name="plus"/>{{copy.addPhoto}}</button>
       </div>
-      <input ref="cameraInput" hidden type="file" :accept="mediaAccept" capture="environment" @change="selected"><input ref="galleryInput" hidden type="file" :accept="mediaAccept" @change="selected">
-      <div class="ta-sticky-action"><button class="ta-primary" :disabled="!files.length" @click="stage='details'">{{ copy.continue }} <AppIcon name="arrow" :size="20"/></button></div>
-    </div>
+      <input ref="fileInput" hidden type="file" accept="image/*" capture="environment" @change="selected">
+    </template>
 
-    <div v-else-if="stage==='details'" class="ta-flow-body ta-form-screen">
-      <h1>{{ copy.details }}</h1>
-      <div class="ta-fields">
-        <template v-for="field in app.template.fields.filter((item:any)=>item.key!=='phone')" :key="field.key">
-          <label><span>{{ label(field) }} <i v-if="!field.required">{{ copy.optional }}</i></span>
-            <textarea v-if="field.type==='textarea'" v-model="form.fields[field.key]" rows="3" :placeholder="field.placeholder"/>
-            <select v-else-if="field.type==='select'" v-model="form.fields[field.key]"><option value="">—</option><option v-for="option in field.options" :key="option" :value="option">{{ option }}</option></select>
-            <input v-else v-model="form.fields[field.key]" :type="field.type==='number'?'number':'text'" :placeholder="field.placeholder">
-          </label>
-        </template>
-        <label><span>{{ copy.summary }} <i>{{ copy.optional }}</i></span><textarea v-model="form.summary" rows="3"/></label>
+    <template v-else-if="stage==='details'">
+      <header class="ta-flow-title compact">
+        <button class="ta-back icon-only" @click="back"><AppIcon name="back"/></button>
+        <div><h1>{{copy.details}}</h1><p>{{copy.detailsSubtitle}}</p></div>
+        <button class="ta-help"><AppIcon name="info"/><span>{{copy.how}}</span></button>
+      </header>
+      <div class="ta-flow-scroll ta-detail-form">
+        <section class="ta-dark-card">
+          <h2>1. {{copy.photos}} <em>*</em></h2><p>{{copy.requestHint}}</p>
+          <div class="ta-detail-photos"><button v-for="(_,index) in slots" :key="index" @click="choose(index)"><img v-if="slotItem(index)" :src="slotItem(index)?.url" alt=""><template v-else><AppIcon name="camera"/><span>{{copy.addPhoto}}</span></template></button></div>
+        </section>
+        <section v-if="vehicleModelField||vehicleYearField" class="ta-dark-card">
+          <h2>2. {{copy.vehicle}}</h2>
+          <div class="ta-field-grid">
+            <label v-if="vehicleModelField"><span>{{copy.vehicleModel}}</span><input v-model="form.fields.vehicle_model" :placeholder="vehicleModelField.placeholder"></label>
+            <label v-if="vehicleYearField"><span>{{copy.vehicleYear}}</span><input v-model="form.fields.vehicle_year" inputmode="numeric" :placeholder="vehicleYearField.placeholder"></label>
+          </div>
+        </section>
+        <section class="ta-dark-card">
+          <h2>3. {{copy.whatToDo}}</h2>
+          <textarea v-model="form.summary" rows="4" maxlength="500" :placeholder="copy.summary"></textarea>
+          <div v-for="field in extraFields" :key="field.key" class="ta-extra-field">
+            <label><span>{{fieldLabel(field)}}</span>
+              <select v-if="field.type==='select'" v-model="form.fields[field.key]"><option value="">—</option><option v-for="option in field.options" :key="option" :value="option">{{option}}</option></select>
+              <textarea v-else-if="field.type==='textarea'" v-model="form.fields[field.key]" rows="3"></textarea>
+              <input v-else v-model="form.fields[field.key]" :type="field.type==='number'?'number':'text'">
+            </label>
+          </div>
+        </section>
+        <section class="ta-dark-card">
+          <h2>4. {{copy.phone}} <em>*</em></h2>
+          <input v-model="form.phone" type="tel" autocomplete="tel" inputmode="tel" :placeholder="copy.phone">
+          <div class="ta-field-grid secondary-fields"><label><span>{{copy.name}}</span><input v-model="form.name" autocomplete="name"></label><label><span>{{copy.email}}</span><input v-model="form.email" type="email" autocomplete="email"></label></div>
+        </section>
+        <section class="ta-dark-card">
+          <h2>5. {{copy.replyMethod}}</h2>
+          <div class="ta-channel-grid">
+            <button :class="{active:form.preferred_channel==='push'}" @click="form.preferred_channel='push'"><AppIcon name="bell"/><span>{{copy.onSite}}</span></button>
+            <button v-if="app.tenant.contact.vk_url" :class="{active:form.preferred_channel==='vk'}" @click="form.preferred_channel='vk'"><b>VK</b><span>VK</span></button>
+            <button :class="{active:form.preferred_channel==='sms'}" @click="form.preferred_channel='sms'"><AppIcon name="phone"/><span>{{copy.byPhone}}</span></button>
+          </div>
+        </section>
+        <p class="ta-privacy"><AppIcon name="shield"/>{{copy.privacyNote}}</p>
+        <p v-if="error" class="ta-error">{{error}}</p>
+        <button class="ta-gold-button" :disabled="busy" @click="submit"><AppIcon name="send"/>{{busy?copy.sending:copy.send}}</button>
       </div>
-      <h2>{{ copy.contact }}</h2>
-      <div class="ta-fields two"><label><span>{{ copy.name }}</span><input v-model="form.name" autocomplete="name"></label><label><span>{{ copy.phone }} *</span><input v-model="form.phone" type="tel" autocomplete="tel" inputmode="tel"></label><label><span>{{ copy.email }}</span><input v-model="form.email" type="email" autocomplete="email"></label></div>
-      <p v-if="error" class="ta-error">{{ error }}</p>
-      <div class="ta-sticky-action"><button class="ta-primary" :disabled="busy" @click="submit">{{ busy ? copy.sending : copy.send }} <AppIcon name="arrow" :size="20"/></button></div>
-    </div>
+      <input ref="fileInput" hidden type="file" accept="image/*" capture="environment" @change="selected">
+    </template>
 
-    <div v-else class="ta-success-screen">
-      <div class="ta-success-mark"><AppIcon name="check" :size="42"/></div><h1>{{ result?.success?.title || copy.sent }}</h1><p>{{ result?.success?.text }}</p><strong>{{ copy.requestNumber }}: {{ result?.request?.number }}</strong>
-      <button v-if="canNotify" class="ta-secondary-action" :disabled="notifying" @click="enableNotifications"><AppIcon name="bell" :size="20"/>{{ notifying ? copy.sending : copy.notifications }}</button>
-      <p v-if="notificationStatus" class="ta-notification-status">{{ notificationStatus }}</p>
-      <button class="ta-primary" @click="emit('close')">{{ copy.activity }} <AppIcon name="arrow" :size="20"/></button>
-    </div>
+    <template v-else-if="stage==='success'">
+      <div class="ta-flow-scroll ta-success-dark">
+        <header><h1>{{copy.sent}}</h1><div class="ta-contact-shortcuts"><a v-if="app.tenant.contact.phone" :href="'tel:'+app.tenant.contact.phone"><AppIcon name="phone"/></a><a v-if="app.tenant.contact.vk_url" :href="app.tenant.contact.vk_url" target="_blank">VK</a></div></header>
+        <div class="ta-success-orbit"><AppIcon name="check" :size="66"/></div>
+        <h2>{{copy.receivedTitle}}<br>{{copy.requestNumber}} №{{result?.request?.number}}</h2>
+        <p>{{copy.receivedText}}</p>
+        <article class="ta-request-summary">
+          <div><AppIcon name="clock"/><span><small>{{copy.today}}</small><b>{{new Date().toLocaleString(locale,{dateStyle:'long',timeStyle:'short'})}}</b></span></div>
+          <div><AppIcon name="message"/><span><small>{{copy.whatToDo}}</small><b>{{form.summary||app.template.hero.action}}</b></span><img v-if="files[0]" :src="files[0].url" alt=""></div>
+        </article>
+        <p>{{copy.savedConversation}}</p>
+        <article class="ta-master-card"><img :src="app.tenant.logo||'/brand/lookdo-mark.webp'" alt=""><div><h3>{{contactName}}</h3><p>{{copy.specialist}}</p><a v-if="app.tenant.contact.phone" :href="'tel:'+app.tenant.contact.phone">{{app.tenant.contact.phone}}</a><span v-if="address">{{address}}</span></div></article>
+        <article class="ta-push-card"><AppIcon name="bell" :size="38"/><div><h3>{{copy.doNotMiss}}</h3><p>{{copy.doNotMissText}}</p></div><button @click="stage='notifications'"><span></span></button></article>
+        <button class="ta-gold-button" @click="finishSuccess">{{copy.continue}}</button>
+        <button class="ta-outline-button" @click="shareRequest"><AppIcon name="share"/>{{copy.shareRequest}}</button>
+      </div>
+    </template>
+
+    <template v-else>
+      <header class="ta-flow-title compact">
+        <button class="ta-back" @click="back"><AppIcon name="back"/><span>{{copy.back}}</span></button>
+        <div><h1>{{copy.notificationTitle}}</h1></div>
+        <div class="ta-contact-shortcuts"><a v-if="app.tenant.contact.phone" :href="'tel:'+app.tenant.contact.phone"><AppIcon name="phone"/></a></div>
+      </header>
+      <div class="ta-flow-scroll ta-notification-screen">
+        <div class="ta-bell-orbit"><AppIcon name="bell" :size="92"/><b>1</b></div>
+        <h2>{{copy.notificationHeadline}}</h2><p>{{copy.notificationText}}</p>
+        <div class="ta-notification-benefits">
+          <article><span><AppIcon name="message"/></span><div><h3>{{copy.notificationBenefit1}}</h3><p>{{copy.notificationBenefit1Text}}</p></div></article>
+          <article><span><AppIcon name="bell"/></span><div><h3>{{copy.notificationBenefit2}}</h3><p>{{copy.notificationBenefit2Text}}</p></div></article>
+          <article><span><AppIcon name="shield"/></span><div><h3>{{copy.notificationBenefit3}}</h3><p>{{copy.notificationBenefit3Text}}</p></div></article>
+        </div>
+        <article class="ta-message-preview"><img :src="app.tenant.logo||'/brand/lookdo-mark.webp'" alt=""><div><b>{{contactName}}</b><p>{{copy.receivedText}}</p></div><small>{{copy.today}}</small></article>
+        <p v-if="notificationStatus" class="ta-notification-status">{{notificationStatus}}</p>
+        <button class="ta-gold-button" :disabled="notifying" @click="enableNotifications"><AppIcon name="bell"/>{{notifying?copy.sending:copy.notifications}}</button>
+        <button class="ta-outline-button" @click="emit('close')">{{copy.later}}</button>
+      </div>
+    </template>
+
+    <div v-if="stage!=='capture'&&stage!=='details'" class="ta-mini-nav"><button @click="emit('close')"><AppIcon name="home"/><span>{{copy.home}}</span></button><button class="central" @click="stage='capture'"><AppIcon name="camera"/><span>{{copy.action}}</span></button><button @click="emit('close')"><AppIcon name="message"/><span>{{copy.messages}}</span></button></div>
   </section>
 </template>

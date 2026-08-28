@@ -23,6 +23,14 @@ defineProps<{ name: string; size?: number }>();
     <template v-else-if="name==='share'"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></template>
     <template v-else-if="name==='check'"><path d="m4 12 5 5L20 6"/></template>
     <template v-else-if="name==='calendar'"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></template>
+    <template v-else-if="name==='menu'"><path d="M4 6h16M4 12h16M4 18h16"/></template>
+    <template v-else-if="name==='info'"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></template>
+    <template v-else-if="name==='image'"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8" cy="9" r="2"/><path d="m21 15-5-5L5 20"/></template>
+    <template v-else-if="name==='rotate'"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M7 8a7 7 0 0 1 11-1l2 2M17 16a7 7 0 0 1-11 1l-2-2"/></template>
+    <template v-else-if="name==='steering'"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><path d="M3.5 10h17M12 14.5V21M8.5 10l3.5 4.5 3.5-4.5"/></template>
+    <template v-else-if="name==='send'"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></template>
+    <template v-else-if="name==='heart'"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></template>
+    <template v-else-if="name==='map'"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Z"/><path d="M9 3v15M15 6v15"/></template>
     <template v-else><circle cx="12" cy="12" r="8"/></template>
   </svg>
 </template>

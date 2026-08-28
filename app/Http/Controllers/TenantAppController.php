@@ -43,9 +43,18 @@ class TenantAppController extends Controller
             'tenant' => $this->tenantPayload($tenant, $locale),
             'template' => $this->templatePayload($tenant, $configuration, $locale),
             'services' => $tenant->services()->where('active', true)->orderBy('sort_order')->get()->map(fn (TenantService $service) => $this->servicePayload($service, $locale)),
-            'portfolio' => $tenant->portfolioItems()->where('published', true)->orderByDesc('featured')->orderBy('sort_order')->get()->map(fn ($item) => [
+            'portfolio' => $tenant->portfolioItems()->where('published', true)->where(function ($query) {
+                $query->where('image_path', '!=', '/brand/leonid-demo.webp')->orWhereNull('image_path')->orWhereNotNull('before_image_path')->orWhereNotNull('after_image_path');
+            })->orderByDesc('featured')->orderBy('sort_order')->get()->map(fn ($item) => [
                 'id' => $item->id, 'title' => $item->localized('title', $locale), 'description' => $item->localized('description', $locale),
                 'image' => $this->assetUrl($item->image_path), 'before_image' => $this->assetUrl($item->before_image_path), 'after_image' => $this->assetUrl($item->after_image_path), 'featured' => $item->featured,
+            ]),
+            'reviews' => $tenant->reviews()->with('customer')->where('published', true)->latest('received_at')->get()->map(fn ($review) => [
+                'id' => $review->id,
+                'rating' => $review->rating,
+                'author' => $review->author_name ?: $review->customer?->name,
+                'body' => $review->body,
+                'received_at' => $review->received_at?->toIso8601String(),
             ]),
             'entitlements' => [
                 'requests' => $this->enabled($tenant, 'request_enabled', true), 'booking' => $this->enabled($tenant, 'booking_enabled', false),
@@ -70,7 +79,7 @@ class TenantAppController extends Controller
 
         $data = $request->validate([
             'name' => 'nullable|string|max:120', 'phone' => 'required|string|max:50', 'email' => 'nullable|email|max:190',
-            'preferred_channel' => 'nullable|in:phone,whatsapp,sms,email', 'summary' => 'nullable|string|max:5000',
+            'preferred_channel' => 'nullable|in:phone,whatsapp,sms,email,push,vk', 'summary' => 'nullable|string|max:5000',
             'fields' => 'nullable', 'media_slots' => 'nullable', 'media' => 'required|array|min:1|max:12',
             'media.*' => 'file|mimetypes:image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime|max:262144',
         ]);
@@ -168,7 +177,7 @@ class TenantAppController extends Controller
         $data = $request->validate([
             'service_id' => 'required|integer', 'starts_at' => 'required|date|after:now', 'name' => 'nullable|string|max:120',
             'phone' => 'required|string|max:50', 'email' => 'nullable|email|max:190', 'comment' => 'nullable|string|max:2000',
-            'preferred_channel' => 'nullable|in:phone,whatsapp,sms,email',
+            'preferred_channel' => 'nullable|in:phone,whatsapp,sms,email,push,vk',
         ]);
         $service = $tenant->services()->where('active', true)->where('booking_enabled', true)->findOrFail($data['service_id']);
         $locale = $this->locale($request, $tenant);
@@ -404,11 +413,27 @@ class TenantAppController extends Controller
     {
         $profile = $tenant->profile;
 
+        $branding = (array) data_get($profile?->content, 'branding', []);
+
         return [
             'id' => $tenant->id, 'name' => $tenant->name, 'slug' => $tenant->slug, 'locale' => $locale,
             'description' => $tenant->business_description, 'logo' => $this->assetUrl($profile?->logo_path),
             'colors' => ['primary' => $profile?->primary_color ?: '#ff6b00', 'secondary' => $profile?->secondary_color ?: '#111318'],
-            'contact' => ['name' => $profile?->contact_name, 'phone' => $profile?->phone, 'email' => $profile?->email, 'street' => $profile?->street, 'postal_code' => $profile?->postal_code, 'city' => $profile?->city],
+            'contact' => [
+                'name' => $profile?->contact_name,
+                'phone' => $profile?->phone,
+                'email' => $profile?->email,
+                'street' => $profile?->street,
+                'postal_code' => $profile?->postal_code,
+                'city' => $profile?->city,
+                'vk_url' => $branding['vk_url'] ?? null,
+                'working_hours' => $branding['working_hours'] ?? null,
+            ],
+            'branding' => [
+                'confirmed' => filled($branding['confirmed_at'] ?? null),
+                'tagline' => $branding['tagline'] ?? null,
+                'hero_image' => $this->assetUrl($branding['hero_image_path'] ?? null),
+            ],
         ];
     }
 
@@ -422,7 +447,12 @@ class TenantAppController extends Controller
         return [
             'id' => $template?->id, 'code' => $template?->code ?: 'general-services.general', 'name' => $template?->localized('name', $locale),
             'engine' => $configuration['engine'] ?? 'request', 'layout' => $configuration['layout'] ?? 'general', 'navigation' => $configuration['navigation'] ?? ['home', 'works', 'action', 'activity', 'profile'],
-            'hero' => $this->localized($configuration['hero'] ?? [], $locale), 'trust' => array_map(fn ($item) => $this->localized($item, $locale), $configuration['trust'] ?? []),
+            'hero' => array_replace(
+                (array) $this->localized($configuration['hero'] ?? [], $locale),
+                filled(data_get($tenant->profile?->content, 'branding.hero_image_path'))
+                    ? ['image' => $this->assetUrl(data_get($tenant->profile?->content, 'branding.hero_image_path'))]
+                    : [],
+            ), 'trust' => array_map(fn ($item) => $this->localized($item, $locale), $configuration['trust'] ?? []),
             'media_slots' => $slots, 'video' => $media['video'] ?? $configuration['video'] ?? [], 'fields' => $fields,
             'submit' => $this->localized($configuration['submit'] ?? ['label' => $configuration['submit_label'] ?? null], $locale),
             'success' => $this->localized($configuration['success'] ?? [], $locale), 'push_prompt' => $this->localized($configuration['push_prompt'] ?? [], $locale),

@@ -15,6 +15,7 @@ use App\Services\StripeService;
 use App\Services\TenantImageGenerationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -41,6 +42,14 @@ class TenantController extends Controller
         if ($tenant->profile?->social_image_path) {
             $tenant->profile->setAttribute('social_image_url', Storage::disk('public')->url($tenant->profile->social_image_path));
         }
+        if ($tenant->profile?->logo_path) {
+            $tenant->profile->setAttribute('logo_url', $this->assetUrl($tenant->profile->logo_path));
+        }
+        $branding = (array) data_get($tenant->profile?->content, 'branding', []);
+        if (filled($branding['hero_image_path'] ?? null)) {
+            $tenant->profile->setAttribute('hero_image_url', $this->assetUrl($branding['hero_image_path']));
+        }
+        $tenant->profile?->setAttribute('branding', $branding);
 
         $subscription = $tenant->currentSubscription;
         $manualAccessActive = $tenant->hasManualAccess();
@@ -86,6 +95,152 @@ class TenantController extends Controller
         $audit->log('tenant.profile.updated', $tenant, $before, $tenant->fresh('profile')->toArray(), $tenant->id);
 
         return response()->json(['tenant' => $tenant->fresh('profile')]);
+    }
+
+    public function updateBranding(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
+    {
+        $this->authorizeTenant($request, $tenant);
+        $data = $request->validate([
+            'business_description' => 'nullable|string|max:3000',
+            'services' => 'nullable|string|max:3000',
+            'customers' => 'nullable|string|max:2000',
+            'style' => 'nullable|string|max:1000',
+            'avoid' => 'nullable|string|max:1000',
+            'tagline' => 'nullable|string|max:300',
+            'vk_url' => 'nullable|url|max:500',
+            'working_hours' => 'nullable|string|max:500',
+            'confirmed' => 'nullable|boolean',
+        ]);
+        $profile = $tenant->profile()->firstOrCreate();
+        $before = (array) data_get($profile->content, 'branding', []);
+        $branding = array_replace($before, Arr::except($data, ['business_description', 'confirmed']));
+        if (array_key_exists('confirmed', $data)) {
+            $branding['confirmed_at'] = $data['confirmed'] ? now()->toIso8601String() : null;
+        }
+        $content = (array) $profile->content;
+        $content['branding'] = $branding;
+        $profile->update(['content' => $content]);
+        if (array_key_exists('business_description', $data)) {
+            $tenant->update(['business_description' => $data['business_description']]);
+        }
+        $audit->log('tenant.branding.updated', $profile, $before, $branding, $tenant->id);
+
+        return response()->json(['branding' => $branding, 'tenant' => $tenant->fresh('profile')]);
+    }
+
+    public function uploadBrandingAsset(Request $request, Tenant $tenant, AuditService $audit, ImageStorageService $images): JsonResponse
+    {
+        $this->authorizeTenant($request, $tenant);
+        $data = $request->validate([
+            'asset' => ['required', Rule::in(['logo', 'hero'])],
+            'image' => 'required|image|mimes:jpg,jpeg,png,webp|max:20480',
+        ]);
+        $profile = $tenant->profile()->firstOrCreate();
+        $content = (array) $profile->content;
+        $branding = (array) ($content['branding'] ?? []);
+        $column = $data['asset'] === 'logo' ? 'logo_path' : null;
+        $old = $column ? $profile->{$column} : ($branding['hero_image_path'] ?? null);
+        $path = $images->storeUploaded(
+            $data['image'],
+            'tenant-app/'.$tenant->id.'/branding',
+            'public',
+            $data['asset'] === 'logo' ? 1024 : 2048,
+            $data['asset'] === 'logo' ? 1024 : 1600,
+        );
+        $this->replaceTenantAsset($old, $path, $tenant->id);
+        if ($column) {
+            $profile->logo_path = $path;
+            $branding['logo_source'] = 'upload';
+        } else {
+            $branding['hero_image_path'] = $path;
+            $branding['hero_source'] = 'upload';
+        }
+        $content['branding'] = $branding;
+        $profile->content = $content;
+        $profile->save();
+        $audit->log('tenant.branding.asset_uploaded', $profile, ['path' => $old], ['asset' => $data['asset'], 'path' => $path], $tenant->id);
+
+        return response()->json(['asset' => $data['asset'], 'path' => $path, 'url' => Storage::disk('public')->url($path), 'branding' => $branding], 201);
+    }
+
+    public function prepareBrandingPrompt(Request $request, Tenant $tenant, OpenAiService $openAi, OpenAiBudgetService $budget, TenantImageGenerationService $imageGenerations): JsonResponse
+    {
+        $this->authorizeTenant($request, $tenant);
+        $this->requireActiveSubscription($tenant);
+        $data = $request->validate(['asset' => ['required', Rule::in(['logo', 'hero'])]]);
+        $tenant->load(['profile', 'businessProfile.category', 'businessProfile.variation', 'businessProfile.template']);
+        $branding = (array) data_get($tenant->profile?->content, 'branding', []);
+        $language = match ($tenant->locale) {'ru' => 'Russian', 'uk' => 'Ukrainian', 'de' => 'German', default => 'English'};
+        $context = [
+            'asset' => $data['asset'],
+            'business_name' => $tenant->name,
+            'business_description' => $tenant->business_description,
+            'services' => $branding['services'] ?? null,
+            'customers' => $branding['customers'] ?? null,
+            'style' => $branding['style'] ?? null,
+            'avoid' => $branding['avoid'] ?? null,
+            'category' => $tenant->businessProfile?->category?->localized('name', $tenant->locale),
+            'variation' => $tenant->businessProfile?->variation?->localized('name', $tenant->locale),
+            'template' => $tenant->businessProfile?->template?->code,
+        ];
+        $budget->ensureAvailable($request->user()?->id);
+        $instructions = $data['asset'] === 'logo'
+            ? 'Write one editable image-generation prompt entirely in '.$language.' for a simple premium square business logo mark. It must remain legible as a tiny app icon, use no copyrighted marks, vehicle brand logos, photographs, mockups, text, letters or watermarks.'
+            : 'Write one editable image-generation prompt entirely in '.$language.' for a premium vertical mobile-app hero photograph. Show the exact service in a realistic workplace, leave darker clean areas for interface text, and include no text, logos, vehicle brand marks, number plates, UI or watermarks.';
+        $result = $openAi->structured($instructions.' Return JSON only.', json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 'tenant_branding_prompt', [
+            'type' => 'object',
+            'properties' => ['prompt' => ['type' => 'string']],
+            'required' => ['prompt'],
+            'additionalProperties' => false,
+        ]);
+        $payload = json_decode($result['text'], true, 512, JSON_THROW_ON_ERROR);
+        $prompt = trim((string) ($payload['prompt'] ?? ''));
+        abort_if($prompt === '', 422, 'IMAGE_PROMPT_PREPARATION_FAILED');
+        $budget->record('tenant_branding_prompt', $result['model'], $result['input_tokens'], $result['output_tokens'], $request->user()?->id, null, $tenant->id);
+
+        return response()->json(['prompt' => $prompt, 'asset' => $data['asset'], 'image_generation' => $imageGenerations->status($tenant)]);
+    }
+
+    public function generateBrandingAsset(Request $request, Tenant $tenant, OpenAiService $openAi, OpenAiBudgetService $budget, AuditService $audit, TenantImageGenerationService $imageGenerations, ImageStorageService $images): JsonResponse
+    {
+        $this->authorizeTenant($request, $tenant);
+        $this->requireActiveSubscription($tenant);
+        $data = $request->validate(['asset' => ['required', Rule::in(['logo', 'hero'])], 'prompt' => 'required|string|min:40|max:4000']);
+        $profile = $tenant->profile()->firstOrCreate();
+        $reservation = null;
+        try {
+            $budget->ensureAvailable($request->user()?->id);
+            $reservation = $imageGenerations->reserve($tenant);
+            $result = $openAi->image($data['prompt'], 'medium', $data['asset'] === 'logo' ? '1024x1024' : '1024x1536');
+        } catch (Throwable $exception) {
+            if ($reservation) {
+                $imageGenerations->release($tenant, $reservation);
+            }
+            if ($exception->getMessage() === 'IMAGE_CREDIT_REQUIRED') {
+                return response()->json(['message' => 'IMAGE_CREDIT_REQUIRED', 'image_generation' => $imageGenerations->status($tenant)], 402);
+            }
+            report($exception);
+            return response()->json(['message' => 'IMAGE_GENERATION_FAILED', 'image_generation' => $imageGenerations->status($tenant)], 422);
+        }
+        $content = (array) $profile->content;
+        $branding = (array) ($content['branding'] ?? []);
+        $old = $data['asset'] === 'logo' ? $profile->logo_path : ($branding['hero_image_path'] ?? null);
+        $path = $images->storeBytes($result['contents'], 'tenant-app/'.$tenant->id.'/branding', $result['format'], 'public', $data['asset'] === 'logo' ? 1024 : 2048, $data['asset'] === 'logo' ? 1024 : 1600);
+        $this->replaceTenantAsset($old, $path, $tenant->id);
+        if ($data['asset'] === 'logo') {
+            $profile->logo_path = $path;
+            $branding['logo_source'] = 'ai';
+        } else {
+            $branding['hero_image_path'] = $path;
+            $branding['hero_source'] = 'ai';
+        }
+        $content['branding'] = $branding;
+        $profile->content = $content;
+        $profile->save();
+        $budget->recordImage('tenant_branding_'.$data['asset'], $result['model'], $result['quality'], $request->user()?->id, $tenant->id);
+        $audit->log('tenant.branding.asset_generated', $profile, ['path' => $old], ['asset' => $data['asset'], 'path' => $path, 'usage' => $reservation['type']], $tenant->id);
+
+        return response()->json(['asset' => $data['asset'], 'path' => $path, 'url' => Storage::disk('public')->url($path), 'branding' => $branding, 'image_generation' => $imageGenerations->status($tenant)], 201);
     }
 
     public function uploadSocialImage(Request $request, Tenant $tenant, AuditService $audit, ImageStorageService $images): JsonResponse
@@ -222,6 +377,21 @@ class TenantController extends Controller
         if ($oldPath && $oldPath !== $newPath && str_starts_with($oldPath, 'tenant-social/')) {
             Storage::disk('public')->delete($oldPath);
         }
+    }
+
+    private function replaceTenantAsset(?string $oldPath, string $newPath, int $tenantId): void
+    {
+        if ($oldPath && $oldPath !== $newPath && str_starts_with($oldPath, 'tenant-app/'.$tenantId.'/branding/')) {
+            Storage::disk('public')->delete($oldPath);
+        }
+    }
+
+    private function assetUrl(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+        return str_starts_with($path, '/') || str_starts_with($path, 'http') ? $path : Storage::disk('public')->url($path);
     }
 
     public function updateSlug(Request $request, Tenant $tenant, AuditService $audit): JsonResponse

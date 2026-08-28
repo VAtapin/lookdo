@@ -88,8 +88,8 @@ function showDemo(){
             <div class="phone-section-title"><b>{{ tr('incomingRequests') }}</b><em>{{ tr('viewAll') }}</em></div>
             <div class="master-request-list"><div v-for="(item,index) in phoneRequests" :key="item[1]" class="master-request-card"><img decoding="async" :src="item[0]" alt=""><span><b>#12{{ 7-index }}</b><small>{{ tr(item[1]) }}</small></span><em>{{ tr('newRequests') }}</em></div></div>
             <div class="phone-section-title"><b>{{ tr('phoneMessages') }}</b><em>{{ tr('viewAll') }}</em></div>
-            <div class="master-message"><i>L</i><span><b>Leonid</b><small>{{ tr('howReply') }}</small></span><time>10:32</time></div>
-            <div class="master-message"><i>M</i><span><b>Maria</b><small>{{ tr('howReceive') }}</small></span><time>09:48</time></div>
+            <div class="master-message"><i>1</i><span><b>#127</b><small>{{ tr('howReply') }}</small></span><time>10:32</time></div>
+            <div class="master-message"><i>2</i><span><b>#126</b><small>{{ tr('howReceive') }}</small></span><time>09:48</time></div>
             <nav class="phone-app-nav master-nav"><span><LineIcon name="home"/><small>{{ tr('phoneHome') }}</small></span><span><LineIcon name="grid"/><small>{{ tr('activity') }}</small></span><span><LineIcon name="chat"/><small>{{ tr('phoneMessages') }}</small></span><span><LineIcon name="user"/><small>{{ tr('account') }}</small></span></nav>
           </div>
         </div>
