@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\Tenant;
 use App\Models\TenantCustomer;
 use App\Models\TenantPushSubscription;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use JsonException;
 use Minishlink\WebPush\ContentEncoding;
@@ -26,16 +28,40 @@ class TenantWebPushService
      */
     public function sendToCustomer(TenantCustomer $customer, array $payload): array
     {
-        if (! $this->configured()) {
-            return ['sent' => 0, 'failed' => 0, 'expired' => 0, 'skipped' => true];
-        }
-
         $subscriptions = TenantPushSubscription::query()
             ->where('tenant_id', $customer->tenant_id)
             ->where('customer_id', $customer->id)
             ->get();
 
-        if ($subscriptions->isEmpty()) {
+        return $this->send($subscriptions, $payload, [
+            'tenant_id' => $customer->tenant_id,
+            'customer_id' => $customer->id,
+        ]);
+    }
+
+    /**
+     * @param  array{title:string,body:string,url?:string,icon?:string,badge?:string,tag?:string,action?:string}  $payload
+     * @return array{sent:int,failed:int,expired:int,skipped:bool}
+     */
+    public function sendToTenantUsers(Tenant $tenant, array $payload): array
+    {
+        $subscriptions = TenantPushSubscription::query()
+            ->where('tenant_id', $tenant->id)
+            ->whereNotNull('user_id')
+            ->get();
+
+        return $this->send($subscriptions, $payload, ['tenant_id' => $tenant->id]);
+    }
+
+    /**
+     * @param  Collection<int, TenantPushSubscription>  $subscriptions
+     * @param  array{title:string,body:string,url?:string,icon?:string,badge?:string,tag?:string,action?:string}  $payload
+     * @param  array<string, int|string|null>  $context
+     * @return array{sent:int,failed:int,expired:int,skipped:bool}
+     */
+    private function send(Collection $subscriptions, array $payload, array $context): array
+    {
+        if (! $this->configured() || $subscriptions->isEmpty()) {
             return ['sent' => 0, 'failed' => 0, 'expired' => 0, 'skipped' => true];
         }
 
@@ -60,7 +86,6 @@ class TenantWebPushService
         }
 
         $result = ['sent' => 0, 'failed' => 0, 'expired' => 0, 'skipped' => false];
-
         foreach ($webPush->flush() as $report) {
             $record = $byEndpoint[$report->getEndpoint()] ?? null;
             if ($report->isSuccess()) {
@@ -75,9 +100,9 @@ class TenantWebPushService
                 continue;
             }
             $result['failed']++;
-            Log::warning('Tenant web push delivery failed.', [
-                'tenant_id' => $customer->tenant_id,
-                'customer_id' => $customer->id,
+            Log::warning('Tenant web push delivery failed.', $context + [
+                'user_id' => $record?->user_id,
+                'customer_id' => $record?->customer_id,
                 'endpoint_hash' => $record?->endpoint_hash,
                 'reason' => $report->getReason(),
             ]);
@@ -86,9 +111,7 @@ class TenantWebPushService
         return $result;
     }
 
-    /**
-     * @throws JsonException
-     */
+    /** @throws JsonException */
     private function payload(array $payload): string
     {
         try {

@@ -34,7 +34,7 @@ export default defineConfig({
                 globPatterns: [
                     'assets/app-*.js',
                     'assets/TenantPublicView-*.js',
-                    'assets/tenant-app-*.css',
+                    'assets/TenantPublicView-*.css',
                 ],
             },
         }),

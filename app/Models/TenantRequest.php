@@ -12,7 +12,7 @@ class TenantRequest extends Model
 
     protected function casts(): array
     {
-        return ['contact_snapshot' => 'array'];
+        return ['contact_snapshot' => 'array', 'completed_at' => 'datetime'];
     }
 
     public function tenant(): BelongsTo

@@ -1,0 +1,320 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Concerns\AuthorizesTenantWorkspace;
+use App\Models\Tenant;
+use App\Models\TenantCustomer;
+use App\Models\TenantPushSubscription;
+use App\Models\TenantRequest;
+use App\Models\User;
+use App\Services\EntitlementService;
+use App\Services\SmsService;
+use App\Services\TenantCalendarService;
+use App\Services\TenantWebPushService;
+use DomainException;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Throwable;
+
+class TenantWorkspaceController extends Controller
+{
+    use AuthorizesTenantWorkspace;
+
+    public function bootstrap(Request $request, Tenant $tenant, TenantCalendarService $calendar, EntitlementService $entitlements): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        $calendar->ensureWorkingHours($tenant);
+        $today = now('Europe/Berlin')->startOfDay();
+        $tomorrow = $today->copy()->addDay();
+        $appointments = $tenant->appointments()->with(['customer', 'service'])->whereBetween('starts_at', [$today, $tomorrow])->orderBy('starts_at')->get();
+        $requests = $tenant->appRequests()->with(['customer', 'media'])->where('created_at', '>=', $today)->latest()->get();
+        $unread = $tenant->messages()->where('sender_type', 'customer')->whereNull('read_at')->count();
+        $repeat = $tenant->appointments()
+            ->with('service:id,repeat_interval_days')
+            ->where('status', 'completed')
+            ->whereNotNull('customer_id')
+            ->latest('starts_at')
+            ->get(['id', 'customer_id', 'service_id', 'starts_at'])
+            ->unique('customer_id')
+            ->filter(function ($appointment): bool {
+                $days = (int) ($appointment->service?->repeat_interval_days ?? 0);
+
+                return $days > 0 && $appointment->starts_at?->copy()->addDays($days)->isPast();
+            })
+            ->count();
+
+        return response()->json([
+            'tenant' => ['id' => $tenant->id, 'name' => $tenant->name, 'slug' => $tenant->slug, 'locale' => $tenant->locale, 'platform_url' => 'https://'.$tenant->slug.'.'.config('tenancy.platform_domain')],
+            'today' => ['date' => $today->toDateString(), 'appointments' => $appointments->map(fn ($a) => $this->appointment($a)), 'requests' => $requests->map(fn ($r) => $this->requestItem($r)), 'unread' => $unread, 'free_slots' => $this->freeSlots($tenant, $calendar, $today->toDateString()), 'repeat_candidates' => $repeat, 'unpublished_works' => $tenant->portfolioItems()->where('published', false)->count()],
+            'counts' => ['requests' => $tenant->appRequests()->count(), 'new_requests' => $tenant->appRequests()->where('status', 'new')->count(), 'customers' => $tenant->customers()->count(), 'messages' => $unread, 'appointments' => $tenant->appointments()->where('starts_at', '>=', now())->whereNotIn('status', ['cancelled'])->count()],
+            'services' => $tenant->services()->orderBy('sort_order')->get(), 'working_hours' => $tenant->workingHours()->orderBy('weekday')->get(),
+            'access' => ['trial' => (bool) $tenant->currentSubscription?->isTrialActive(), 'entitlements' => $entitlements->all($tenant)],
+            'push' => ['enabled' => filled(config('services.webpush.vapid_public_key')) && (string) $entitlements->get($tenant, 'push_enabled', '1') === '1', 'public_key' => (string) config('services.webpush.vapid_public_key', '')],
+        ]);
+    }
+
+    public function requests(Request $request, Tenant $tenant): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        $q = $tenant->appRequests()->with(['customer', 'media', 'values', 'messages.senderUser']);
+        if ($request->filled('status')) {
+            $q->where('status', $request->string('status'));
+        }
+        if ($request->filled('search')) {
+            $term = '%'.$request->string('search').'%';
+            $q->where(fn ($x) => $x->where('number', 'like', $term)->orWhere('summary', 'like', $term)->orWhereHas('customer', fn ($c) => $c->where('name', 'like', $term)->orWhere('phone', 'like', $term)));
+        }
+
+        return response()->json(['items' => $q->latest()->paginate(30)->through(fn ($r) => $this->requestItem($r, true))]);
+    }
+
+    public function updateRequest(Request $request, Tenant $tenant, TenantRequest $tenantRequest): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($tenantRequest->tenant_id === $tenant->id, 404);
+        $data = $request->validate(['status' => 'sometimes|in:new,viewed,in_progress,waiting,completed,cancelled', 'internal_note' => 'nullable|string|max:5000']);
+        if (($data['status'] ?? null) === 'completed') {
+            $data['completed_at'] = now();
+        }
+        $tenantRequest->update($data);
+
+        return response()->json(['request' => $this->requestItem($tenantRequest->fresh(['customer', 'media', 'values', 'messages.senderUser']), true)]);
+    }
+
+    public function reply(Request $request, Tenant $tenant, TenantRequest $tenantRequest, TenantWebPushService $push, SmsService $sms): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($tenantRequest->tenant_id === $tenant->id, 404);
+        $data = $request->validate(['body' => 'required|string|max:5000', 'event' => 'nullable|in:master_replied,work_ready']);
+        $message = $tenantRequest->messages()->create(['tenant_id' => $tenant->id, 'customer_id' => $tenantRequest->customer_id, 'sender_type' => 'master', 'sender_user_id' => $request->user()->id, 'body' => $data['body']]);
+        $tenantRequest->messages()->where('sender_type', 'customer')->whereNull('read_at')->update(['read_at' => now()]);
+        $customer = $tenantRequest->customer;
+        $delivery = ['push' => null, 'sms' => null];
+        if ($customer) {
+            try {
+                $delivery['push'] = $push->sendToCustomer($customer, ['title' => $tenant->name, 'body' => $data['body'], 'url' => '/activity']);
+            } catch (Throwable $e) {
+                $delivery['push'] = ['error' => $e->getMessage()];
+            }
+            if (filled($customer->phone)) {
+                try {
+                    $queued = $sms->queueImportant($tenant, $customer->phone, $data['body'], $data['event'] ?? 'master_replied', 'request-'.$tenantRequest->id.'-message-'.$message->id);
+                    $delivery['sms'] = ['status' => $queued->status];
+                } catch (DomainException $e) {
+                    $delivery['sms'] = ['skipped' => $e->getMessage()];
+                }
+            }
+        }
+
+        return response()->json(['message' => $message, 'delivery' => $delivery], 201);
+    }
+
+    public function conversations(Request $request, Tenant $tenant): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        $items = $tenant->appRequests()->whereHas('messages')->with(['customer', 'messages' => fn ($q) => $q->latest()])->latest('updated_at')->get()->map(fn ($r) => [
+            'request' => $this->requestItem($r, true), 'customer' => $r->customer, 'last_message' => $r->messages->first(), 'unread' => $r->messages->where('sender_type', 'customer')->whereNull('read_at')->count(),
+        ]);
+
+        return response()->json(['items' => $items]);
+    }
+
+    public function customers(Request $request, Tenant $tenant): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        $q = $tenant->customers()->withCount(['requests', 'appointments'])->with('possibleDuplicate');
+        if ($request->filled('search')) {
+            $term = '%'.$request->string('search').'%';
+            $q->where(fn ($x) => $x->where('name', 'like', $term)->orWhere('phone', 'like', $term)->orWhere('email', 'like', $term));
+        }
+
+        return response()->json(['items' => $q->latest('last_activity_at')->paginate(40)]);
+    }
+
+    public function customer(Request $request, Tenant $tenant, TenantCustomer $customer): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($customer->tenant_id === $tenant->id, 404);
+
+        return response()->json([
+            'customer' => $customer->load('possibleDuplicate'),
+            'requests' => $customer->requests()->with('media')->latest()->limit(50)->get()->map(fn (TenantRequest $tenantRequest) => $this->requestItem($tenantRequest)),
+            'appointments' => $customer->appointments()->with('service')->latest('starts_at')->limit(50)->get()->map(fn ($appointment) => $this->appointment($appointment)),
+            'messages' => $customer->messages()->latest()->limit(50)->get()->reverse()->values(),
+        ]);
+    }
+
+    public function updateCustomer(Request $request, Tenant $tenant, TenantCustomer $customer): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($customer->tenant_id === $tenant->id, 404);
+        $data = $request->validate(['name' => 'nullable|string|max:120', 'phone' => 'nullable|string|max:50', 'email' => 'nullable|email|max:190', 'preferred_channel' => 'nullable|in:phone,whatsapp,sms,email,push', 'notes' => 'nullable|string|max:5000', 'tags' => 'nullable|array', 'marketing_consent' => 'nullable|boolean', 'publication_consent' => 'nullable|boolean']);
+        if (array_key_exists('phone', $data)) {
+            $data['phone_normalized'] = preg_replace('/\D+/', '', (string) $data['phone']);
+        }
+        if (array_key_exists('marketing_consent', $data)) {
+            $data['marketing_consent_at'] = $data['marketing_consent'] ? now() : null;
+            unset($data['marketing_consent']);
+        }
+        if (array_key_exists('publication_consent', $data)) {
+            $data['publication_consent_at'] = $data['publication_consent'] ? now() : null;
+            unset($data['publication_consent']);
+        }
+        $customer->update($data);
+
+        return response()->json(['customer' => $customer->fresh('possibleDuplicate')]);
+    }
+
+    public function mergeCustomer(Request $request, Tenant $tenant, TenantCustomer $customer): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($customer->tenant_id === $tenant->id, 404);
+        $data = $request->validate(['source_id' => 'required|integer|different:target_id']);
+        $source = $tenant->customers()->findOrFail($data['source_id']);
+        DB::transaction(function () use ($tenant, $customer, $source) {
+            foreach (['appRequests' => 'tenant_requests', 'appointments' => 'tenant_appointments', 'messages' => 'tenant_messages', 'clientTokens' => 'tenant_client_tokens', 'pushSubscriptions' => 'tenant_push_subscriptions', 'reminders' => 'tenant_reminders'] as $table) {
+                DB::table($table)->where('tenant_id', $tenant->id)->where('customer_id', $source->id)->update(['customer_id' => $customer->id]);
+            }
+            $customer->update(['name' => $customer->name ?: $source->name, 'phone' => $customer->phone ?: $source->phone, 'email' => $customer->email ?: $source->email, 'possible_duplicate_of_id' => null, 'last_activity_at' => collect([$customer->last_activity_at, $source->last_activity_at])->filter()->sortDesc()->first()]);
+            $tenant->customers()->where('possible_duplicate_of_id', $source->id)->update(['possible_duplicate_of_id' => $customer->id]);
+            $source->delete();
+        });
+
+        return response()->json(['customer' => $customer->fresh()]);
+    }
+
+    public function subscribePush(Request $request, Tenant $tenant, EntitlementService $entitlements): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless((string) $entitlements->get($tenant, 'push_enabled', '1') === '1', 403, 'PUSH_NOT_INCLUDED');
+        $data = $request->validate([
+            'endpoint' => 'required|url|max:2000',
+            'keys.p256dh' => 'required|string|max:1000',
+            'keys.auth' => 'required|string|max:500',
+        ]);
+
+        TenantPushSubscription::updateOrCreate(
+            ['tenant_id' => $tenant->id, 'endpoint_hash' => hash('sha256', $data['endpoint'])],
+            [
+                'customer_id' => null,
+                'user_id' => $request->user()->id,
+                'endpoint' => $data['endpoint'],
+                'public_key' => $data['keys']['p256dh'],
+                'auth_token' => $data['keys']['auth'],
+                'locale' => in_array($tenant->locale, ['de', 'en', 'ru', 'uk'], true) ? $tenant->locale : 'de',
+            ],
+        );
+
+        return response()->json(['subscribed' => true]);
+    }
+
+    public function unsubscribePush(Request $request, Tenant $tenant): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        $data = $request->validate(['endpoint' => 'required|url|max:2000']);
+        TenantPushSubscription::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('user_id', $request->user()->id)
+            ->where('endpoint_hash', hash('sha256', $data['endpoint']))
+            ->delete();
+
+        return response()->json(['subscribed' => false]);
+    }
+
+    public function team(Request $request, Tenant $tenant, EntitlementService $entitlements): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        $limit = max(1, (int) $entitlements->get($tenant, 'staff_users', 1));
+
+        return response()->json([
+            'members' => $tenant->users()->orderByRaw("CASE tenant_users.role WHEN 'owner' THEN 0 ELSE 1 END")->orderBy('users.name')->get(['users.id', 'users.name', 'users.email', 'users.is_active'])->map(fn (User $user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'active' => $user->is_active,
+                'role' => $user->pivot->role,
+            ]),
+            'limit' => $limit,
+            'can_manage' => $this->canManageTeam($request, $tenant),
+        ]);
+    }
+
+    public function addTeamMember(Request $request, Tenant $tenant, EntitlementService $entitlements): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($this->canManageTeam($request, $tenant), 403, 'OWNER_REQUIRED');
+        $limit = max(1, (int) $entitlements->get($tenant, 'staff_users', 1));
+        abort_if($tenant->users()->count() >= $limit, 422, 'TEAM_LIMIT_REACHED');
+        $data = $request->validate([
+            'name' => 'required|string|max:120',
+            'email' => 'required|email|max:255',
+            'role' => 'required|in:staff,manager',
+        ]);
+
+        $user = User::query()->where('email', mb_strtolower($data['email']))->first();
+        $created = false;
+        if (! $user) {
+            $created = true;
+            $user = User::create([
+                'name' => $data['name'],
+                'email' => mb_strtolower($data['email']),
+                'password' => Str::random(48),
+                'is_active' => true,
+                'email_verified_at' => now(),
+            ]);
+        }
+        abort_if($tenant->users()->whereKey($user->id)->exists(), 422, 'TEAM_MEMBER_EXISTS');
+        $tenant->users()->attach($user->id, ['role' => $data['role']]);
+        $setupUrl = null;
+        if ($created) {
+            $token = Password::broker()->createToken($user);
+            $setupUrl = url('/reset-password/'.$token).'?email='.urlencode($user->email);
+        }
+
+        return response()->json(['member' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'role' => $data['role']], 'setup_url' => $setupUrl], 201);
+    }
+
+    public function removeTeamMember(Request $request, Tenant $tenant, User $user): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($this->canManageTeam($request, $tenant), 403, 'OWNER_REQUIRED');
+        $member = $tenant->users()->whereKey($user->id)->firstOrFail();
+        abort_if($member->pivot->role === 'owner', 422, 'OWNER_CANNOT_BE_REMOVED');
+        $tenant->users()->detach($user->id);
+
+        return response()->json(['deleted' => true]);
+    }
+
+    private function canManageTeam(Request $request, Tenant $tenant): bool
+    {
+        return (bool) ($request->user()?->is_super_admin || $tenant->users()->whereKey($request->user()?->id)->wherePivot('role', 'owner')->exists());
+    }
+
+    private function requestItem(TenantRequest $r, bool $full = false): array
+    {
+        $base = ['id' => $r->id, 'number' => $r->number, 'status' => $r->status, 'summary' => $r->summary, 'internal_note' => $r->internal_note, 'locale' => $r->locale, 'created_at' => $r->created_at?->toIso8601String(), 'customer' => $r->customer, 'media' => $r->media->map(fn ($m) => ['id' => $m->id, 'type' => $m->type, 'slot' => $m->slot_key, 'url' => Storage::disk('public')->url($m->storage_key)])];
+        if ($full) {
+            $base['values'] = $r->values;
+            $base['messages'] = $r->messages;
+        }
+
+        return $base;
+    }
+
+    private function appointment($a): array
+    {
+        return ['id' => $a->id, 'number' => $a->number, 'status' => $a->status, 'starts_at' => $a->starts_at?->toIso8601String(), 'ends_at' => $a->ends_at?->toIso8601String(), 'customer' => $a->customer, 'service' => $a->service];
+    }
+
+    private function freeSlots(Tenant $tenant, TenantCalendarService $calendar, string $date): array
+    {
+        $service = $tenant->services()->where('active', true)->first();
+
+        return $service ? $calendar->slots($tenant, $service, $date) : [];
+    }
+}

@@ -65,14 +65,24 @@ class TenantController extends Controller
         ]);
     }
 
-    public function updateProfile(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
+    public function updateProfile(Request $request, Tenant $tenant, AuditService $audit, EntitlementService $entitlements): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
-        $data = $request->validate(['name' => 'required|string|max:160', 'locale' => ['nullable', Rule::in(['de', 'en', 'ru', 'uk'])], 'contact_name' => 'nullable|string|max:120', 'email' => 'nullable|email|max:255', 'phone' => 'nullable|string|max:50', 'street' => 'nullable|string|max:160', 'postal_code' => 'nullable|string|max:30', 'city' => 'nullable|string|max:100', 'primary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'secondary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/']]);
+        $data = $request->validate(['name' => 'required|string|max:160', 'locale' => ['nullable', Rule::in(['de', 'en', 'ru', 'uk'])], 'contact_name' => 'nullable|string|max:120', 'email' => 'nullable|email|max:255', 'phone' => 'nullable|string|max:50', 'street' => 'nullable|string|max:160', 'postal_code' => 'nullable|string|max:30', 'city' => 'nullable|string|max:100', 'primary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'secondary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'notification_preferences' => 'nullable|array', 'notification_preferences.push' => 'nullable|boolean', 'notification_preferences.sms' => 'nullable|boolean', 'notification_preferences.email' => 'nullable|boolean']);
         $before = $tenant->load('profile')->toArray();
         $tenant->update(['name' => $data['name'], 'locale' => $data['locale'] ?? $tenant->locale]);
         unset($data['name'], $data['locale']);
-        $tenant->profile()->updateOrCreate([], $data);
+        $profile = $tenant->profile()->firstOrNew();
+        if (array_key_exists('notification_preferences', $data)) {
+            if (! filter_var($entitlements->get($tenant, 'sms_enabled', false), FILTER_VALIDATE_BOOL)) {
+                $data['notification_preferences']['sms'] = false;
+            }
+            $content = (array) $profile->content;
+            $content['notifications'] = $data['notification_preferences'];
+            $data['content'] = $content;
+            unset($data['notification_preferences']);
+        }
+        $profile->fill($data)->save();
         $audit->log('tenant.profile.updated', $tenant, $before, $tenant->fresh('profile')->toArray(), $tenant->id);
 
         return response()->json(['tenant' => $tenant->fresh('profile')]);

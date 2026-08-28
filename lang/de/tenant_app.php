@@ -10,6 +10,12 @@ return [
     'slot_unavailable' => 'Dieser Termin wurde gerade vergeben. Bitte wählen Sie einen anderen.',
     'device_unlinked' => 'Dieses Gerät ist noch keiner Anfrage zugeordnet.',
     'received' => 'Ihre Anfrage ist angekommen. Der Meister prüft die Angaben und antwortet hier.',
+    'master_push' => [
+        'open' => 'Öffnen',
+        'new_request' => ['title' => 'Neue Anfrage', 'body' => 'Eine neue visuelle Anfrage ist eingegangen.'],
+        'new_message' => ['title' => 'Neue Nachricht', 'body' => 'Im Kundenbereich wartet eine neue Nachricht.'],
+        'new_appointment' => ['title' => 'Neuer Termin', 'body' => 'Ein neuer Termin wurde gebucht.'],
+    ],
     'media_slots' => [
         'overall' => 'Lenkrad komplett',
         'top' => 'Oberer Bereich',

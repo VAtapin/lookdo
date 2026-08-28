@@ -41,15 +41,15 @@ onMounted(()=>{window.addEventListener('beforeinstallprompt',beforeInstall);load
 
 <template>
 <div class="tenant-app-viewport" :style="theme">
-  <div v-if="loading" class="ta-splash"><img decoding="async" :src="'/brand/lookdo-mark.png'" alt=""><span>LOOKDO</span></div>
-  <div v-else-if="error&&!app" class="ta-unavailable"><img decoding="async" :src="'/brand/lookdo-mark.png'" alt=""><h1>{{ copy.unavailable }}</h1><p>{{ error }}</p><button class="ta-primary" @click="load">{{ copy.retry }}</button></div>
+  <div v-if="loading" class="ta-splash"><img decoding="async" :src="'/brand/lookdo-mark.webp'" alt=""><span>LOOKDO</span></div>
+  <div v-else-if="error&&!app" class="ta-unavailable"><img decoding="async" :src="'/brand/lookdo-mark.webp'" alt=""><h1>{{ copy.unavailable }}</h1><p>{{ error }}</p><button class="ta-primary" @click="load">{{ copy.retry }}</button></div>
   <div v-else-if="app" class="tenant-app-desktop">
     <main class="tenant-app-shell">
       <RequestFlow v-if="screen==='request'" :app="app" :copy="copy" :locale="locale" :token="clientToken" @close="go('home')" @success="flowSuccess"/>
       <BookingFlow v-else-if="screen==='book'" :app="app" :copy="copy" :locale="locale" :token="clientToken" @close="go('home')" @success="flowSuccess"/>
       <template v-else>
         <header class="ta-topbar">
-          <button class="ta-brand" @click="go('home')"><img decoding="async" :src="app.tenant.logo||'/brand/lookdo-mark.png'" :alt="app.tenant.name"><span>{{ app.tenant.name }}</span></button>
+          <button class="ta-brand" @click="go('home')"><img decoding="async" :src="app.tenant.logo||'/brand/lookdo-mark.webp'" :alt="app.tenant.name"><span>{{ app.tenant.name }}</span></button>
           <div class="ta-top-actions"><select :value="locale" :aria-label="copy.language" @change="changeLocale(($event.target as HTMLSelectElement).value)"><option value="de">DE</option><option value="en">EN</option><option value="ru">RU</option><option value="uk">UK</option></select><button class="ta-icon-button" @click="go('activity')"><AppIcon name="bell"/></button></div>
         </header>
 
@@ -80,14 +80,14 @@ onMounted(()=>{window.addEventListener('beforeinstallprompt',beforeInstall);load
             </template>
           </section>
 
-          <section v-else-if="screen==='profile'" class="ta-page"><div class="ta-profile-hero"><img decoding="async" :src="app.tenant.logo||'/brand/lookdo-mark.png'" :alt="app.tenant.name"><div><small>{{ app.template.name }}</small><h1>{{ app.tenant.name }}</h1><p>{{ app.tenant.description }}</p></div></div><div class="ta-profile-actions"><a v-if="app.tenant.contact.phone" :href="`tel:${app.tenant.contact.phone}`"><AppIcon name="phone"/><span>{{ copy.call }}</span></a><a v-if="app.tenant.contact.email" :href="`mailto:${app.tenant.contact.email}`"><AppIcon name="message"/><span>{{ copy.write }}</span></a><button @click="share"><AppIcon name="share"/><span>{{ copy.share }}</span></button></div><section class="ta-profile-card"><h2>{{ copy.businessInfo }}</h2><p v-if="address"><AppIcon name="home"/><span><b>{{ copy.address }}</b>{{ address }}</span></p><p v-if="app.tenant.contact.phone"><AppIcon name="phone"/><span><b>{{ copy.phone }}</b>{{ app.tenant.contact.phone }}</span></p><p v-if="app.tenant.contact.email"><AppIcon name="message"/><span><b>{{ copy.email }}</b>{{ app.tenant.contact.email }}</span></p><p v-if="!address&&!app.tenant.contact.phone&&!app.tenant.contact.email">{{ copy.profileEmpty }}</p></section><button class="ta-install" @click="install"><img decoding="async" :src="'/brand/lookdo-mark.png'" alt=""><span><b>{{ copy.install }}</b><small>{{ copy.powered }}</small></span><AppIcon name="arrow"/></button></section>
+          <section v-else-if="screen==='profile'" class="ta-page"><div class="ta-profile-hero"><img decoding="async" :src="app.tenant.logo||'/brand/lookdo-mark.webp'" :alt="app.tenant.name"><div><small>{{ app.template.name }}</small><h1>{{ app.tenant.name }}</h1><p>{{ app.tenant.description }}</p></div></div><div class="ta-profile-actions"><a v-if="app.tenant.contact.phone" :href="`tel:${app.tenant.contact.phone}`"><AppIcon name="phone"/><span>{{ copy.call }}</span></a><a v-if="app.tenant.contact.email" :href="`mailto:${app.tenant.contact.email}`"><AppIcon name="message"/><span>{{ copy.write }}</span></a><button @click="share"><AppIcon name="share"/><span>{{ copy.share }}</span></button></div><section class="ta-profile-card"><h2>{{ copy.businessInfo }}</h2><p v-if="address"><AppIcon name="home"/><span><b>{{ copy.address }}</b>{{ address }}</span></p><p v-if="app.tenant.contact.phone"><AppIcon name="phone"/><span><b>{{ copy.phone }}</b>{{ app.tenant.contact.phone }}</span></p><p v-if="app.tenant.contact.email"><AppIcon name="message"/><span><b>{{ copy.email }}</b>{{ app.tenant.contact.email }}</span></p><p v-if="!address&&!app.tenant.contact.phone&&!app.tenant.contact.email">{{ copy.profileEmpty }}</p></section><button class="ta-install" @click="install"><img decoding="async" :src="'/brand/lookdo-mark.webp'" alt=""><span><b>{{ copy.install }}</b><small>{{ copy.powered }}</small></span><AppIcon name="arrow"/></button></section>
           <section v-else class="ta-page ta-empty"><h1>404</h1><button class="ta-primary" @click="go('home')">{{ copy.home }}</button></section>
         </div>
 
         <nav class="ta-bottom-nav" :aria-label="copy.navigation"><button v-for="item in navItems" :key="item.key" :class="{active:screen===item.key,central:item.central}" @click="go(item.key)"><span><AppIcon :name="item.icon"/></span><small>{{ item.label }}</small></button></nav>
       </template>
     </main>
-    <aside class="ta-desktop-aside"><img decoding="async" :src="'/brand/lookdo-mark.png'" alt="LOOKDO"><small>{{ app.tenant.name }}</small><h2>{{ copy.desktopTitle }}</h2><p>{{ copy.desktopText }}</p><div><span><AppIcon name="camera"/></span><span><AppIcon name="message"/></span><span><AppIcon name="calendar"/></span></div><button @click="share"><AppIcon name="share"/>{{ copy.share }}</button><em>{{ copy.powered }}</em></aside>
+    <aside class="ta-desktop-aside"><img decoding="async" :src="'/brand/lookdo-mark.webp'" alt="LOOKDO"><small>{{ app.tenant.name }}</small><h2>{{ copy.desktopTitle }}</h2><p>{{ copy.desktopText }}</p><div><span><AppIcon name="camera"/></span><span><AppIcon name="message"/></span><span><AppIcon name="calendar"/></span></div><button @click="share"><AppIcon name="share"/>{{ copy.share }}</button><em>{{ copy.powered }}</em></aside>
   </div>
 </div>
 </template>

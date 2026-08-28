@@ -12,12 +12,30 @@ class TenantCustomer extends Model
 
     protected function casts(): array
     {
-        return ['last_activity_at' => 'datetime'];
+        return [
+            'tags' => 'array',
+            'last_activity_at' => 'datetime',
+            'phone_verified_at' => 'datetime',
+            'email_verified_at' => 'datetime',
+            'service_consent_at' => 'datetime',
+            'marketing_consent_at' => 'datetime',
+            'publication_consent_at' => 'datetime',
+        ];
     }
 
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    public function possibleDuplicate(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'possible_duplicate_of_id');
+    }
+
+    public function reminders(): HasMany
+    {
+        return $this->hasMany(TenantReminder::class, 'customer_id');
     }
 
     public function tokens(): HasMany

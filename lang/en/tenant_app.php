@@ -10,6 +10,12 @@ return [
     'slot_unavailable' => 'This time has just been booked. Please select another one.',
     'device_unlinked' => 'This device is not linked to a request yet.',
     'received' => 'Your request has arrived. The specialist will review it and reply here.',
+    'master_push' => [
+        'open' => 'Open',
+        'new_request' => ['title' => 'New request', 'body' => 'A new visual request has arrived.'],
+        'new_message' => ['title' => 'New message', 'body' => 'A new message is waiting in the customer workspace.'],
+        'new_appointment' => ['title' => 'New appointment', 'body' => 'A new appointment has been booked.'],
+    ],
     'media_slots' => [
         'overall' => 'Whole steering wheel',
         'top' => 'Top section',

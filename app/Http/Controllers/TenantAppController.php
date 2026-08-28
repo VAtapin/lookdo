@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendTenantMasterPush;
 use App\Models\Tenant;
 use App\Models\TenantAppointment;
 use App\Models\TenantClientToken;
@@ -13,6 +14,7 @@ use App\Models\TenantRequestValue;
 use App\Models\TenantService;
 use App\Services\EntitlementService;
 use App\Services\ImageStorageService;
+use App\Services\TenantCalendarService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
@@ -75,7 +77,7 @@ class TenantAppController extends Controller
         $fields = $this->jsonArray($data['fields'] ?? []);
         $slots = $this->jsonArray($data['media_slots'] ?? []);
         $locale = $this->locale($request, $tenant);
-        [$customer, $rawToken] = $this->customerAndToken($tenant, $data, $locale);
+        [$customer, $rawToken] = $this->customerAndToken($request, $tenant, $data, $locale);
 
         $tenantRequest = DB::transaction(function () use ($tenant, $customer, $data, $fields, $slots, $locale, $request, $images) {
             $appRequest = $tenant->appRequests()->create([
@@ -113,6 +115,8 @@ class TenantAppController extends Controller
             return $appRequest;
         });
 
+        $this->notifyMaster($tenant, 'new_request', '/app/requests', 'request-'.$tenantRequest->id);
+
         return response()->json(['token' => $rawToken, 'request' => $this->requestPayload($tenantRequest->fresh(['media', 'messages'])), 'success' => $this->localized(data_get($this->configuration($tenant), 'success', []), $locale)], 201);
     }
 
@@ -136,11 +140,12 @@ class TenantAppController extends Controller
         $data = $request->validate(['body' => 'required|string|max:5000']);
         $message = $tenantRequest->messages()->create(['tenant_id' => $tenant->id, 'customer_id' => $customer->id, 'sender_type' => 'customer', 'body' => $data['body']]);
         $customer->update(['last_activity_at' => now()]);
+        $this->notifyMaster($tenant, 'new_message', '/app/messages', 'message-'.$message->id);
 
         return response()->json(['message' => $this->messagePayload($message)], 201);
     }
 
-    public function availability(Request $request): JsonResponse
+    public function availability(Request $request, TenantCalendarService $calendar): JsonResponse
     {
         $tenant = $this->tenant($request);
         $this->ensureAvailable($request, $tenant);
@@ -150,10 +155,10 @@ class TenantAppController extends Controller
         $data = $request->validate(['service_id' => 'required|integer', 'date' => 'required|date_format:Y-m-d|after_or_equal:today']);
         $service = $tenant->services()->where('active', true)->findOrFail($data['service_id']);
 
-        return response()->json(['slots' => $this->availableSlots($tenant, $service, $data['date'])]);
+        return response()->json(['slots' => $calendar->slots($tenant, $service, $data['date'])]);
     }
 
-    public function createAppointment(Request $request): JsonResponse
+    public function createAppointment(Request $request, TenantCalendarService $calendar): JsonResponse
     {
         $tenant = $this->tenant($request);
         $this->ensureAvailable($request, $tenant);
@@ -167,14 +172,14 @@ class TenantAppController extends Controller
         ]);
         $service = $tenant->services()->where('active', true)->where('booking_enabled', true)->findOrFail($data['service_id']);
         $locale = $this->locale($request, $tenant);
-        [$customer, $rawToken] = $this->customerAndToken($tenant, $data, $locale);
+        [$customer, $rawToken] = $this->customerAndToken($request, $tenant, $data, $locale);
         $start = CarbonImmutable::parse($data['starts_at'], 'Europe/Berlin');
         $end = $start->addMinutes($service->duration_minutes);
 
-        $appointment = DB::transaction(function () use ($tenant, $customer, $service, $data, $locale, $start, $end) {
-            $overlap = TenantAppointment::where('tenant_id', $tenant->id)->whereNotIn('status', ['cancelled'])
-                ->where('starts_at', '<', $end)->where('ends_at', '>', $start)->lockForUpdate()->exists();
-            if ($overlap) {
+        $appointment = DB::transaction(function () use ($tenant, $customer, $service, $data, $locale, $start, $end, $calendar) {
+            try {
+                $calendar->assertAvailable($tenant, $service, $start, $end);
+            } catch (ValidationException) {
                 throw ValidationException::withMessages(['starts_at' => trans('tenant_app.slot_unavailable', locale: $locale)]);
             }
 
@@ -184,6 +189,8 @@ class TenantAppController extends Controller
                 'contact_snapshot' => Arr::only($data, ['name', 'phone', 'email', 'preferred_channel']),
             ]);
         });
+
+        $this->notifyMaster($tenant, 'new_appointment', '/app/calendar', 'appointment-'.$appointment->id);
 
         return response()->json(['token' => $rawToken, 'appointment' => $this->appointmentPayload($appointment->load('service'), $locale)], 201);
     }
@@ -202,6 +209,22 @@ class TenantAppController extends Controller
         );
 
         return response()->json(['subscribed' => true]);
+    }
+
+    private function notifyMaster(Tenant $tenant, string $event, string $url, string $tag): void
+    {
+        if (! $this->enabled($tenant, 'push_enabled', true)) {
+            return;
+        }
+
+        $locale = in_array($tenant->locale, ['de', 'en', 'ru', 'uk'], true) ? $tenant->locale : 'de';
+        SendTenantMasterPush::dispatch($tenant->id, [
+            'title' => trans("tenant_app.master_push.$event.title", locale: $locale),
+            'body' => trans("tenant_app.master_push.$event.body", locale: $locale),
+            'url' => $url,
+            'tag' => "lookdo-master-$tag",
+            'action' => trans('tenant_app.master_push.open', locale: $locale),
+        ])->afterResponse();
     }
 
     private function tenant(Request $request): Tenant
@@ -279,15 +302,52 @@ class TenantAppController extends Controller
         }
     }
 
-    private function customerAndToken(Tenant $tenant, array $data, string $locale): array
+    /**
+     * A phone number is only a duplicate signal. It never grants access to another
+     * device's history. Known devices keep their customer; unknown devices get a
+     * separate record which the master may merge after verification.
+     */
+    private function customerAndToken(Request $request, Tenant $tenant, array $data, string $locale): array
     {
+        $customer = $this->customerFromToken($request, $tenant);
+        $rawToken = null;
         $normalized = preg_replace('/\D+/', '', (string) $data['phone']);
-        $customer = $tenant->customers()->firstOrNew(['phone_normalized' => $normalized]);
-        $customer->fill(['name' => $data['name'] ?? $customer->name, 'phone' => $data['phone'], 'email' => $data['email'] ?? $customer->email, 'locale' => $locale, 'preferred_channel' => $data['preferred_channel'] ?? 'phone', 'last_activity_at' => now()])->save();
-        $raw = Str::random(80);
-        $customer->tokens()->create(['tenant_id' => $tenant->id, 'token_hash' => hash('sha256', $raw), 'last_used_at' => now(), 'expires_at' => now()->addYear()]);
 
-        return [$customer, $raw];
+        if (! $customer) {
+            $possibleDuplicate = $normalized !== ''
+                ? $tenant->customers()->where('phone_normalized', $normalized)->latest('id')->first()
+                : null;
+            $customer = $tenant->customers()->create([
+                'possible_duplicate_of_id' => $possibleDuplicate?->id,
+                'name' => $data['name'] ?? null,
+                'phone' => $data['phone'],
+                'phone_normalized' => $normalized,
+                'email' => $data['email'] ?? null,
+                'locale' => $locale,
+                'preferred_channel' => $data['preferred_channel'] ?? 'phone',
+                'last_activity_at' => now(),
+                'service_consent_at' => now(),
+            ]);
+            $rawToken = Str::random(80);
+            $customer->tokens()->create([
+                'tenant_id' => $tenant->id,
+                'token_hash' => hash('sha256', $rawToken),
+                'last_used_at' => now(),
+                'expires_at' => now()->addYear(),
+            ]);
+        } else {
+            $customer->fill([
+                'name' => $data['name'] ?? $customer->name,
+                'phone' => $data['phone'],
+                'phone_normalized' => $normalized,
+                'email' => $data['email'] ?? $customer->email,
+                'locale' => $locale,
+                'preferred_channel' => $data['preferred_channel'] ?? $customer->preferred_channel ?? 'phone',
+                'last_activity_at' => now(),
+            ])->save();
+        }
+
+        return [$customer, $rawToken ?: (string) $request->header('X-Lookdo-Client-Token')];
     }
 
     private function customerFromToken(Request $request, Tenant $tenant): ?TenantCustomer

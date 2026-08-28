@@ -103,6 +103,36 @@ class Tenant extends Model
         return $this->hasMany(TenantPushSubscription::class);
     }
 
+    public function messages(): HasMany
+    {
+        return $this->hasMany(TenantMessage::class);
+    }
+
+    public function workingHours(): HasMany
+    {
+        return $this->hasMany(TenantWorkingHour::class);
+    }
+
+    public function calendarBlocks(): HasMany
+    {
+        return $this->hasMany(TenantCalendarBlock::class);
+    }
+
+    public function reminders(): HasMany
+    {
+        return $this->hasMany(TenantReminder::class);
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(TenantReview::class);
+    }
+
+    public function socialDrafts(): HasMany
+    {
+        return $this->hasMany(TenantSocialDraft::class);
+    }
+
     public function hasActiveSubscription(): bool
     {
         if ($this->hasManualAccess()) {

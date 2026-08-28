@@ -22,7 +22,7 @@ const platformRoutes: RouteRecordRaw[] = [
     { path: '/:locale(de|en|ru|uk)/login', component: LoginView },
     { path: '/register', component: RegisterView },
     { path: '/:locale(de|en|ru|uk)/register', component: RegisterView },
-    { path: '/app/:section(overview|business|domain|billing)?', component: TenantView, meta: { private: true } },
+    { path: '/app/:section(today|requests|calendar|messages|customers|work|services|more|business|domain|billing|team|settings)?', component: TenantView, meta: { private: true } },
     { path: '/control/settings/:settingsGroup?', component: ControlView, meta: { private: true, control: true } },
     { path: '/control/:section(dashboard|tenants|administrators|subscriptions|plans|stripe|sms|templates|ai|classifications|content|backups|audit)?', component: ControlView, meta: { private: true, control: true } },
     { path: '/:key(impressum|datenschutz|agb|kontakt)', component: LegalView },
@@ -36,7 +36,7 @@ const router = createRouter({
     scrollBehavior: (to) => to.hash ? ({ el: to.hash, top: 78, behavior: 'smooth' }) : ({ top: 0 }),
 });
 
-if (isTenantHost && 'serviceWorker' in navigator) {
+if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => undefined);
     });

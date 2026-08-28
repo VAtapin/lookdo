@@ -5,9 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class TenantPushSubscription extends Model
+class TenantReminder extends Model
 {
     protected $guarded = [];
+
+    protected function casts(): array
+    {
+        return ['scheduled_at' => 'datetime', 'sent_at' => 'datetime'];
+    }
 
     public function tenant(): BelongsTo
     {
@@ -19,8 +24,8 @@ class TenantPushSubscription extends Model
         return $this->belongsTo(TenantCustomer::class, 'customer_id');
     }
 
-    public function user(): BelongsTo
+    public function appointment(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(TenantAppointment::class, 'appointment_id');
     }
 }

@@ -118,7 +118,11 @@ chmod 750 /var/www/vhosts/lookdo.app/private/backups
 
 $PHP_BIN artisan backup:create
 $PHP_BIN artisan backup:verify
-$PHP_BIN artisan optimize
+$PHP_BIN artisan optimize:clear
+$PHP_BIN artisan config:cache
+$PHP_BIN artisan route:cache
+$PHP_BIN artisan view:cache
+$PHP_BIN artisan event:cache
 ```
 
 Встроенная копия содержит согласованный dump MariaDB и `storage/app`, хранит SHA-256 и автоматически оставляет последние 14 комплектов. Она дополняет, но не заменяет внешнюю резервную копию подписки Plesk. Подробности: [BACKUP.md](BACKUP.md).
@@ -137,7 +141,7 @@ $PHP_BIN artisan optimize
 /opt/plesk/php/8.5/bin/php /var/www/vhosts/lookdo.app/httpdocs/artisan queue:work --sleep=3 --tries=3 --timeout=300
 ```
 
-Scheduler ежедневно создаёт backup в 02:30 и проверяет последнюю копию в 04:00.
+Scheduler ежедневно создаёт backup в 02:30 и проверяет последнюю копию в 04:00. Команда `lookdo:reminders:send` подготовлена, но намеренно не добавлена в расписание: регулярная внешняя отправка подключается только отдельным явным решением владельца платформы.
 
 ## 6. Финальная проверка
 
@@ -176,7 +180,11 @@ $NODE_DIR/npm ci --include=dev
 $NODE_DIR/npm run build
 $PHP_BIN artisan migrate --force
 $PHP_BIN artisan lookdo:platform-data --repair
-$PHP_BIN artisan optimize
+$PHP_BIN artisan optimize:clear
+$PHP_BIN artisan config:cache
+$PHP_BIN artisan route:cache
+$PHP_BIN artisan view:cache
+$PHP_BIN artisan event:cache
 $PHP_BIN artisan queue:restart
 $PHP_BIN artisan up
 $PHP_BIN artisan lookdo:platform-data
@@ -205,8 +213,12 @@ $PHP_BIN artisan migrate --force
 $PHP_BIN artisan lookdo:platform-data --repair
 $PHP_BIN artisan backup:create
 $PHP_BIN artisan backup:verify
-$PHP_BIN artisan optimize
+$PHP_BIN artisan optimize:clear
+$PHP_BIN artisan config:cache
+$PHP_BIN artisan route:cache
+$PHP_BIN artisan view:cache
+$PHP_BIN artisan event:cache
 $PHP_BIN artisan queue:restart
 ```
 
-Правильное имя команды кеширования — `artisan optimize`, без буквы `d` в конце.
+В этой установке используется явное кеширование `config`, `route`, `view` и `event`; команда `artisan optimize` не применяется.

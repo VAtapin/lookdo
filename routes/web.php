@@ -8,7 +8,10 @@ use App\Http\Controllers\SevenSmsWebhookController;
 use App\Http\Controllers\SmsAdminController;
 use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\TenantAppController;
+use App\Http\Controllers\TenantCalendarController;
+use App\Http\Controllers\TenantContentController;
 use App\Http\Controllers\TenantController;
+use App\Http\Controllers\TenantWorkspaceController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('api')->middleware('locale')->group(function () {
@@ -47,6 +50,48 @@ Route::prefix('api')->middleware('locale')->group(function () {
         Route::post('/tenant/{tenant}/domains/{domain}/verify', [TenantController::class, 'verifyDomain']);
         Route::delete('/tenant/{tenant}/domains/{domain}', [TenantController::class, 'removeDomain']);
         Route::post('/tenant/{tenant}/checkout', [TenantController::class, 'checkout']);
+        Route::get('/tenant/{tenant}/workspace', [TenantWorkspaceController::class, 'bootstrap']);
+        Route::get('/tenant/{tenant}/workspace/requests', [TenantWorkspaceController::class, 'requests']);
+        Route::put('/tenant/{tenant}/workspace/requests/{tenantRequest}', [TenantWorkspaceController::class, 'updateRequest']);
+        Route::post('/tenant/{tenant}/workspace/requests/{tenantRequest}/reply', [TenantWorkspaceController::class, 'reply']);
+        Route::get('/tenant/{tenant}/workspace/conversations', [TenantWorkspaceController::class, 'conversations']);
+        Route::get('/tenant/{tenant}/workspace/customers', [TenantWorkspaceController::class, 'customers']);
+        Route::get('/tenant/{tenant}/workspace/customers/{customer}', [TenantWorkspaceController::class, 'customer']);
+        Route::put('/tenant/{tenant}/workspace/customers/{customer}', [TenantWorkspaceController::class, 'updateCustomer']);
+        Route::post('/tenant/{tenant}/workspace/customers/{customer}/merge', [TenantWorkspaceController::class, 'mergeCustomer']);
+        Route::post('/tenant/{tenant}/workspace/push-subscriptions', [TenantWorkspaceController::class, 'subscribePush'])->middleware('throttle:10,1');
+        Route::delete('/tenant/{tenant}/workspace/push-subscriptions', [TenantWorkspaceController::class, 'unsubscribePush'])->middleware('throttle:10,1');
+        Route::get('/tenant/{tenant}/workspace/team', [TenantWorkspaceController::class, 'team']);
+        Route::post('/tenant/{tenant}/workspace/team', [TenantWorkspaceController::class, 'addTeamMember']);
+        Route::delete('/tenant/{tenant}/workspace/team/{user}', [TenantWorkspaceController::class, 'removeTeamMember']);
+
+        Route::get('/tenant/{tenant}/calendar', [TenantCalendarController::class, 'index']);
+        Route::put('/tenant/{tenant}/calendar/working-hours', [TenantCalendarController::class, 'saveWorkingHours']);
+        Route::get('/tenant/{tenant}/calendar/slots', [TenantCalendarController::class, 'slots']);
+        Route::post('/tenant/{tenant}/services', [TenantCalendarController::class, 'saveService']);
+        Route::put('/tenant/{tenant}/services/{service}', [TenantCalendarController::class, 'saveService']);
+        Route::delete('/tenant/{tenant}/services/{service}', [TenantCalendarController::class, 'deleteService']);
+        Route::post('/tenant/{tenant}/calendar/appointments', [TenantCalendarController::class, 'saveAppointment']);
+        Route::put('/tenant/{tenant}/calendar/appointments/{appointment}', [TenantCalendarController::class, 'saveAppointment']);
+        Route::delete('/tenant/{tenant}/calendar/appointments/{appointment}', [TenantCalendarController::class, 'deleteAppointment']);
+        Route::post('/tenant/{tenant}/calendar/blocks', [TenantCalendarController::class, 'saveBlock']);
+        Route::put('/tenant/{tenant}/calendar/blocks/{block}', [TenantCalendarController::class, 'saveBlock']);
+        Route::delete('/tenant/{tenant}/calendar/blocks/{block}', [TenantCalendarController::class, 'deleteBlock']);
+        Route::post('/tenant/{tenant}/calendar/reminders', [TenantCalendarController::class, 'saveReminder']);
+        Route::put('/tenant/{tenant}/calendar/reminders/{reminder}', [TenantCalendarController::class, 'saveReminder']);
+        Route::delete('/tenant/{tenant}/calendar/reminders/{reminder}', [TenantCalendarController::class, 'deleteReminder']);
+
+        Route::get('/tenant/{tenant}/content-workspace', [TenantContentController::class, 'index']);
+        Route::post('/tenant/{tenant}/portfolio', [TenantContentController::class, 'savePortfolio']);
+        Route::post('/tenant/{tenant}/portfolio/{item}', [TenantContentController::class, 'savePortfolio']);
+        Route::delete('/tenant/{tenant}/portfolio/{item}', [TenantContentController::class, 'deletePortfolio']);
+        Route::post('/tenant/{tenant}/reviews', [TenantContentController::class, 'saveReview']);
+        Route::put('/tenant/{tenant}/reviews/{review}', [TenantContentController::class, 'saveReview']);
+        Route::delete('/tenant/{tenant}/reviews/{review}', [TenantContentController::class, 'deleteReview']);
+        Route::post('/tenant/{tenant}/social-drafts', [TenantContentController::class, 'saveSocial']);
+        Route::put('/tenant/{tenant}/social-drafts/{draft}', [TenantContentController::class, 'saveSocial']);
+        Route::delete('/tenant/{tenant}/social-drafts/{draft}', [TenantContentController::class, 'deleteSocial']);
+        Route::post('/tenant/{tenant}/workspace/ai', [TenantContentController::class, 'ai'])->middleware('throttle:20,1');
         Route::post('/impersonation/stop', [AdminController::class, 'stopImpersonation']);
 
         Route::prefix('control')->middleware('superadmin')->group(function () {
@@ -132,4 +177,4 @@ Route::get('/sitemap.xml', function () {
 });
 Route::get('/robots.txt', fn () => response("User-agent: *\nAllow: /\nDisallow: /app\nDisallow: /control\nDisallow: /api\nSitemap: ".rtrim(config('app.url'), '/')."/sitemap.xml\n", 200, ['Content-Type' => 'text/plain']));
 Route::get('/reset-password/{token}', fn () => view('app'))->middleware('locale')->name('password.reset');
-Route::view('/{path?}', 'app')->middleware('locale')->where('path', '^(?!api|up|sitemap\.xml|robots\.txt).*$');
+Route::view('/{path?}', 'app')->middleware('locale')->where('path', '^(?!api|up|sitemap\\.xml|robots\\.txt).*$');

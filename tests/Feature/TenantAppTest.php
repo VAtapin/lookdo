@@ -151,7 +151,7 @@ class TenantAppTest extends TestCase
         $this->assertNotNull($serviceId);
 
         $date = CarbonImmutable::now('Europe/Berlin')->addDay();
-        while ($date->dayOfWeekIso === 7) {
+        while ($date->dayOfWeekIso > 5) {
             $date = $date->addDay();
         }
         $availability = $this->getJson($this->url($tenant, '/api/tenant-app/availability?service_id='.$serviceId.'&date='.$date->format('Y-m-d')))

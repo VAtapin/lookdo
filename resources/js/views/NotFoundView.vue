@@ -4,7 +4,7 @@ import { tr } from '../i18n';
 
 <template>
   <main class="not-found-page">
-    <img decoding="async" :src="'/brand/lookdo-mark.png'" alt="LOOKDO">
+    <img decoding="async" :src="'/brand/lookdo-mark.webp'" alt="LOOKDO">
     <p>404</p>
     <h1>{{ tr('pageNotFound') }}</h1>
     <RouterLink class="button" to="/">{{ tr('returnHome') }}</RouterLink>

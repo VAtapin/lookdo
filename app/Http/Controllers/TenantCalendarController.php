@@ -1,0 +1,269 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Concerns\AuthorizesTenantWorkspace;
+use App\Models\Tenant;
+use App\Models\TenantAppointment;
+use App\Models\TenantCalendarBlock;
+use App\Models\TenantReminder;
+use App\Models\TenantService;
+use App\Services\EntitlementService;
+use App\Services\TenantCalendarService;
+use Carbon\CarbonImmutable;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+
+class TenantCalendarController extends Controller
+{
+    use AuthorizesTenantWorkspace;
+
+    public function index(Request $request, Tenant $tenant, TenantCalendarService $calendar, EntitlementService $entitlements): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        $calendar->ensureWorkingHours($tenant);
+        $from = CarbonImmutable::parse($request->input('from', now()->startOfMonth()), TenantCalendarService::TIMEZONE)->startOfDay();
+        $to = CarbonImmutable::parse($request->input('to', $from->addMonth()), TenantCalendarService::TIMEZONE)->endOfDay();
+
+        return response()->json([
+            'appointments' => $tenant->appointments()->with(['customer', 'service'])->where('starts_at', '<', $to)->where('ends_at', '>', $from)->orderBy('starts_at')->get(),
+            'blocks' => $tenant->calendarBlocks()->where('starts_at', '<', $to)->where('ends_at', '>', $from)->orderBy('starts_at')->get(),
+            'working_hours' => $tenant->workingHours()->orderBy('weekday')->get(),
+            'services' => $tenant->services()->orderBy('sort_order')->get(),
+            'reminders' => $tenant->reminders()->with(['customer', 'appointment'])->whereBetween('scheduled_at', [$from, $to])->orderBy('scheduled_at')->get(),
+            'customers' => $tenant->customers()->orderBy('name')->orderBy('phone')->get(['id', 'name', 'phone']),
+            'entitlements' => $entitlements->all($tenant),
+        ]);
+    }
+
+    public function saveWorkingHours(Request $request, Tenant $tenant): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        $data = $request->validate([
+            'days' => 'required|array|size:7',
+            'days.*.weekday' => 'required|integer|between:1,7|distinct',
+            'days.*.enabled' => 'required|boolean',
+            'days.*.starts_at' => 'nullable|date_format:H:i',
+            'days.*.ends_at' => 'nullable|date_format:H:i',
+            'days.*.breaks' => 'nullable|array',
+            'days.*.breaks.*.start' => 'required_with:days.*.breaks|date_format:H:i',
+            'days.*.breaks.*.end' => 'required_with:days.*.breaks|date_format:H:i',
+        ]);
+
+        foreach ($data['days'] as $index => $day) {
+            if ($day['enabled'] && (blank($day['starts_at'] ?? null) || blank($day['ends_at'] ?? null) || $day['starts_at'] >= $day['ends_at'])) {
+                throw ValidationException::withMessages(["days.$index.ends_at" => 'INVALID_WORKING_HOURS']);
+            }
+        }
+
+        DB::transaction(fn () => collect($data['days'])->each(
+            fn ($day) => $tenant->workingHours()->updateOrCreate(
+                ['weekday' => $day['weekday']],
+                Arr::only($day, ['enabled', 'starts_at', 'ends_at', 'breaks']),
+            ),
+        ));
+
+        return response()->json(['working_hours' => $tenant->workingHours()->orderBy('weekday')->get()]);
+    }
+
+    public function saveService(Request $request, Tenant $tenant, EntitlementService $entitlements, ?TenantService $service = null): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($this->enabled($entitlements, $tenant, 'services_enabled', true), 403, 'SERVICES_NOT_INCLUDED');
+        if ($service) {
+            abort_unless($service->tenant_id === $tenant->id, 404);
+        }
+
+        $data = $request->validate([
+            'name' => 'required|array',
+            'description' => 'nullable|array',
+            'duration_minutes' => 'required|integer|between:10,1440',
+            'buffer_before_minutes' => 'nullable|integer|between:0,240',
+            'buffer_after_minutes' => 'nullable|integer|between:0,240',
+            'repeat_interval_days' => 'nullable|integer|between:1,3650',
+            'price' => 'nullable|numeric|min:0',
+            'currency' => 'required|string|size:3',
+            'booking_enabled' => 'required|boolean',
+            'media_allowed' => 'required|boolean',
+            'active' => 'required|boolean',
+            'sort_order' => 'nullable|integer|min:0',
+        ]);
+
+        $service ? $service->update($data) : $service = $tenant->services()->create($data);
+
+        return response()->json(['service' => $service], $service->wasRecentlyCreated ? 201 : 200);
+    }
+
+    public function deleteService(Request $request, Tenant $tenant, TenantService $service): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($service->tenant_id === $tenant->id, 404);
+        abort_if($service->appointments()->exists(), 422, 'SERVICE_HAS_APPOINTMENTS');
+        $service->delete();
+
+        return response()->json(['deleted' => true]);
+    }
+
+    public function slots(Request $request, Tenant $tenant, TenantCalendarService $calendar): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        $data = $request->validate(['service_id' => 'required|integer', 'date' => 'required|date_format:Y-m-d']);
+        $service = $tenant->services()->findOrFail($data['service_id']);
+
+        return response()->json(['slots' => $calendar->slots($tenant, $service, $data['date'])]);
+    }
+
+    public function saveAppointment(Request $request, Tenant $tenant, TenantCalendarService $calendar, EntitlementService $entitlements, ?TenantAppointment $appointment = null): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        if ($appointment) {
+            abort_unless($appointment->tenant_id === $tenant->id, 404);
+        }
+
+        $data = $request->validate([
+            'customer_id' => ['nullable', 'integer', Rule::exists('tenant_customers', 'id')->where('tenant_id', $tenant->id)],
+            'service_id' => ['required', 'integer', Rule::exists('tenant_services', 'id')->where('tenant_id', $tenant->id)],
+            'starts_at' => 'required|date',
+            'status' => ['required', Rule::in(['pending', 'confirmed', 'completed', 'cancelled', 'no_show'])],
+            'comment' => 'nullable|string|max:2000',
+            'reminder_at' => 'nullable|date',
+        ]);
+
+        $service = $tenant->services()->findOrFail($data['service_id']);
+        $start = CarbonImmutable::parse($data['starts_at'], TenantCalendarService::TIMEZONE);
+        $end = $start->addMinutes($service->duration_minutes);
+
+        DB::transaction(function () use ($tenant, $service, $start, $end, $data, $calendar, $entitlements, &$appointment): void {
+            $calendar->assertAvailable($tenant, $service, $start, $end, $appointment?->id);
+            $payload = array_merge($data, [
+                'ends_at' => $end,
+                'number' => $appointment?->number ?: 'A-'.now()->format('ymd').'-'.Str::upper(Str::random(6)),
+                'locale' => $tenant->locale,
+            ]);
+            $appointment ? $appointment->update($payload) : $appointment = $tenant->appointments()->create($payload);
+
+            if (filled($data['reminder_at'] ?? null) && filled($data['customer_id'] ?? null) && $this->enabled($entitlements, $tenant, 'reminders_enabled', false)) {
+                $tenant->reminders()->updateOrCreate(
+                    ['appointment_id' => $appointment->id, 'type' => 'appointment'],
+                    [
+                        'customer_id' => $data['customer_id'],
+                        'channel' => 'push',
+                        'status' => 'scheduled',
+                        'scheduled_at' => $data['reminder_at'],
+                        'message' => $this->appointmentReminder($tenant->locale, $start),
+                        'sent_at' => null,
+                        'error' => null,
+                    ],
+                );
+            } else {
+                $tenant->reminders()->where('appointment_id', $appointment->id)->where('type', 'appointment')->whereIn('status', ['scheduled', 'failed', 'skipped'])->delete();
+            }
+        });
+
+        return response()->json(['appointment' => $appointment->fresh(['customer', 'service'])], $appointment->wasRecentlyCreated ? 201 : 200);
+    }
+
+    public function deleteAppointment(Request $request, Tenant $tenant, TenantAppointment $appointment): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($appointment->tenant_id === $tenant->id, 404);
+        $appointment->reminders()->delete();
+        $appointment->delete();
+
+        return response()->json(['deleted' => true]);
+    }
+
+    public function saveBlock(Request $request, Tenant $tenant, ?TenantCalendarBlock $block = null): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        if ($block) {
+            abort_unless($block->tenant_id === $tenant->id, 404);
+        }
+        $data = $request->validate([
+            'kind' => 'required|in:blocked,vacation,exception,personal',
+            'reason' => 'nullable|string|max:190',
+            'starts_at' => 'required|date',
+            'ends_at' => 'required|date|after:starts_at',
+            'all_day' => 'required|boolean',
+        ]);
+        $block ? $block->update($data) : $block = $tenant->calendarBlocks()->create($data);
+
+        return response()->json(['block' => $block], $block->wasRecentlyCreated ? 201 : 200);
+    }
+
+    public function deleteBlock(Request $request, Tenant $tenant, TenantCalendarBlock $block): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($block->tenant_id === $tenant->id, 404);
+        $block->delete();
+
+        return response()->json(['deleted' => true]);
+    }
+
+    public function saveReminder(Request $request, Tenant $tenant, EntitlementService $entitlements, ?TenantReminder $reminder = null): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($this->enabled($entitlements, $tenant, 'reminders_enabled', false), 403, 'REMINDERS_NOT_INCLUDED');
+        if ($reminder) {
+            abort_unless($reminder->tenant_id === $tenant->id, 404);
+        }
+
+        $data = $request->validate([
+            'customer_id' => ['required', 'integer', Rule::exists('tenant_customers', 'id')->where('tenant_id', $tenant->id)],
+            'appointment_id' => ['nullable', 'integer', Rule::exists('tenant_appointments', 'id')->where('tenant_id', $tenant->id)],
+            'type' => 'required|in:appointment,agreement,repeat_visit,vacancy',
+            'channel' => 'required|in:push,sms,email,whatsapp',
+            'scheduled_at' => 'required|date',
+            'message' => 'required|string|max:1000',
+        ]);
+
+        if ($data['type'] === 'repeat_visit') {
+            abort_unless($this->enabled($entitlements, $tenant, 'repeat_visit_enabled', false), 403, 'REPEAT_VISITS_NOT_INCLUDED');
+        }
+        if ($data['type'] === 'vacancy') {
+            abort_unless($this->enabled($entitlements, $tenant, 'vacancy_fill_enabled', false), 403, 'VACANCY_FILL_NOT_INCLUDED');
+        }
+        if ($data['channel'] === 'sms') {
+            abort_unless($this->enabled($entitlements, $tenant, 'sms_enabled', false), 403, 'SMS_NOT_INCLUDED');
+        }
+
+        $data['status'] = 'scheduled';
+        $data['sent_at'] = null;
+        $data['error'] = null;
+        $reminder ? $reminder->update($data) : $reminder = $tenant->reminders()->create($data);
+
+        return response()->json(['reminder' => $reminder], $reminder->wasRecentlyCreated ? 201 : 200);
+    }
+
+    public function deleteReminder(Request $request, Tenant $tenant, TenantReminder $reminder): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($reminder->tenant_id === $tenant->id, 404);
+        abort_if(in_array($reminder->status, ['sent', 'queued'], true), 422, 'REMINDER_ALREADY_SENT');
+        $reminder->delete();
+
+        return response()->json(['deleted' => true]);
+    }
+
+    private function enabled(EntitlementService $entitlements, Tenant $tenant, string $key, bool $default): bool
+    {
+        return filter_var($entitlements->get($tenant, $key, $default), FILTER_VALIDATE_BOOL);
+    }
+
+    private function appointmentReminder(string $locale, CarbonImmutable $start): string
+    {
+        $when = $start->setTimezone(TenantCalendarService::TIMEZONE)->format('d.m.Y H:i');
+
+        return match ($locale) {
+            'ru' => "Напоминаем о вашей записи $when.",
+            'uk' => "Нагадуємо про ваш запис $when.",
+            'en' => "Reminder: your appointment is scheduled for $when.",
+            default => "Erinnerung: Ihr Termin ist am $when.",
+        };
+    }
+}
