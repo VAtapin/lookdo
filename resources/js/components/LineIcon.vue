@@ -27,6 +27,7 @@ defineProps<{ name: string }>();
     <template v-else-if="name === 'briefcase'"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V4h8v3M3 12h18M10 12v2h4v-2"/></template>
     <template v-else-if="name === 'card'"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></template>
     <template v-else-if="name === 'external'"><path d="M14 3h7v7M10 14 21 3"/><path d="M18 13v7a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h7"/></template>
+    <template v-else-if="name === 'share'"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></template>
     <template v-else-if="name === 'logout'"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M14 3h6a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-6"/></template>
     <template v-else><path d="M4 19h16M7 19v-5M17 19v-8M10 14l7-7M14 7h3v3"/></template>
   </svg>

@@ -197,6 +197,38 @@ class TenantWorkspaceTest extends TestCase
             ->assertJsonPath('review.published', true);
     }
 
+    public function test_master_can_prepare_a_social_publication_from_own_portfolio(): void
+    {
+        $tenant = $this->tenant('social-publication');
+        $owner = $this->owner($tenant);
+        DB::table('tenant_entitlement_overrides')->insert([
+            'tenant_id' => $tenant->id,
+            'key' => 'social_content_enabled',
+            'value' => '1',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $work = $tenant->portfolioItems()->create([
+            'title' => ['ru' => 'Перетяжка руля'],
+            'description' => ['ru' => 'До и после'],
+            'image_path' => 'tenant-app/'.$tenant->id.'/portfolio/work.jpg',
+            'published' => true,
+        ]);
+
+        $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/social-drafts', [
+            'portfolio_item_id' => $work->id,
+            'format' => 'feed',
+            'channel' => 'facebook',
+            'locale' => 'ru',
+            'caption' => 'Готовая работа',
+            'image_path' => $work->image_path,
+            'booking_url' => 'https://'.$tenant->slug.'.'.config('tenancy.platform_domain'),
+            'status' => 'ready',
+        ])->assertCreated()
+            ->assertJsonPath('draft.channel', 'facebook')
+            ->assertJsonPath('draft.image_path', $work->image_path);
+    }
+
     public function test_customer_profile_returns_only_that_customers_history(): void
     {
         $tenant = $this->tenant('customer-history');

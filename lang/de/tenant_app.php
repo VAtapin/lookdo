@@ -10,6 +10,7 @@ return [
     'slot_unavailable' => 'Dieser Termin wurde gerade vergeben. Bitte wählen Sie einen anderen.',
     'device_unlinked' => 'Dieses Gerät ist noch keiner Anfrage zugeordnet.',
     'received' => 'Ihre Anfrage ist angekommen. Der Meister prüft die Angaben und antwortet hier.',
+    'ai_temporarily_unavailable' => 'Der Text konnte nicht vorbereitet werden. Versuchen Sie es in einer Minute erneut oder schreiben Sie die Antwort manuell.',
     'master_push' => [
         'open' => 'Öffnen',
         'new_request' => ['title' => 'Neue Anfrage', 'body' => 'Eine neue visuelle Anfrage ist eingegangen.'],

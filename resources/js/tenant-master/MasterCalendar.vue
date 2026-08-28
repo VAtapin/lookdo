@@ -2,12 +2,13 @@
 import {computed,onMounted,reactive,ref} from 'vue';
 import {api} from '../api';
 const props=defineProps<{tenantId:number;locale:string;t:(key:string)=>string;initialTab?:string}>();
-const data=ref<any>({appointments:[],blocks:[],services:[],working_hours:[],reminders:[],customers:[],entitlements:{}}),tab=ref(props.initialTab||'calendar'),busy=ref(false),error=ref('');
+const initialQuery=new URLSearchParams(window.location.search);
+const data=ref<any>({appointments:[],blocks:[],services:[],working_hours:[],reminders:[],customers:[],entitlements:{}}),tab=ref(initialQuery.get('tab')||props.initialTab||'calendar'),busy=ref(false),error=ref('');
 const month=ref(new Date().toISOString().slice(0,7)),day=ref(new Date().toISOString().slice(0,10));
 const appointment=reactive<any>({id:null,customer_id:'',service_id:'',starts_at:'',status:'confirmed',comment:'',reminder_at:''});
 const block=reactive<any>({kind:'blocked',reason:'',starts_at:'',ends_at:'',all_day:false});
 const service=reactive<any>({id:null,name:{de:'',en:'',ru:'',uk:''},description:{},duration_minutes:60,buffer_before_minutes:0,buffer_after_minutes:0,repeat_interval_days:null,price:null,currency:'EUR',booking_enabled:true,media_allowed:true,active:true,sort_order:0});
-const reminder=reactive<any>({customer_id:'',appointment_id:'',type:'appointment',channel:'push',scheduled_at:'',message:''});
+const reminder=reactive<any>({customer_id:'',appointment_id:'',type:initialQuery.get('type')||'appointment',channel:'push',scheduled_at:'',message:''});
 const enabled=(key:string,fallback=false)=>String(data.value.entitlements?.[key]??(fallback?'1':'0'))==='1';
 const hasReminders=computed(()=>enabled('reminders_enabled')),hasAi=computed(()=>enabled('ai_communication_enabled')),hasSms=computed(()=>enabled('sms_enabled'));
 const reminderChannels=computed(()=>['push',...(hasSms.value?['sms']:[]),'emailChannel','whatsapp']);

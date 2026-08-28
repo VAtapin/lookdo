@@ -13,8 +13,10 @@ use App\Services\OpenAiBudgetService;
 use App\Services\OpenAiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use RuntimeException;
 
 class TenantContentController extends Controller
 {
@@ -27,8 +29,9 @@ class TenantContentController extends Controller
         return response()->json([
             'portfolio' => $tenant->portfolioItems()->with('service')->orderByDesc('created_at')->get()->each(fn ($item) => $this->urls($item)),
             'reviews' => $tenant->reviews()->with(['customer', 'request'])->latest()->get(),
-            'social' => $tenant->socialDrafts()->with('portfolioItem')->latest()->get(),
+            'social' => $tenant->socialDrafts()->with('portfolioItem')->latest()->get()->each(fn ($draft) => $this->socialUrl($draft)),
             'entitlements' => $entitlements->all($tenant),
+            'share_url' => 'https://'.$tenant->slug.'.'.config('tenancy.platform_domain'),
         ]);
     }
 
@@ -129,7 +132,7 @@ class TenantContentController extends Controller
         return response()->json(['deleted' => true]);
     }
 
-    public function saveSocial(Request $request, Tenant $tenant, EntitlementService $entitlements, ?TenantSocialDraft $draft = null): JsonResponse
+    public function saveSocial(Request $request, Tenant $tenant, EntitlementService $entitlements, ImageStorageService $images, ?TenantSocialDraft $draft = null): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($this->enabled($entitlements, $tenant, 'social_content_enabled'), 403, 'SOCIAL_CONTENT_NOT_INCLUDED');
@@ -140,16 +143,33 @@ class TenantContentController extends Controller
         $data = $request->validate([
             'portfolio_item_id' => ['nullable', 'integer', Rule::exists('tenant_portfolio_items', 'id')->where('tenant_id', $tenant->id)],
             'format' => 'required|in:story,feed,status',
-            'channel' => 'required|in:share,instagram,whatsapp,telegram,viber,vk',
+            'channel' => 'required|in:share,instagram,whatsapp,telegram,viber,vk,facebook,linkedin,x',
             'locale' => 'required|in:de,en,ru,uk',
             'caption' => 'nullable|string|max:5000',
             'image_path' => 'nullable|string|max:500',
+            'image' => 'nullable|image|max:20480',
             'booking_url' => 'nullable|url|max:500',
             'status' => 'required|in:draft,ready,published',
         ]);
 
+        if ($request->hasFile('image')) {
+            $old = $draft?->image_path;
+            $data['image_path'] = $images->storeUploaded($request->file('image'), 'tenant-app/'.$tenant->id.'/social', 'public', 2048, 2048);
+            if ($old && str_starts_with($old, 'tenant-app/'.$tenant->id.'/social/') && Storage::disk('public')->exists($old)) {
+                Storage::disk('public')->delete($old);
+            }
+        } elseif (filled($data['image_path'] ?? null)) {
+            $allowedPaths = $tenant->portfolioItems()->get(['image_path', 'before_image_path', 'after_image_path'])
+                ->flatMap(fn ($item) => [$item->image_path, $item->before_image_path, $item->after_image_path])
+                ->filter()
+                ->values();
+            abort_unless($allowedPaths->contains($data['image_path']) || $data['image_path'] === $draft?->image_path, 422, 'INVALID_SOCIAL_IMAGE');
+        }
+        unset($data['image']);
+
         $data['published_at'] = $data['status'] === 'published' ? now() : null;
         $draft ? $draft->update($data) : $draft = $tenant->socialDrafts()->create($data);
+        $this->socialUrl($draft);
 
         return response()->json(['draft' => $draft], $draft->wasRecentlyCreated ? 201 : 200);
     }
@@ -158,6 +178,9 @@ class TenantContentController extends Controller
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($draft->tenant_id === $tenant->id, 404);
+        if ($draft->image_path && str_starts_with($draft->image_path, 'tenant-app/'.$tenant->id.'/social/')) {
+            Storage::disk('public')->delete($draft->image_path);
+        }
         $draft->delete();
 
         return response()->json(['deleted' => true]);
@@ -185,10 +208,26 @@ class TenantContentController extends Controller
         }
 
         $budget->ensureAvailable($request->user()->id);
-        $instructions = 'You assist a service-business owner. Return JSON with one key "text". Write in locale '.$data['locale'].'. Be concise, honest and friendly. Never invent prices, availability, promises, results or customer facts. Task: '.$data['task'];
-        $result = $openAi->text($instructions, $data['context']);
-        $decoded = json_decode($result['text'], true);
-        $text = is_array($decoded) ? ($decoded['text'] ?? $result['text']) : $result['text'];
+        $language = ['de' => 'German', 'en' => 'English', 'ru' => 'Russian', 'uk' => 'Ukrainian'][$data['locale']];
+        $instructions = 'You assist a service-business owner. Write only the final text in '.$language.'. Be concise, honest and friendly. Never invent prices, availability, promises, results or customer facts. Do not wrap the answer in JSON, quotes or markdown. Task: '.$data['task'];
+
+        try {
+            $result = $openAi->text($instructions, $data['context']);
+        } catch (RuntimeException $exception) {
+            Log::warning('Tenant AI request failed', [
+                'tenant_id' => $tenant->id,
+                'user_id' => $request->user()->id,
+                'task' => $data['task'],
+                'exception' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => trans('tenant_app.ai_temporarily_unavailable', locale: $data['locale']),
+                'code' => 'AI_TEMPORARILY_UNAVAILABLE',
+            ], 503);
+        }
+
+        $text = trim($result['text']);
         $budget->record('tenant_'.$data['task'], $result['model'], $result['input_tokens'], $result['output_tokens'], $request->user()->id, null, $tenant->id);
 
         return response()->json(['text' => $text]);
@@ -205,6 +244,13 @@ class TenantContentController extends Controller
             if ($item->{$field}) {
                 $item->setAttribute(str_replace('_path', '_url', $field), Storage::disk('public')->url($item->{$field}));
             }
+        }
+    }
+
+    private function socialUrl(TenantSocialDraft $draft): void
+    {
+        if ($draft->image_path) {
+            $draft->setAttribute('image_url', Storage::disk('public')->url($draft->image_path));
         }
     }
 }

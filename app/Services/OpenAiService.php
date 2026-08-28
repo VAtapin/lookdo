@@ -15,7 +15,7 @@ class OpenAiService
     /** @return array{text:string,model:string,input_tokens:int,output_tokens:int} */
     public function text(string $instructions, string $input): array
     {
-        return $this->request($instructions, $input, ['type' => 'json_object']);
+        return $this->request($instructions, $input);
     }
 
     /**
@@ -64,24 +64,29 @@ class OpenAiService
     }
 
     /**
-     * @param  array<string, mixed>  $format
+     * @param  array<string, mixed>|null  $format
      * @return array{text:string,model:string,input_tokens:int,output_tokens:int}
      */
-    private function request(string $instructions, string $input, array $format): array
+    private function request(string $instructions, string $input, ?array $format = null): array
     {
         if (! $this->configured()) {
             throw new RuntimeException('OPENAI_API_KEY is not configured.');
         }
 
+        $payload = [
+            'model' => config('services.openai.text_model'),
+            'instructions' => $instructions,
+            'input' => $input,
+            'store' => false,
+        ];
+
+        if ($format !== null) {
+            $payload['text'] = ['format' => $format];
+        }
+
         $response = Http::withToken(config('services.openai.key'))
             ->timeout((int) config('services.openai.timeout'))
-            ->post('https://api.openai.com/v1/responses', [
-                'model' => config('services.openai.text_model'),
-                'instructions' => $instructions,
-                'input' => $input,
-                'text' => ['format' => $format],
-                'store' => false,
-            ]);
+            ->post('https://api.openai.com/v1/responses', $payload);
 
         if ($response->failed()) {
             throw new RuntimeException((string) ($response->json('error.message') ?: 'OpenAI request failed.'));

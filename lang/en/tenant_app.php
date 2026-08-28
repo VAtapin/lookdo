@@ -10,6 +10,7 @@ return [
     'slot_unavailable' => 'This time has just been booked. Please select another one.',
     'device_unlinked' => 'This device is not linked to a request yet.',
     'received' => 'Your request has arrived. The specialist will review it and reply here.',
+    'ai_temporarily_unavailable' => 'The text could not be prepared. Try again in a minute or write the reply manually.',
     'master_push' => [
         'open' => 'Open',
         'new_request' => ['title' => 'New request', 'body' => 'A new visual request has arrived.'],

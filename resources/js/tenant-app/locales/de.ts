@@ -1,6 +1,6 @@
 export default {
     home:'Start', works:'Arbeiten', action:'Anfrage', book:'Termin', activity:'Nachrichten', profile:'Profil',
-    featured:'Vorher / Nachher', recent:'Neueste Arbeiten', all:'Alle ansehen', how:'So funktioniert es',
+    featured:'Vorher / Nachher', before:'Vorher', after:'Nachher', recent:'Neueste Arbeiten', all:'Alle ansehen', how:'So funktioniert es',
     step1:'Foto oder Video senden', step2:'Der Meister prüft alles', step3:'Antwort erhalten',
     requestTitle:'Zeigen Sie die Aufgabe', requestHint:'Fügen Sie mindestens ein klares Foto hinzu. Weitere Aufnahmen helfen dem Meister.',
     camera:'Foto aufnehmen', gallery:'Aus Galerie wählen', continue:'Weiter', back:'Zurück', remove:'Entfernen', optional:'Optional', required:'Erforderlich',
