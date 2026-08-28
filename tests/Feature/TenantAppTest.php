@@ -98,10 +98,10 @@ class TenantAppTest extends TestCase
             ->assertJsonPath('template.layout', 'steering')
             ->assertJsonPath('template.hero.action', 'Оценить мой руль')
             ->assertJsonPath('entitlements.video', false)
-            ->assertJsonCount(5, 'template.navigation')
-            ->assertJsonCount(3, 'portfolio');
+            ->assertJsonCount(4, 'template.navigation')
+            ->assertJsonCount(0, 'portfolio');
 
-        $this->assertDatabaseCount('tenant_portfolio_items', 3);
+        $this->assertDatabaseCount('tenant_portfolio_items', 0);
 
         $this->getJson($this->url($tenant, '/manifest.webmanifest'))
             ->assertOk()->assertHeader('Content-Type', 'application/manifest+json')
@@ -144,9 +144,19 @@ class TenantAppTest extends TestCase
 
     public function test_brow_template_seeds_services_and_books_only_free_slots(): void
     {
-        $tenant = $this->tenant('ivanna-brows', 'beauty.brows');
-        $bootstrap = $this->withHeader('X-Locale', 'uk')->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
-            ->assertOk()->assertJsonPath('template.engine', 'booking')->assertJsonPath('template.hero.action', 'Записатися');
+        $tenant = $this->tenant('brow-studio', 'beauty.brows');
+        $actions = ['de' => 'Termin buchen', 'en' => 'Book an appointment', 'ru' => 'Записаться', 'uk' => 'Записатися'];
+        foreach ($actions as $locale => $action) {
+            $this->withHeader('X-Locale', $locale)->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
+                ->assertOk()
+                ->assertJsonPath('template.engine', 'booking')
+                ->assertJsonPath('template.layout', 'brows')
+                ->assertJsonPath('template.hero.action', $action)
+                ->assertJsonPath('template.theme.primary', '#c8663e')
+                ->assertJsonPath('services.0.image', '/brand/service-brows.webp');
+        }
+
+        $bootstrap = $this->withHeader('X-Locale', 'uk')->getJson($this->url($tenant, '/api/tenant-app/bootstrap'));
         $serviceId = $bootstrap->json('services.0.id');
         $this->assertNotNull($serviceId);
 
@@ -162,11 +172,27 @@ class TenantAppTest extends TestCase
         $booking = $this->withHeader('X-Locale', 'uk')->postJson($this->url($tenant, '/api/tenant-app/appointments'), [
             'service_id' => $serviceId, 'starts_at' => $startsAt, 'name' => 'Олена', 'phone' => '+380671234567', 'comment' => 'Перша процедура',
         ])->assertCreated()->assertJsonPath('appointment.status', 'pending');
-        $this->assertNotEmpty($booking->json('token'));
+        $token = $booking->json('token');
+        $appointmentId = $booking->json('appointment.id');
+        $this->assertNotEmpty($token);
 
         $this->postJson($this->url($tenant, '/api/tenant-app/appointments'), [
             'service_id' => $serviceId, 'starts_at' => $startsAt, 'name' => 'Марія', 'phone' => '+380671111111',
         ])->assertUnprocessable()->assertJsonValidationErrors('starts_at');
+
+        $rescheduledStart = $availability->json('slots.1.starts_at');
+        $this->assertNotNull($rescheduledStart);
+        $this->withHeader('X-Lookdo-Client-Token', $token)
+            ->patchJson($this->url($tenant, '/api/tenant-app/appointments/'.$appointmentId), ['starts_at' => $rescheduledStart])
+            ->assertOk()
+            ->assertJsonPath('appointment.status', 'confirmed')
+            ->assertJsonPath('appointment.starts_at', $rescheduledStart);
+
+        $this->withHeader('X-Lookdo-Client-Token', $token)
+            ->deleteJson($this->url($tenant, '/api/tenant-app/appointments/'.$appointmentId))
+            ->assertOk()
+            ->assertJsonPath('appointment.status', 'cancelled');
+        $this->assertDatabaseHas('tenant_appointments', ['id' => $appointmentId, 'status' => 'cancelled']);
     }
 
     public function test_recent_unpaid_subscription_is_activated_as_full_trial(): void

@@ -294,6 +294,38 @@ class TenantWorkspaceTest extends TestCase
         ]);
     }
 
+    public function test_master_can_replace_and_remove_a_service_image(): void
+    {
+        Storage::fake('public');
+        $tenant = $this->tenant('service-image');
+        $owner = $this->owner($tenant);
+        $service = $tenant->services()->create([
+            'name' => ['ru' => 'Коррекция бровей', 'de' => 'Augenbrauenkorrektur'],
+            'description' => [],
+            'image_path' => '/brand/service-brows.webp',
+            'duration_minutes' => 45,
+            'price' => 35,
+            'currency' => 'EUR',
+            'booking_enabled' => true,
+            'media_allowed' => true,
+            'active' => true,
+        ]);
+
+        $response = $this->actingAs($owner)->post('/api/tenant/'.$tenant->id.'/services/'.$service->id.'/image', [
+            'image' => UploadedFile::fake()->image('brows.jpg', 1400, 1000),
+        ])->assertCreated();
+
+        $path = $response->json('service.image_path');
+        $this->assertStringStartsWith('tenant-app/'.$tenant->id.'/services/', $path);
+        Storage::disk('public')->assertExists($path);
+
+        $this->actingAs($owner)->deleteJson('/api/tenant/'.$tenant->id.'/services/'.$service->id.'/image')
+            ->assertOk()
+            ->assertJsonPath('service.image_path', null);
+        Storage::disk('public')->assertMissing($path);
+        $this->assertDatabaseHas('tenant_services', ['id' => $service->id, 'image_path' => null]);
+    }
+
     private function tenant(string $slug): Tenant
     {
         $template = RequestTemplate::where('code', 'automotive.steering-wheel-upholstery')->firstOrFail();

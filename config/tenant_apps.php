@@ -46,7 +46,8 @@ return [
         'beauty.brows' => [
             'engine' => 'booking',
             'layout' => 'brows',
-            'navigation' => ['home', 'works', 'action', 'activity', 'profile'],
+            'navigation' => ['home', 'services', 'book', 'contacts'],
+            'theme' => ['primary' => '#c8663e', 'secondary' => '#fff8f3', 'surface' => '#fffaf6', 'text' => '#2e1c18'],
             'hero' => [
                 'image' => '/brand/service-brows.webp',
                 'eyebrow' => ['de' => 'BROW ARTIST', 'en' => 'BROW ARTIST', 'ru' => 'BROW-МАСТЕР', 'uk' => 'BROW-МАЙСТЕР'],
@@ -55,14 +56,17 @@ return [
                 'action' => ['de' => 'Termin buchen', 'en' => 'Book an appointment', 'ru' => 'Записаться', 'uk' => 'Записатися'],
             ],
             'trust' => [
-                ['icon' => 'star', 'label' => ['de' => 'Natürliches Ergebnis', 'en' => 'Natural result', 'ru' => 'Естественный результат', 'uk' => 'Природний результат']],
+                ['icon' => 'star', 'label' => ['de' => 'Individuelle Form', 'en' => 'Shape made for you', 'ru' => 'Форма именно для вас', 'uk' => 'Форма саме для вас']],
                 ['icon' => 'shield', 'label' => ['de' => 'Sicher und sauber', 'en' => 'Safe and clean', 'ru' => 'Безопасно и чисто', 'uk' => 'Безпечно та чисто']],
                 ['icon' => 'clock', 'label' => ['de' => 'Online-Termin', 'en' => 'Online booking', 'ru' => 'Онлайн-запись', 'uk' => 'Онлайн-запис']],
+                ['icon' => 'heart', 'label' => ['de' => 'Sanfte Pflege', 'en' => 'Gentle care', 'ru' => 'Бережный уход', 'uk' => 'Дбайливий догляд']],
             ],
             'starter_services' => [
-                ['duration' => 45, 'name' => ['de' => 'Augenbrauenkorrektur', 'en' => 'Brow shaping', 'ru' => 'Коррекция бровей', 'uk' => 'Корекція брів'], 'description' => ['de' => 'Form und saubere Kontur', 'en' => 'Shape and clean contour', 'ru' => 'Форма и аккуратный контур', 'uk' => 'Форма й акуратний контур']],
-                ['duration' => 60, 'name' => ['de' => 'Färben und Korrektur', 'en' => 'Tint and shaping', 'ru' => 'Окрашивание и коррекция', 'uk' => 'Фарбування та корекція'], 'description' => ['de' => 'Farbe, Form und Pflege', 'en' => 'Color, shape and care', 'ru' => 'Цвет, форма и уход', 'uk' => 'Колір, форма й догляд']],
-                ['duration' => 75, 'name' => ['de' => 'Brow-Laminierung', 'en' => 'Brow lamination', 'ru' => 'Ламинирование бровей', 'uk' => 'Ламінування брів'], 'description' => ['de' => 'Styling mit langem Halt', 'en' => 'Long-lasting styling', 'ru' => 'Долговременная укладка', 'uk' => 'Довготривале укладання']],
+                ['duration' => 45, 'image' => '/brand/service-brows.webp', 'name' => ['de' => 'Augenbrauenkorrektur', 'en' => 'Brow shaping', 'ru' => 'Коррекция бровей', 'uk' => 'Корекція брів'], 'description' => ['de' => 'Form und saubere Kontur', 'en' => 'Shape and clean contour', 'ru' => 'Форма и аккуратный контур', 'uk' => 'Форма й акуратний контур']],
+                ['duration' => 60, 'image' => '/brand/service-brows.webp', 'name' => ['de' => 'Färben und Korrektur', 'en' => 'Tint and shaping', 'ru' => 'Окрашивание и коррекция', 'uk' => 'Фарбування та корекція'], 'description' => ['de' => 'Farbe, Form und Pflege', 'en' => 'Color, shape and care', 'ru' => 'Цвет, форма и уход', 'uk' => 'Колір, форма й догляд']],
+                ['duration' => 75, 'image' => '/brand/service-brows.webp', 'name' => ['de' => 'Brow-Laminierung', 'en' => 'Brow lamination', 'ru' => 'Ламинирование бровей', 'uk' => 'Ламінування брів'], 'description' => ['de' => 'Styling mit langem Halt', 'en' => 'Long-lasting styling', 'ru' => 'Долговременная укладка', 'uk' => 'Довготривале укладання']],
+                ['duration' => 40, 'image' => '/brand/service-brows.webp', 'name' => ['de' => 'Augenbrauen färben', 'en' => 'Brow tinting', 'ru' => 'Окрашивание бровей', 'uk' => 'Фарбування брів'], 'description' => ['de' => 'Passender Ton und gepflegtes Ergebnis', 'en' => 'A matching tint and polished result', 'ru' => 'Подходящий оттенок и аккуратный результат', 'uk' => 'Влучний відтінок та охайний результат']],
+                ['duration' => 90, 'image' => '/brand/service-brows.webp', 'name' => ['de' => 'Komplettpflege', 'en' => 'Complete brow care', 'ru' => 'Комплексный уход', 'uk' => 'Комплексний догляд'], 'description' => ['de' => 'Korrektur, Farbe und Pflege', 'en' => 'Shaping, tint and care', 'ru' => 'Коррекция, окрашивание и уход', 'uk' => 'Корекція, фарбування та догляд']],
             ],
             'starter_portfolio' => [
                 ['title' => ['de' => 'Korrektur', 'en' => 'Shaping', 'ru' => 'Коррекция', 'uk' => 'Корекція'], 'image' => '/brand/service-brows.webp', 'featured' => true],

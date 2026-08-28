@@ -24,6 +24,8 @@ Route::prefix('api')->middleware('locale')->group(function () {
         Route::post('/requests/{tenantRequest}/messages', [TenantAppController::class, 'postMessage'])->middleware('throttle:30,1');
         Route::get('/availability', [TenantAppController::class, 'availability'])->middleware('throttle:60,1');
         Route::post('/appointments', [TenantAppController::class, 'createAppointment'])->middleware('throttle:12,1');
+        Route::patch('/appointments/{tenantAppointment}', [TenantAppController::class, 'rescheduleAppointment'])->middleware('throttle:20,1');
+        Route::delete('/appointments/{tenantAppointment}', [TenantAppController::class, 'cancelAppointment'])->middleware('throttle:20,1');
         Route::post('/push-subscriptions', [TenantAppController::class, 'subscribePush'])->middleware('throttle:10,1');
     });
     Route::get('/platform/pages/{key}', [PlatformController::class, 'page'])->whereIn('key', ['impressum', 'datenschutz', 'agb', 'kontakt']);
@@ -74,6 +76,8 @@ Route::prefix('api')->middleware('locale')->group(function () {
         Route::get('/tenant/{tenant}/calendar/slots', [TenantCalendarController::class, 'slots']);
         Route::post('/tenant/{tenant}/services', [TenantCalendarController::class, 'saveService']);
         Route::put('/tenant/{tenant}/services/{service}', [TenantCalendarController::class, 'saveService']);
+        Route::post('/tenant/{tenant}/services/{service}/image', [TenantCalendarController::class, 'uploadServiceImage']);
+        Route::delete('/tenant/{tenant}/services/{service}/image', [TenantCalendarController::class, 'removeServiceImage']);
         Route::delete('/tenant/{tenant}/services/{service}', [TenantCalendarController::class, 'deleteService']);
         Route::post('/tenant/{tenant}/calendar/appointments', [TenantCalendarController::class, 'saveAppointment']);
         Route::put('/tenant/{tenant}/calendar/appointments/{appointment}', [TenantCalendarController::class, 'saveAppointment']);

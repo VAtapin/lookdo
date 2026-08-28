@@ -161,10 +161,20 @@ class TenantAppController extends Controller
         if (! $this->enabled($tenant, 'booking_enabled', false)) {
             $this->apiError($request, $tenant, 'TENANT_APP_BOOKING_DISABLED', 'tenant_app.booking_disabled', 403);
         }
-        $data = $request->validate(['service_id' => 'required|integer', 'date' => 'required|date_format:Y-m-d|after_or_equal:today']);
+        $data = $request->validate([
+            'service_id' => 'required|integer',
+            'date' => 'required|date_format:Y-m-d|after_or_equal:today',
+            'appointment_id' => 'nullable|integer',
+        ]);
         $service = $tenant->services()->where('active', true)->findOrFail($data['service_id']);
+        $exceptAppointmentId = null;
+        if (filled($data['appointment_id'] ?? null)) {
+            $customer = $this->requireCustomer($request, $tenant);
+            $appointment = $tenant->appointments()->where('customer_id', $customer->id)->findOrFail($data['appointment_id']);
+            $exceptAppointmentId = $appointment->id;
+        }
 
-        return response()->json(['slots' => $calendar->slots($tenant, $service, $data['date'])]);
+        return response()->json(['slots' => $calendar->slots($tenant, $service, $data['date'], $exceptAppointmentId)]);
     }
 
     public function createAppointment(Request $request, TenantCalendarService $calendar): JsonResponse
@@ -177,7 +187,7 @@ class TenantAppController extends Controller
         $data = $request->validate([
             'service_id' => 'required|integer', 'starts_at' => 'required|date|after:now', 'name' => 'nullable|string|max:120',
             'phone' => 'required|string|max:50', 'email' => 'nullable|email|max:190', 'comment' => 'nullable|string|max:2000',
-            'preferred_channel' => 'nullable|in:phone,whatsapp,sms,email,push,vk',
+            'preferred_channel' => 'nullable|in:phone,whatsapp,viber,telegram,sms,email,push,vk',
         ]);
         $service = $tenant->services()->where('active', true)->where('booking_enabled', true)->findOrFail($data['service_id']);
         $locale = $this->locale($request, $tenant);
@@ -202,6 +212,41 @@ class TenantAppController extends Controller
         $this->notifyMaster($tenant, 'new_appointment', '/app/calendar', 'appointment-'.$appointment->id);
 
         return response()->json(['token' => $rawToken, 'appointment' => $this->appointmentPayload($appointment->load('service'), $locale)], 201);
+    }
+
+    public function rescheduleAppointment(Request $request, TenantAppointment $tenantAppointment, TenantCalendarService $calendar): JsonResponse
+    {
+        $tenant = $this->tenant($request);
+        $this->ensureAvailable($request, $tenant);
+        $customer = $this->requireCustomer($request, $tenant);
+        abort_unless($tenantAppointment->tenant_id === $tenant->id && $tenantAppointment->customer_id === $customer->id, 404);
+        abort_if(in_array($tenantAppointment->status, ['cancelled', 'completed', 'no_show'], true), 409);
+        $data = $request->validate(['starts_at' => 'required|date|after:now']);
+        $tenantAppointment->load('service');
+        abort_unless($tenantAppointment->service?->active && $tenantAppointment->service?->booking_enabled, 409);
+        $start = CarbonImmutable::parse($data['starts_at'], TenantCalendarService::TIMEZONE);
+        $end = $start->addMinutes($tenantAppointment->service->duration_minutes);
+
+        DB::transaction(function () use ($tenant, $tenantAppointment, $calendar, $start, $end) {
+            $calendar->assertAvailable($tenant, $tenantAppointment->service, $start, $end, $tenantAppointment->id);
+            $tenantAppointment->update(['starts_at' => $start, 'ends_at' => $end, 'status' => 'confirmed']);
+        });
+
+        $this->notifyMaster($tenant, 'new_appointment', '/app/calendar', 'appointment-rescheduled-'.$tenantAppointment->id);
+
+        return response()->json(['appointment' => $this->appointmentPayload($tenantAppointment->fresh('service'), $customer->locale ?: $tenant->locale)]);
+    }
+
+    public function cancelAppointment(Request $request, TenantAppointment $tenantAppointment): JsonResponse
+    {
+        $tenant = $this->tenant($request);
+        $this->ensureAvailable($request, $tenant);
+        $customer = $this->requireCustomer($request, $tenant);
+        abort_unless($tenantAppointment->tenant_id === $tenant->id && $tenantAppointment->customer_id === $customer->id, 404);
+        abort_if(in_array($tenantAppointment->status, ['completed', 'no_show'], true), 409);
+        $tenantAppointment->update(['status' => 'cancelled']);
+
+        return response()->json(['appointment' => $this->appointmentPayload($tenantAppointment->fresh('service'), $customer->locale ?: $tenant->locale)]);
     }
 
     public function subscribePush(Request $request): JsonResponse
@@ -299,9 +344,17 @@ class TenantAppController extends Controller
 
     private function seedDefaults(Tenant $tenant, array $configuration): void
     {
+        $starterServices = (array) ($configuration['starter_services'] ?? []);
         if ($tenant->services()->doesntExist()) {
-            foreach ((array) ($configuration['starter_services'] ?? []) as $index => $service) {
-                $tenant->services()->create(['name' => $service['name'], 'description' => $service['description'] ?? [], 'duration_minutes' => $service['duration'] ?? 60, 'booking_enabled' => true, 'active' => true, 'sort_order' => $index * 10]);
+            foreach ($starterServices as $index => $service) {
+                $tenant->services()->create(['name' => $service['name'], 'description' => $service['description'] ?? [], 'image_path' => $service['image'] ?? null, 'duration_minutes' => $service['duration'] ?? 60, 'booking_enabled' => true, 'active' => true, 'sort_order' => $index * 10]);
+            }
+        } else {
+            foreach ($starterServices as $index => $service) {
+                $existing = $tenant->services()->where('sort_order', $index * 10)->first();
+                if ($existing && blank($existing->image_path) && filled($service['image'] ?? null)) {
+                    $existing->update(['image_path' => $service['image']]);
+                }
             }
         }
         if ($tenant->portfolioItems()->doesntExist()) {
@@ -447,6 +500,7 @@ class TenantAppController extends Controller
         return [
             'id' => $template?->id, 'code' => $template?->code ?: 'general-services.general', 'name' => $template?->localized('name', $locale),
             'engine' => $configuration['engine'] ?? 'request', 'layout' => $configuration['layout'] ?? 'general', 'navigation' => $configuration['navigation'] ?? ['home', 'works', 'action', 'activity', 'profile'],
+            'theme' => $configuration['theme'] ?? [],
             'hero' => array_replace(
                 (array) $this->localized($configuration['hero'] ?? [], $locale),
                 filled(data_get($tenant->profile?->content, 'branding.hero_image_path'))
@@ -493,7 +547,7 @@ class TenantAppController extends Controller
 
     private function servicePayload(TenantService $service, string $locale): array
     {
-        return ['id' => $service->id, 'name' => $service->localized('name', $locale), 'description' => $service->localized('description', $locale), 'duration' => $service->duration_minutes, 'price' => $service->price, 'currency' => $service->currency];
+        return ['id' => $service->id, 'name' => $service->localized('name', $locale), 'description' => $service->localized('description', $locale), 'image' => $this->assetUrl($service->image_path), 'duration' => $service->duration_minutes, 'price' => $service->price, 'currency' => $service->currency];
     }
 
     private function requestPayload(TenantRequest $request): array

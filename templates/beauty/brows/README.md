@@ -212,7 +212,7 @@ AI использует язык клиента и контекст, но отп
 - заполнение свободного окна;
 - короткий ответ на типовой вопрос;
 - текст публикации из новой работы;
-- адаптация одного текста на UA/RU/DE.
+- адаптация одного текста на UA/RU/DE/EN.
 
 AI не должен придумывать цену, скидку, медицинские обещания или услугу, которой нет у tenant.
 
@@ -244,13 +244,19 @@ AI не должен придумывать цену, скидку, медици
 - `uk` — украинский;
 - `ru` — русский;
 - `de` — немецкий.
+- `en` — английский.
 
 Все строки template/booking/service labels локализуемые. Язык клиента сохраняется в customer profile.
+
+Каждый подключённый Brow tenant хранит собственные логотип, hero, фотографии услуг, портфолио, контакты и цвета отдельно от шаблона. Шаблон задаёт композицию и поведение; tenant-данные не встраиваются в код.
+
+Цвета интерфейса используют семантические переменные `primary`, `secondary`, `surface`, `text`. Кнопки, активные состояния, календарь и центральное действие автоматически получают выбранный tenant основной цвет.
 
 Примеры CTA:
 - UK: `Записатися`, `Роботи`, `Обрати час`, `Перенести`, `Скасувати`;
 - RU: `Записаться`, `Работы`, `Выбрать время`, `Перенести`, `Отменить`;
-- DE: `Termin buchen`, `Arbeiten`, `Zeit wählen`, `Verschieben`, `Absagen`.
+- DE: `Termin buchen`, `Arbeiten`, `Zeit wählen`, `Verschieben`, `Absagen`;
+- EN: `Book an appointment`, `Portfolio`, `Choose a time`, `Reschedule`, `Cancel`.
 
 ## 20. AI phrases / synonyms
 
@@ -262,6 +268,9 @@ AI не должен придумывать цену, скидку, медици
 
 ### DE
 Augenbrauen; Augenbrauenstyling; Augenbrauenkorrektur; Augenbrauen färben; Brow Artist; Brow Stylist; Brow Lifting nur wenn tenant diese Leistung tatsächlich anbietet.
+
+### EN
+brows; brow artist; brow stylist; eyebrow shaping; eyebrow tinting; brow correction; brow lamination only when the tenant actually offers that service.
 
 Не классифицировать автоматически Permanent Make-up/Microblading/Powder Brows как этот шаблон без отдельного подтверждения.
 

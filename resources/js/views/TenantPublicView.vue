@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import '../../css/tenant-app.css';
 import '../../css/tenant-steering.css';
+import '../../css/tenant-brows.css';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ApiError, api } from '../api';
@@ -26,16 +27,25 @@ const copy=computed(()=>appCopy(locale.value));
 const screen=computed(()=>{const parts=route.path.split('/').filter(Boolean).filter(part=>!['de','en','ru','uk'].includes(part));return parts[0]||'home';});
 const actionScreen=computed(()=>app.value?.template?.engine==='booking'?'book':'request');
 const isSteering=computed(()=>app.value?.template?.layout==='steering');
-const theme=computed(()=>({'--ta-primary':isSteering.value?'#e2ad55':app.value?.tenant?.colors?.primary||'#ff6b00','--ta-secondary':isSteering.value?'#07090b':app.value?.tenant?.colors?.secondary||'#111318'}));
+const isBrows=computed(()=>app.value?.template?.layout==='brows');
+const theme=computed(()=>({'--ta-primary':isSteering.value?'#e2ad55':app.value?.tenant?.colors?.primary||app.value?.template?.theme?.primary||'#ff6b00','--ta-secondary':isSteering.value?'#07090b':app.value?.tenant?.colors?.secondary||app.value?.template?.theme?.secondary||'#111318','--ta-template-surface':app.value?.template?.theme?.surface||'#fff','--ta-template-text':app.value?.template?.theme?.text||'#111318'}));
 const address=computed(()=>[app.value?.tenant?.contact?.street,[app.value?.tenant?.contact?.postal_code,app.value?.tenant?.contact?.city].filter(Boolean).join(' ')].filter(Boolean).join(', '));
 const averageRating=computed(()=>{const rows=app.value?.reviews||[];return rows.length?(rows.reduce((sum:number,item:any)=>sum+Number(item.rating||0),0)/rows.length).toFixed(1):'—';});
 const navItems=computed(()=>[
+  ...(isBrows.value?[
+    {key:'home',icon:'home',label:copy.value.home},
+    {key:'services',icon:'works',label:copy.value.servicesNav},
+    {key:'book',icon:'calendar',label:copy.value.book,central:true},
+    {key:'contacts',icon:'phone',label:copy.value.contacts},
+  ]:[
   {key:'home',icon:'home',label:copy.value.home},
   {key:'works',icon:'works',label:copy.value.works},
   {key:actionScreen.value,icon:'camera',label:copy.value.action,central:true},
   {key:'activity',icon:'message',label:copy.value.activity},
+  ]),
 ]);
 const contactName=computed(()=>app.value?.tenant?.contact?.name||app.value?.tenant?.name);
+const rescheduleAppointment=ref<any>(null);
 
 function tenantLocale(value:unknown):TenantLocale|null{return typeof value==='string'&&['de','en','ru','uk'].includes(value)?value as TenantLocale:null;}
 function applyTenantLocale(value:unknown){const next=tenantLocale(value);if(!next)return;locale.value=next;setLocale(next);}
@@ -57,6 +67,7 @@ async function loadActivity(){
   catch(e:any){error.value=e.message;}finally{activityLoading.value=false;}
 }
 function flowSuccess(payload:any){if(payload.token){clientToken.value=payload.token;localStorage.setItem(tokenKey,payload.token);}loadActivity();}
+async function cancelAppointment(item:any){if(!confirm(copy.value.cancelConfirm))return;try{await api('/tenant-app/appointments/'+item.id,{method:'DELETE',headers:{'X-Lookdo-Client-Token':clientToken.value}});await loadActivity();}catch(e:any){error.value=e.message;}}
 async function changeLocale(value:string){locale.value=value as TenantLocale;hasSelectedLocale.value=true;localStorage.setItem(localeKey,locale.value);setLocale(locale.value);await load();}
 async function sendMessage(){
   if(!message.value.trim()||!selectedRequest.value)return;sending.value=true;
@@ -91,12 +102,13 @@ onBeforeUnmount(()=>{if(clock)window.clearInterval(clock);});
 </script>
 
 <template>
-<div class="tenant-app-viewport" :class="{'theme-steering':isSteering}" :style="theme">
+<div class="tenant-app-viewport" :class="{'theme-steering':isSteering,'theme-brows':isBrows}" :style="theme">
   <div v-if="loading" class="ta-splash"><img :src="'/brand/lookdo-mark.webp'" alt=""><span>LOOKDO</span></div>
   <div v-else-if="error&&!app" class="ta-unavailable"><img :src="'/brand/lookdo-mark.webp'" alt=""><h1>{{copy.unavailable}}</h1><p>{{error}}</p><button class="ta-primary" @click="load">{{copy.retry}}</button></div>
   <div v-else-if="app" class="tenant-app-desktop">
     <main class="tenant-app-shell">
-      <RequestFlow v-if="screen==='request'" :app="app" :copy="copy" :locale="locale" :token="clientToken" @close="go('home')" @success="flowSuccess"/>
+      <BookingFlow v-if="rescheduleAppointment" :app="app" :copy="copy" :locale="locale" :token="clientToken" :appointment="rescheduleAppointment" @close="rescheduleAppointment=null" @success="flowSuccess"/>
+      <RequestFlow v-else-if="screen==='request'" :app="app" :copy="copy" :locale="locale" :token="clientToken" @close="go('home')" @success="flowSuccess"/>
       <BookingFlow v-else-if="screen==='book'" :app="app" :copy="copy" :locale="locale" :token="clientToken" @close="go('home')" @success="flowSuccess"/>
       <section v-else-if="screen==='login'" class="ta-login-screen">
         <div class="ta-statusbar"><b>{{now.toLocaleTimeString(locale,{hour:'2-digit',minute:'2-digit'})}}</b><span class="ta-device-icons"><i class="signal"></i><i class="wifi"></i><i class="battery"></i></span></div>
@@ -116,7 +128,15 @@ onBeforeUnmount(()=>{if(clock)window.clearInterval(clock);});
       <template v-else>
         <div class="ta-statusbar"><b>{{now.toLocaleTimeString(locale,{hour:'2-digit',minute:'2-digit'})}}</b><span class="ta-device-icons"><i class="signal"></i><i class="wifi"></i><i class="battery"></i></span></div>
         <div class="ta-scroll-area">
-          <section v-if="screen==='home'" class="ta-home-screen">
+          <section v-if="screen==='home'&&isBrows" class="ta-home-screen ta-brows-home">
+            <header class="ta-brows-header"><button class="ta-brand" @click="go('home')"><img :src="app.tenant.logo||'/brand/lookdo-mark.webp'" :alt="app.tenant.name"><span>{{app.tenant.name}}</span></button><div><a v-if="app.tenant.contact.phone" :href="'https://wa.me/'+app.tenant.contact.phone.replace(/\D/g,'')" target="_blank"><AppIcon name="message"/></a><button @click="menuOpen=true"><AppIcon name="menu"/></button></div></header>
+            <article class="ta-brows-hero"><img :src="app.template.hero.image||'/brand/service-brows.webp'" :alt="app.template.hero.title"><div></div><section><small>{{app.template.hero.eyebrow}}</small><h1>{{app.tenant.branding?.tagline||app.template.hero.title}}</h1><p>{{app.template.hero.text}}</p><button class="ta-primary" @click="go('book')"><AppIcon name="calendar"/>{{app.template.hero.action}}</button></section></article>
+            <section class="ta-section ta-featured"><div class="ta-section-head"><h2>{{copy.featured}}</h2><button @click="go('works')">{{copy.all}} <AppIcon name="arrow" :size="17"/></button></div><div v-if="app.portfolio.length" class="ta-work-strip"><button v-for="item in app.portfolio.slice(0,4)" :key="item.id" @click="go('works')"><BeforeAfterSlider v-if="item.before_image&&item.after_image" :before="item.before_image" :after="item.after_image" :before-label="copy.before" :after-label="copy.after" :alt="item.title"/><img v-else :src="item.image||item.after_image||item.before_image" :alt="item.title"><span>{{item.title}}</span></button></div><div v-else class="ta-section-empty"><AppIcon name="image"/><p>{{copy.noActivity}}</p></div></section>
+            <section v-if="app.template.trust.length" class="ta-brows-trust"><article v-for="item in app.template.trust" :key="item.label"><span><AppIcon :name="item.icon"/></span><p>{{item.label}}</p></article></section>
+            <section class="ta-section ta-recent"><div class="ta-section-head"><h2>{{copy.recent}}</h2><button @click="go('works')">{{copy.all}} <AppIcon name="arrow" :size="17"/></button></div><div class="ta-work-grid"><article v-for="item in app.portfolio.slice(0,8)" :key="item.id"><img :src="item.image||item.after_image||item.before_image" :alt="item.title"><h3>{{item.title}}</h3><p>{{item.description}}</p></article></div></section>
+          </section>
+
+          <section v-else-if="screen==='home'" class="ta-home-screen">
             <article class="ta-hero">
               <img class="ta-hero-image" :src="app.template.hero.image||'/brand/steering-wheel-placeholder.svg'" :alt="app.template.hero.eyebrow">
               <div class="ta-hero-shade"></div>
@@ -140,6 +160,12 @@ onBeforeUnmount(()=>{if(clock)window.clearInterval(clock);});
             <section class="ta-section ta-recent"><div class="ta-section-head"><h2>{{copy.recent}}</h2><button @click="go('works')">{{copy.all}} <AppIcon name="arrow" :size="17"/></button></div><div class="ta-work-grid"><article v-for="item in app.portfolio.slice(0,8)" :key="item.id"><img :src="item.image||item.after_image||item.before_image" :alt="item.title"><h3>{{item.title}}</h3><p>{{item.description}}</p></article></div></section>
           </section>
 
+          <section v-else-if="screen==='services'" class="ta-page ta-brows-services-page">
+            <header class="ta-simple-header"><button @click="go('home')"><AppIcon name="back"/>{{copy.back}}</button><h1>{{copy.servicesNav}}</h1><button class="ta-icon-button" @click="menuOpen=true"><AppIcon name="menu"/></button></header>
+            <p class="ta-centered">{{app.template.hero.text}}</p>
+            <div class="ta-brows-service-catalog"><article v-for="service in app.services" :key="service.id"><img v-if="service.image" :src="service.image" :alt="service.name"><div><h2>{{service.name}}</h2><p>{{service.description}}</p><span>{{service.duration}} {{copy.duration}}</span></div><button @click="go('book')">{{copy.bookNow}}<AppIcon name="arrow"/></button></article></div>
+          </section>
+
           <section v-else-if="screen==='works'" class="ta-page ta-works-page">
             <header class="ta-page-header"><button @click="go('home')"><img :src="app.tenant.logo||'/brand/lookdo-mark.webp'" alt=""><span>{{app.tenant.name}}</span></button><div><a v-if="app.tenant.contact.vk_url" :href="app.tenant.contact.vk_url" target="_blank">VK</a><a v-if="app.tenant.contact.phone" :href="'tel:'+app.tenant.contact.phone"><AppIcon name="phone"/></a></div></header>
             <div class="ta-page-title"><h1>{{copy.works}}</h1><p>{{app.tenant.description}}</p></div>
@@ -153,7 +179,7 @@ onBeforeUnmount(()=>{if(clock)window.clearInterval(clock);});
             <div v-if="activityLoading" class="ta-loading-line"></div>
             <div v-else-if="!activity.requests.length&&!activity.appointments.length" class="ta-empty"><span><AppIcon name="message" :size="42"/></span><h2>{{copy.noActivity}}</h2><p>{{copy.noActivityText}}</p><button class="ta-gold-button" @click="go(actionScreen)">{{app.template.hero.action}}</button></div>
             <template v-else>
-              <div class="ta-activity-list"><button v-for="item in activity.requests" :key="'r'+item.id" @click="selectedRequest=item"><span class="ta-activity-icon"><AppIcon name="camera"/></span><span><b>#{{item.number}}</b><small>{{new Date(item.created_at).toLocaleString(locale,{dateStyle:'medium',timeStyle:'short'})}}</small><em>{{item.messages.at(-1)?.body}}</em></span><i>{{statusLabel(item.status)}}</i></button><article v-for="item in activity.appointments" :key="'a'+item.id"><span class="ta-activity-icon"><AppIcon name="calendar"/></span><span><b>{{item.service?.name}}</b><small>{{new Date(item.starts_at).toLocaleString(locale,{dateStyle:'long',timeStyle:'short'})}}</small></span><i>{{statusLabel(item.status)}}</i></article></div>
+              <div class="ta-activity-list"><button v-for="item in activity.requests" :key="'r'+item.id" @click="selectedRequest=item"><span class="ta-activity-icon"><AppIcon name="camera"/></span><span><b>#{{item.number}}</b><small>{{new Date(item.created_at).toLocaleString(locale,{dateStyle:'medium',timeStyle:'short'})}}</small><em>{{item.messages.at(-1)?.body}}</em></span><i>{{statusLabel(item.status)}}</i></button><article v-for="item in activity.appointments" :key="'a'+item.id" class="ta-appointment-card"><span class="ta-activity-icon"><AppIcon name="calendar"/></span><span><b>{{item.service?.name}}</b><small>{{new Date(item.starts_at).toLocaleString(locale,{dateStyle:'long',timeStyle:'short'})}}</small><em>#{{item.number}}</em></span><i>{{statusLabel(item.status)}}</i><footer v-if="!['cancelled','completed','no_show'].includes(item.status)"><button @click="rescheduleAppointment=item">{{copy.reschedule}}</button><button @click="cancelAppointment(item)">{{copy.cancelAppointment}}</button></footer></article></div>
               <div v-if="selectedRequest" class="ta-thread"><header><button @click="selectedRequest=null"><AppIcon name="back"/></button><span><b>#{{selectedRequest.number}}</b><small>{{copy.messages}}</small></span></header><div class="ta-thread-messages"><p v-for="item in selectedRequest.messages" :key="item.id" :class="item.sender"><span>{{item.body}}</span><small>{{new Date(item.created_at).toLocaleTimeString(locale,{hour:'2-digit',minute:'2-digit'})}}</small></p></div><form @submit.prevent="sendMessage"><input v-model="message" :placeholder="copy.messagePlaceholder"><button :disabled="sending||!message.trim()"><AppIcon name="send"/></button></form></div>
             </template>
           </section>
@@ -179,7 +205,7 @@ onBeforeUnmount(()=>{if(clock)window.clearInterval(clock);});
         </div>
 
         <nav class="ta-bottom-nav" :aria-label="copy.navigation"><button v-for="item in navItems" :key="item.key" :class="{active:screen===item.key,central:item.central}" @click="go(item.key)"><span><AppIcon :name="item.icon"/></span><small>{{item.label}}</small></button></nav>
-        <div v-if="menuOpen" class="ta-menu-overlay" @click.self="menuOpen=false"><aside><header><img :src="app.tenant.logo||'/brand/lookdo-mark.webp'" alt=""><div><b>{{app.tenant.name}}</b><small>{{app.template.name}}</small></div><button @click="menuOpen=false"><AppIcon name="close"/></button></header><nav><button @click="go('contacts')"><AppIcon name="phone"/>{{copy.contacts}}<AppIcon name="arrow"/></button><button @click="go('reviews')"><AppIcon name="star"/>{{copy.reviews}}<AppIcon name="arrow"/></button><button @click="share"><AppIcon name="share"/>{{copy.share}}<AppIcon name="arrow"/></button><button @click="go('login')"><AppIcon name="shield"/>{{copy.login}}<AppIcon name="arrow"/></button></nav><label>{{copy.language}}<select :value="locale" @change="changeLocale(($event.target as HTMLSelectElement).value)"><option value="de">Deutsch</option><option value="en">English</option><option value="ru">Русский</option><option value="uk">Українська</option></select></label><small>{{copy.powered}}</small></aside></div>
+        <div v-if="menuOpen" class="ta-menu-overlay" @click.self="menuOpen=false"><aside><header><img :src="app.tenant.logo||'/brand/lookdo-mark.webp'" alt=""><div><b>{{app.tenant.name}}</b><small>{{app.template.name}}</small></div><button @click="menuOpen=false"><AppIcon name="close"/></button></header><nav><button v-if="isBrows" @click="go('activity')"><AppIcon name="calendar"/>{{copy.appointments}}<AppIcon name="arrow"/></button><button @click="go('contacts')"><AppIcon name="phone"/>{{copy.contacts}}<AppIcon name="arrow"/></button><button @click="go('reviews')"><AppIcon name="star"/>{{copy.reviews}}<AppIcon name="arrow"/></button><button @click="share"><AppIcon name="share"/>{{copy.share}}<AppIcon name="arrow"/></button><button @click="go('login')"><AppIcon name="shield"/>{{copy.login}}<AppIcon name="arrow"/></button></nav><label>{{copy.language}}<select :value="locale" @change="changeLocale(($event.target as HTMLSelectElement).value)"><option value="de">Deutsch</option><option value="en">English</option><option value="ru">Русский</option><option value="uk">Українська</option></select></label><small>{{copy.powered}}</small></aside></div>
         <div v-if="pushPrompt" class="ta-menu-overlay ta-push-overlay" @click.self="dismissPush"><aside><div class="ta-bell-orbit"><AppIcon name="bell" :size="80"/><b>1</b></div><h2>{{copy.notificationHeadline}}</h2><p>{{copy.notificationText}}</p><p v-if="pushStatus" class="ta-notification-status">{{pushStatus}}</p><button class="ta-gold-button" :disabled="pushBusy" @click="enablePush"><AppIcon name="bell"/>{{pushBusy?copy.sending:copy.notifications}}</button><button class="ta-outline-button" @click="dismissPush">{{copy.later}}</button></aside></div>
       </template>
     </main>

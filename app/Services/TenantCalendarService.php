@@ -26,7 +26,7 @@ class TenantCalendarService
         }
     }
 
-    public function slots(Tenant $tenant, TenantService $service, string $date): array
+    public function slots(Tenant $tenant, TenantService $service, string $date, ?int $exceptAppointmentId = null): array
     {
         $this->ensureWorkingHours($tenant);
         $day = CarbonImmutable::parse($date, self::TIMEZONE);
@@ -36,7 +36,9 @@ class TenantCalendarService
         }
         $open = CarbonImmutable::parse($date.' '.substr((string) $hours->starts_at, 0, 5), self::TIMEZONE);
         $close = CarbonImmutable::parse($date.' '.substr((string) $hours->ends_at, 0, 5), self::TIMEZONE);
-        $appointments = $tenant->appointments()->whereNotIn('status', ['cancelled', 'no_show'])->whereDate('starts_at', $date)->get();
+        $appointments = $tenant->appointments()->whereNotIn('status', ['cancelled', 'no_show'])
+            ->when($exceptAppointmentId, fn ($query) => $query->whereKeyNot($exceptAppointmentId))
+            ->whereDate('starts_at', $date)->get();
         $blocks = $tenant->calendarBlocks()->where('starts_at', '<', $close)->where('ends_at', '>', $open)->get();
         $breaks = collect($hours->breaks ?: [])->map(fn ($b) => [
             CarbonImmutable::parse($date.' '.$b['start'], self::TIMEZONE), CarbonImmutable::parse($date.' '.$b['end'], self::TIMEZONE),

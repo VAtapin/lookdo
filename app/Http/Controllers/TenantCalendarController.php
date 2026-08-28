@@ -9,12 +9,14 @@ use App\Models\TenantCalendarBlock;
 use App\Models\TenantReminder;
 use App\Models\TenantService;
 use App\Services\EntitlementService;
+use App\Services\ImageStorageService;
 use App\Services\TenantCalendarService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -99,12 +101,44 @@ class TenantCalendarController extends Controller
         return response()->json(['service' => $service], $service->wasRecentlyCreated ? 201 : 200);
     }
 
+    public function uploadServiceImage(Request $request, Tenant $tenant, TenantService $service, ImageStorageService $images): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($service->tenant_id === $tenant->id, 404);
+        $data = $request->validate(['image' => 'required|image|mimes:jpg,jpeg,png,webp|max:20480']);
+        $oldPath = $service->image_path;
+        $path = $images->storeUploaded($data['image'], 'tenant-app/'.$tenant->id.'/services', 'public', 1600, 1200);
+        $service->update(['image_path' => $path]);
+        if ($oldPath && $oldPath !== $path && str_starts_with($oldPath, 'tenant-app/'.$tenant->id.'/services/')) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        return response()->json(['service' => $service->fresh(), 'image_url' => Storage::disk('public')->url($path)], 201);
+    }
+
+    public function removeServiceImage(Request $request, Tenant $tenant, TenantService $service): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($service->tenant_id === $tenant->id, 404);
+        $oldPath = $service->image_path;
+        $service->update(['image_path' => null]);
+        if ($oldPath && str_starts_with($oldPath, 'tenant-app/'.$tenant->id.'/services/')) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        return response()->json(['service' => $service->fresh(), 'image_url' => null]);
+    }
+
     public function deleteService(Request $request, Tenant $tenant, TenantService $service): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($service->tenant_id === $tenant->id, 404);
         abort_if($service->appointments()->exists(), 422, 'SERVICE_HAS_APPOINTMENTS');
+        $imagePath = $service->image_path;
         $service->delete();
+        if ($imagePath && str_starts_with($imagePath, 'tenant-app/'.$tenant->id.'/services/')) {
+            Storage::disk('public')->delete($imagePath);
+        }
 
         return response()->json(['deleted' => true]);
     }
