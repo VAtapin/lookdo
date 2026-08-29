@@ -26,7 +26,7 @@ class TenantCalendarService
         }
     }
 
-    public function slots(Tenant $tenant, TenantService $service, string $date, ?int $exceptAppointmentId = null): array
+    public function slots(Tenant $tenant, TenantService $service, string $date, ?int $exceptAppointmentId = null, ?int $resourceId = null): array
     {
         $this->ensureWorkingHours($tenant);
         $day = CarbonImmutable::parse($date, self::TIMEZONE);
@@ -38,8 +38,11 @@ class TenantCalendarService
         $close = CarbonImmutable::parse($date.' '.substr((string) $hours->ends_at, 0, 5), self::TIMEZONE);
         $appointments = $tenant->appointments()->whereNotIn('status', ['cancelled', 'no_show'])
             ->when($exceptAppointmentId, fn ($query) => $query->whereKeyNot($exceptAppointmentId))
+            ->when($resourceId, fn ($query) => $query->where(fn ($resources) => $resources->whereNull('resource_id')->orWhere('resource_id', $resourceId)))
             ->whereDate('starts_at', $date)->get();
-        $blocks = $tenant->calendarBlocks()->where('starts_at', '<', $close)->where('ends_at', '>', $open)->get();
+        $blocks = $tenant->calendarBlocks()
+            ->when($resourceId, fn ($query) => $query->where(fn ($resources) => $resources->whereNull('resource_id')->orWhere('resource_id', $resourceId)))
+            ->where('starts_at', '<', $close)->where('ends_at', '>', $open)->get();
         $breaks = collect($hours->breaks ?: [])->map(fn ($b) => [
             CarbonImmutable::parse($date.' '.$b['start'], self::TIMEZONE), CarbonImmutable::parse($date.' '.$b['end'], self::TIMEZONE),
         ]);
@@ -64,7 +67,7 @@ class TenantCalendarService
         return $slots;
     }
 
-    public function assertAvailable(Tenant $tenant, TenantService $service, CarbonImmutable $start, CarbonImmutable $end, ?int $exceptId = null): void
+    public function assertAvailable(Tenant $tenant, TenantService $service, CarbonImmutable $start, CarbonImmutable $end, ?int $exceptId = null, ?int $resourceId = null): void
     {
         $this->ensureWorkingHours($tenant);
         $localStart = $start->setTimezone(self::TIMEZONE);
@@ -86,8 +89,11 @@ class TenantCalendarService
         }
 
         $busy = $tenant->appointments()->whereNotIn('status', ['cancelled', 'no_show'])->when($exceptId, fn ($q) => $q->whereKeyNot($exceptId))
+            ->when($resourceId, fn ($query) => $query->where(fn ($resources) => $resources->whereNull('resource_id')->orWhere('resource_id', $resourceId)))
             ->where('starts_at', '<', $to)->where('ends_at', '>', $from)->lockForUpdate()->exists();
-        $blocked = $tenant->calendarBlocks()->where('starts_at', '<', $to)->where('ends_at', '>', $from)->exists();
+        $blocked = $tenant->calendarBlocks()
+            ->when($resourceId, fn ($query) => $query->where(fn ($resources) => $resources->whereNull('resource_id')->orWhere('resource_id', $resourceId)))
+            ->where('starts_at', '<', $to)->where('ends_at', '>', $from)->exists();
         if ($busy || $blocked) {
             throw ValidationException::withMessages(['starts_at' => 'CALENDAR_SLOT_UNAVAILABLE']);
         }

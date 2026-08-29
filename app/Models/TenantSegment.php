@@ -4,14 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-class TenantCalendarBlock extends Model
+class TenantSegment extends Model
 {
     protected $guarded = [];
 
     protected function casts(): array
     {
-        return ['starts_at' => 'datetime', 'ends_at' => 'datetime', 'all_day' => 'boolean'];
+        return ['rules' => 'array', 'active' => 'boolean'];
     }
 
     public function tenant(): BelongsTo
@@ -19,8 +20,8 @@ class TenantCalendarBlock extends Model
         return $this->belongsTo(Tenant::class);
     }
 
-    public function resource(): BelongsTo
+    public function customers(): BelongsToMany
     {
-        return $this->belongsTo(TenantResource::class, 'resource_id');
+        return $this->belongsToMany(TenantCustomer::class, 'tenant_customer_segment')->withTimestamps();
     }
 }

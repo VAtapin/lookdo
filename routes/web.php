@@ -11,6 +11,7 @@ use App\Http\Controllers\TenantAppController;
 use App\Http\Controllers\TenantCalendarController;
 use App\Http\Controllers\TenantContentController;
 use App\Http\Controllers\TenantController;
+use App\Http\Controllers\TenantOperationsController;
 use App\Http\Controllers\TenantWorkspaceController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,6 +28,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
         Route::patch('/appointments/{tenantAppointment}', [TenantAppController::class, 'rescheduleAppointment'])->middleware('throttle:20,1');
         Route::delete('/appointments/{tenantAppointment}', [TenantAppController::class, 'cancelAppointment'])->middleware('throttle:20,1');
         Route::post('/push-subscriptions', [TenantAppController::class, 'subscribePush'])->middleware('throttle:10,1');
+        Route::post('/reviews', [TenantAppController::class, 'submitReview'])->middleware('throttle:10,1');
     });
     Route::get('/platform/pages/{key}', [PlatformController::class, 'page'])->whereIn('key', ['impressum', 'datenschutz', 'agb', 'kontakt']);
     Route::post('/classify', [AuthController::class, 'classify'])->middleware('throttle:30,1');
@@ -70,6 +72,16 @@ Route::prefix('api')->middleware('locale')->group(function () {
         Route::get('/tenant/{tenant}/workspace/team', [TenantWorkspaceController::class, 'team']);
         Route::post('/tenant/{tenant}/workspace/team', [TenantWorkspaceController::class, 'addTeamMember']);
         Route::delete('/tenant/{tenant}/workspace/team/{user}', [TenantWorkspaceController::class, 'removeTeamMember']);
+        Route::get('/tenant/{tenant}/workspace/resources', [TenantOperationsController::class, 'resources']);
+        Route::post('/tenant/{tenant}/workspace/resources', [TenantOperationsController::class, 'saveResource']);
+        Route::put('/tenant/{tenant}/workspace/resources/{resource}', [TenantOperationsController::class, 'saveResource']);
+        Route::delete('/tenant/{tenant}/workspace/resources/{resource}', [TenantOperationsController::class, 'deleteResource']);
+        Route::get('/tenant/{tenant}/workspace/segments', [TenantOperationsController::class, 'segments']);
+        Route::post('/tenant/{tenant}/workspace/segments', [TenantOperationsController::class, 'saveSegment']);
+        Route::put('/tenant/{tenant}/workspace/segments/{segment}', [TenantOperationsController::class, 'saveSegment']);
+        Route::delete('/tenant/{tenant}/workspace/segments/{segment}', [TenantOperationsController::class, 'deleteSegment']);
+        Route::put('/tenant/{tenant}/workspace/customers/{customer}/segments', [TenantOperationsController::class, 'syncCustomerSegments']);
+        Route::get('/tenant/{tenant}/workspace/vacancy-candidates', [TenantOperationsController::class, 'vacancyCandidates']);
 
         Route::get('/tenant/{tenant}/calendar', [TenantCalendarController::class, 'index']);
         Route::put('/tenant/{tenant}/calendar/working-hours', [TenantCalendarController::class, 'saveWorkingHours']);

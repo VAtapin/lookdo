@@ -127,7 +127,7 @@ class TenantWorkspaceController extends Controller
     public function customers(Request $request, Tenant $tenant): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
-        $q = $tenant->customers()->withCount(['requests', 'appointments'])->with('possibleDuplicate');
+        $q = $tenant->customers()->withCount(['requests', 'appointments'])->with(['possibleDuplicate', 'segments']);
         if ($request->filled('search')) {
             $term = '%'.$request->string('search').'%';
             $q->where(fn ($x) => $x->where('name', 'like', $term)->orWhere('phone', 'like', $term)->orWhere('email', 'like', $term));
@@ -142,7 +142,7 @@ class TenantWorkspaceController extends Controller
         abort_unless($customer->tenant_id === $tenant->id, 404);
 
         return response()->json([
-            'customer' => $customer->load('possibleDuplicate'),
+            'customer' => $customer->load(['possibleDuplicate', 'segments']),
             'requests' => $customer->requests()->with('media')->latest()->limit(50)->get()->map(fn (TenantRequest $tenantRequest) => $this->requestItem($tenantRequest)),
             'appointments' => $customer->appointments()->with('service')->latest('starts_at')->limit(50)->get()->map(fn ($appointment) => $this->appointment($appointment)),
             'messages' => $customer->messages()->latest()->limit(50)->get()->reverse()->values(),
@@ -153,7 +153,7 @@ class TenantWorkspaceController extends Controller
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($customer->tenant_id === $tenant->id, 404);
-        $data = $request->validate(['name' => 'nullable|string|max:120', 'phone' => 'nullable|string|max:50', 'email' => 'nullable|email|max:190', 'preferred_channel' => 'nullable|in:phone,whatsapp,sms,email,push,vk', 'notes' => 'nullable|string|max:5000', 'tags' => 'nullable|array', 'marketing_consent' => 'nullable|boolean', 'publication_consent' => 'nullable|boolean']);
+        $data = $request->validate(['name' => 'nullable|string|max:120', 'phone' => 'nullable|string|max:50', 'email' => 'nullable|email|max:190', 'preferred_channel' => 'nullable|in:phone,whatsapp,sms,email,push,vk', 'notes' => 'nullable|string|max:5000', 'tags' => 'nullable|array', 'service_consent' => 'nullable|boolean', 'marketing_consent' => 'nullable|boolean', 'publication_consent' => 'nullable|boolean']);
         if (array_key_exists('phone', $data)) {
             $data['phone_normalized'] = preg_replace('/\D+/', '', (string) $data['phone']);
         }
@@ -161,13 +161,17 @@ class TenantWorkspaceController extends Controller
             $data['marketing_consent_at'] = $data['marketing_consent'] ? now() : null;
             unset($data['marketing_consent']);
         }
+        if (array_key_exists('service_consent', $data)) {
+            $data['service_consent_at'] = $data['service_consent'] ? now() : null;
+            unset($data['service_consent']);
+        }
         if (array_key_exists('publication_consent', $data)) {
             $data['publication_consent_at'] = $data['publication_consent'] ? now() : null;
             unset($data['publication_consent']);
         }
         $customer->update($data);
 
-        return response()->json(['customer' => $customer->fresh('possibleDuplicate')]);
+        return response()->json(['customer' => $customer->fresh(['possibleDuplicate', 'segments'])]);
     }
 
     public function mergeCustomer(Request $request, Tenant $tenant, TenantCustomer $customer): JsonResponse

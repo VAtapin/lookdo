@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'review_received' => 'Thank you. Your review will be published after moderation.',
     'inactive' => 'This application has been disabled by the provider.',
     'subscription_inactive' => 'The trial has ended or the subscription is not active.',
     'requests_disabled' => 'Requests are not included in this plan.',

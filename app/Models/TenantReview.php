@@ -11,7 +11,7 @@ class TenantReview extends Model
 
     protected function casts(): array
     {
-        return ['published' => 'boolean', 'received_at' => 'datetime'];
+        return ['published' => 'boolean', 'received_at' => 'datetime', 'replied_at' => 'datetime'];
     }
 
     public function tenant(): BelongsTo

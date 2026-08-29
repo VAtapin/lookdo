@@ -54,6 +54,8 @@ class TenantAppController extends Controller
                 'rating' => $review->rating,
                 'author' => $review->author_name ?: $review->customer?->name,
                 'body' => $review->body,
+                'master_reply' => $review->master_reply,
+                'replied_at' => $review->replied_at?->toIso8601String(),
                 'received_at' => $review->received_at?->toIso8601String(),
             ]),
             'entitlements' => [
@@ -165,6 +167,7 @@ class TenantAppController extends Controller
             'service_id' => 'required|integer',
             'date' => 'required|date_format:Y-m-d|after_or_equal:today',
             'appointment_id' => 'nullable|integer',
+            'resource_id' => 'nullable|integer',
         ]);
         $service = $tenant->services()->where('active', true)->findOrFail($data['service_id']);
         $exceptAppointmentId = null;
@@ -174,7 +177,17 @@ class TenantAppController extends Controller
             $exceptAppointmentId = $appointment->id;
         }
 
-        return response()->json(['slots' => $calendar->slots($tenant, $service, $data['date'], $exceptAppointmentId)]);
+        $resourceIds = filled($data['resource_id'] ?? null)
+            ? [$tenant->resources()->where('active', true)->findOrFail($data['resource_id'])->id]
+            : $tenant->resources()->where('active', true)->orderBy('sort_order')->pluck('id')->all();
+        if ($resourceIds === []) {
+            $resourceIds = [null];
+        }
+        $slots = collect($resourceIds)->flatMap(fn ($resourceId) => collect($calendar->slots($tenant, $service, $data['date'], $exceptAppointmentId, $resourceId))
+            ->map(fn ($slot) => array_merge($slot, ['resource_id' => $resourceId])))
+            ->sortBy('starts_at')->unique('starts_at')->values();
+
+        return response()->json(['slots' => $slots]);
     }
 
     public function createAppointment(Request $request, TenantCalendarService $calendar): JsonResponse
@@ -188,22 +201,32 @@ class TenantAppController extends Controller
             'service_id' => 'required|integer', 'starts_at' => 'required|date|after:now', 'name' => 'nullable|string|max:120',
             'phone' => 'required|string|max:50', 'email' => 'nullable|email|max:190', 'comment' => 'nullable|string|max:2000',
             'preferred_channel' => 'nullable|in:phone,whatsapp,viber,telegram,sms,email,push,vk',
+            'resource_id' => 'nullable|integer',
         ]);
         $service = $tenant->services()->where('active', true)->where('booking_enabled', true)->findOrFail($data['service_id']);
         $locale = $this->locale($request, $tenant);
         [$customer, $rawToken] = $this->customerAndToken($request, $tenant, $data, $locale);
         $start = CarbonImmutable::parse($data['starts_at'], 'Europe/Berlin');
         $end = $start->addMinutes($service->duration_minutes);
+        $resourceId = filled($data['resource_id'] ?? null)
+            ? $tenant->resources()->where('active', true)->findOrFail($data['resource_id'])->id
+            : $tenant->resources()->where('active', true)->orderBy('sort_order')->get()->first(function ($resource) use ($calendar, $tenant, $service, $start): bool {
+                return collect($calendar->slots($tenant, $service, $start->toDateString(), null, $resource->id))
+                    ->contains(fn ($slot) => CarbonImmutable::parse($slot['starts_at'])->equalTo($start));
+            })?->id;
+        if ($resourceId === null && $tenant->resources()->where('active', true)->exists()) {
+            throw ValidationException::withMessages(['starts_at' => trans('tenant_app.slot_unavailable', locale: $locale)]);
+        }
 
-        $appointment = DB::transaction(function () use ($tenant, $customer, $service, $data, $locale, $start, $end, $calendar) {
+        $appointment = DB::transaction(function () use ($tenant, $customer, $service, $data, $locale, $start, $end, $calendar, $resourceId) {
             try {
-                $calendar->assertAvailable($tenant, $service, $start, $end);
+                $calendar->assertAvailable($tenant, $service, $start, $end, null, $resourceId);
             } catch (ValidationException) {
                 throw ValidationException::withMessages(['starts_at' => trans('tenant_app.slot_unavailable', locale: $locale)]);
             }
 
             return $tenant->appointments()->create([
-                'customer_id' => $customer->id, 'service_id' => $service->id, 'number' => $this->number('A'), 'status' => 'pending',
+                'customer_id' => $customer->id, 'service_id' => $service->id, 'resource_id' => $resourceId, 'number' => $this->number('A'), 'status' => 'pending',
                 'starts_at' => $start, 'ends_at' => $end, 'comment' => $data['comment'] ?? null, 'locale' => $locale,
                 'contact_snapshot' => Arr::only($data, ['name', 'phone', 'email', 'preferred_channel']),
             ]);
@@ -228,7 +251,7 @@ class TenantAppController extends Controller
         $end = $start->addMinutes($tenantAppointment->service->duration_minutes);
 
         DB::transaction(function () use ($tenant, $tenantAppointment, $calendar, $start, $end) {
-            $calendar->assertAvailable($tenant, $tenantAppointment->service, $start, $end, $tenantAppointment->id);
+            $calendar->assertAvailable($tenant, $tenantAppointment->service, $start, $end, $tenantAppointment->id, $tenantAppointment->resource_id);
             $tenantAppointment->update(['starts_at' => $start, 'ends_at' => $end, 'status' => 'confirmed']);
         });
 
@@ -263,6 +286,34 @@ class TenantAppController extends Controller
         );
 
         return response()->json(['subscribed' => true]);
+    }
+
+    public function submitReview(Request $request): JsonResponse
+    {
+        $tenant = $this->tenant($request);
+        $this->ensureAvailable($request, $tenant);
+        $customer = $this->requireCustomer($request, $tenant);
+        $data = $request->validate([
+            'request_id' => 'nullable|integer',
+            'rating' => 'required|integer|between:1,5',
+            'body' => 'required|string|max:3000',
+            'author_name' => 'nullable|string|max:120',
+        ]);
+        $tenantRequest = filled($data['request_id'] ?? null)
+            ? $tenant->appRequests()->where('customer_id', $customer->id)->findOrFail($data['request_id'])
+            : null;
+        $review = $tenant->reviews()->updateOrCreate(
+            ['customer_id' => $customer->id, 'request_id' => $tenantRequest?->id],
+            [
+                'rating' => $data['rating'],
+                'body' => $data['body'],
+                'author_name' => $data['author_name'] ?: $customer->name,
+                'published' => false,
+                'received_at' => now(),
+            ],
+        );
+
+        return response()->json(['review' => $review, 'message' => trans('tenant_app.review_received', locale: $this->locale($request, $tenant))], 201);
     }
 
     private function notifyMaster(Tenant $tenant, string $event, string $url, string $tag): void
@@ -510,6 +561,22 @@ class TenantAppController extends Controller
             'media_slots' => $slots, 'video' => $media['video'] ?? $configuration['video'] ?? [], 'fields' => $fields,
             'submit' => $this->localized($configuration['submit'] ?? ['label' => $configuration['submit_label'] ?? null], $locale),
             'success' => $this->localized($configuration['success'] ?? [], $locale), 'push_prompt' => $this->localized($configuration['push_prompt'] ?? [], $locale),
+            'screens' => collect($configuration['screens'] ?? [])->map(function ($screen) use ($locale) {
+                $screen['name'] = $this->localized($screen['name'] ?? $screen['key'] ?? '', $locale);
+                $screen['blocks'] = collect($screen['blocks'] ?? [])->filter(fn ($block) => ($block['enabled'] ?? true) === true)->map(function ($block) use ($locale) {
+                    $block['title'] = $this->localized($block['title'] ?? '', $locale);
+
+                    return $block;
+                })->values()->all();
+
+                return $screen;
+            })->values()->all(),
+            'actions' => collect($configuration['actions'] ?? [])->filter(fn ($action) => ($action['enabled'] ?? true) === true)->map(function ($action) use ($locale) {
+                $action['label'] = $this->localized($action['label'] ?? '', $locale);
+
+                return $action;
+            })->values()->all(),
+            'locales' => array_values(array_intersect(['de', 'en', 'ru', 'uk'], $configuration['locales'] ?? ['de', 'en', 'ru', 'uk'])),
             'capabilities' => $configuration['capabilities'] ?? ['request' => true],
         ];
     }

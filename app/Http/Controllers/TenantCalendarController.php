@@ -29,16 +29,29 @@ class TenantCalendarController extends Controller
     {
         $this->authorizeWorkspace($request, $tenant);
         $calendar->ensureWorkingHours($tenant);
+        if (! $tenant->resources()->exists()) {
+            $tenant->users()->orderBy('tenant_users.created_at')->get()->each(function ($user, $index) use ($tenant): void {
+                $tenant->resources()->create([
+                    'user_id' => $user->id,
+                    'name' => $user->name,
+                    'kind' => 'staff',
+                    'color' => $index === 0 ? '#ff6b00' : '#2f80ed',
+                    'active' => true,
+                    'sort_order' => $index,
+                ]);
+            });
+        }
         $from = CarbonImmutable::parse($request->input('from', now()->startOfMonth()), TenantCalendarService::TIMEZONE)->startOfDay();
         $to = CarbonImmutable::parse($request->input('to', $from->addMonth()), TenantCalendarService::TIMEZONE)->endOfDay();
 
         return response()->json([
-            'appointments' => $tenant->appointments()->with(['customer', 'service'])->where('starts_at', '<', $to)->where('ends_at', '>', $from)->orderBy('starts_at')->get(),
-            'blocks' => $tenant->calendarBlocks()->where('starts_at', '<', $to)->where('ends_at', '>', $from)->orderBy('starts_at')->get(),
+            'appointments' => $tenant->appointments()->with(['customer', 'service', 'resource'])->where('starts_at', '<', $to)->where('ends_at', '>', $from)->orderBy('starts_at')->get(),
+            'blocks' => $tenant->calendarBlocks()->with('resource')->where('starts_at', '<', $to)->where('ends_at', '>', $from)->orderBy('starts_at')->get(),
             'working_hours' => $tenant->workingHours()->orderBy('weekday')->get(),
             'services' => $tenant->services()->orderBy('sort_order')->get(),
             'reminders' => $tenant->reminders()->with(['customer', 'appointment'])->whereBetween('scheduled_at', [$from, $to])->orderBy('scheduled_at')->get(),
             'customers' => $tenant->customers()->orderBy('name')->orderBy('phone')->get(['id', 'name', 'phone']),
+            'resources' => $tenant->resources()->with('user:id,name,email')->where('active', true)->orderBy('sort_order')->orderBy('name')->get(),
             'entitlements' => $entitlements->all($tenant),
         ]);
     }
@@ -146,10 +159,14 @@ class TenantCalendarController extends Controller
     public function slots(Request $request, Tenant $tenant, TenantCalendarService $calendar): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
-        $data = $request->validate(['service_id' => 'required|integer', 'date' => 'required|date_format:Y-m-d']);
+        $data = $request->validate([
+            'service_id' => 'required|integer',
+            'date' => 'required|date_format:Y-m-d',
+            'resource_id' => ['nullable', 'integer', Rule::exists('tenant_resources', 'id')->where('tenant_id', $tenant->id)],
+        ]);
         $service = $tenant->services()->findOrFail($data['service_id']);
 
-        return response()->json(['slots' => $calendar->slots($tenant, $service, $data['date'])]);
+        return response()->json(['slots' => $calendar->slots($tenant, $service, $data['date'], null, $data['resource_id'] ?? null)]);
     }
 
     public function saveAppointment(Request $request, Tenant $tenant, TenantCalendarService $calendar, EntitlementService $entitlements, ?TenantAppointment $appointment = null): JsonResponse
@@ -162,6 +179,7 @@ class TenantCalendarController extends Controller
         $data = $request->validate([
             'customer_id' => ['nullable', 'integer', Rule::exists('tenant_customers', 'id')->where('tenant_id', $tenant->id)],
             'service_id' => ['required', 'integer', Rule::exists('tenant_services', 'id')->where('tenant_id', $tenant->id)],
+            'resource_id' => ['nullable', 'integer', Rule::exists('tenant_resources', 'id')->where('tenant_id', $tenant->id)],
             'starts_at' => 'required|date',
             'status' => ['required', Rule::in(['pending', 'confirmed', 'completed', 'cancelled', 'no_show'])],
             'comment' => 'nullable|string|max:2000',
@@ -173,7 +191,7 @@ class TenantCalendarController extends Controller
         $end = $start->addMinutes($service->duration_minutes);
 
         DB::transaction(function () use ($tenant, $service, $start, $end, $data, $calendar, $entitlements, &$appointment): void {
-            $calendar->assertAvailable($tenant, $service, $start, $end, $appointment?->id);
+            $calendar->assertAvailable($tenant, $service, $start, $end, $appointment?->id, $data['resource_id'] ?? null);
             $payload = array_merge($data, [
                 'ends_at' => $end,
                 'number' => $appointment?->number ?: 'A-'.now()->format('ymd').'-'.Str::upper(Str::random(6)),
@@ -199,7 +217,7 @@ class TenantCalendarController extends Controller
             }
         });
 
-        return response()->json(['appointment' => $appointment->fresh(['customer', 'service'])], $appointment->wasRecentlyCreated ? 201 : 200);
+        return response()->json(['appointment' => $appointment->fresh(['customer', 'service', 'resource'])], $appointment->wasRecentlyCreated ? 201 : 200);
     }
 
     public function deleteAppointment(Request $request, Tenant $tenant, TenantAppointment $appointment): JsonResponse
@@ -224,6 +242,7 @@ class TenantCalendarController extends Controller
             'starts_at' => 'required|date',
             'ends_at' => 'required|date|after:starts_at',
             'all_day' => 'required|boolean',
+            'resource_id' => ['nullable', 'integer', Rule::exists('tenant_resources', 'id')->where('tenant_id', $tenant->id)],
         ]);
         $block ? $block->update($data) : $block = $tenant->calendarBlocks()->create($data);
 

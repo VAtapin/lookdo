@@ -153,6 +153,8 @@ body{background:#fff}
 .mw-thread-close{display:none;border:0;background:#17181c;color:#fff;border-radius:12px;font-size:24px}.mw-thread>header>div{flex:1}@media(max-width:720px){.mw-thread-close{position:fixed;z-index:43;top:14px;right:16px;display:grid;width:42px;height:42px;place-items:center}.mw-thread>header:before{display:none}}
 
 .mw-danger-link{border:0;background:none;color:#b42318;font-weight:850;cursor:pointer}.mw-danger{border-color:#efb1aa;background:#fff0ed;color:#9a2f24}.mw-setup-link{display:grid;grid-column:1/-1;gap:8px;padding:14px;border:1px solid #ffd0ae;border-radius:13px;background:#fff5ed}.mw-form fieldset{display:grid;grid-column:1/-1;gap:10px;margin:0;padding:14px;border:1px solid #e0ddd5;border-radius:13px}.mw-form legend{padding:0 6px;font-weight:850}.mw-more-grid .line-icon{width:29px;height:29px;color:#ff6b00}.mw-more-grid button{color:inherit}.mw-service-row button{min-height:36px}
+.mw-resource-row{width:100%;border:0;border-bottom:1px solid #eeeae3;background:none;color:inherit;text-align:left;cursor:pointer}.mw-resource-color{width:13px;height:36px;flex:0 0 13px;border-radius:99px}.mw-resource-row>span{margin-right:auto}.mw-muted{color:#777a81}.mw-resource-row>em{padding:5px 8px;border-radius:99px;background:#f3f1ec}
+.mw-segments-panel>header{align-items:flex-start}.mw-segments-panel .mw-inline{margin:0}.mw-segments-panel input[type=color]{width:48px;min-width:48px;padding:5px}.mw-segment-list{display:flex;flex-wrap:wrap;gap:8px}.mw-segment-list>span{display:inline-flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid #ff6b00;border-radius:99px;background:#fff}.mw-segment-list>span.smart{border-color:#ddd9d1;background:#f5f2ec}.mw-segment-list button{border:0;background:none;color:#9a2f24;font-size:18px;cursor:pointer}.mw-customer-segments{display:flex!important;flex-wrap:wrap}.mw-customer-segments label{padding:7px 9px;border:1px solid #e0ddd5;border-radius:10px}.mw-customer-segments i{width:9px;height:9px;border-radius:50%}
 
 /* Customer history and compact row actions in the mobile master workspace. */
 .mw-row-actions{display:flex!important;align-items:center;gap:8px}.mw-customer-verification{display:flex;flex-wrap:wrap;gap:8px;grid-column:1/-1}.mw-customer-verification span{padding:8px 10px;border-radius:10px;background:#f2efe8;color:#656970;font-size:11px}.mw-history{display:grid;grid-column:1/-1;gap:8px;margin-top:10px;padding-top:18px;border-top:1px solid #e4e0d8}.mw-history h3{margin:0 0 5px}.mw-history article{display:grid;gap:4px;padding:11px 12px;border-radius:12px;background:#f4f1eb}.mw-history small{color:#686b72;white-space:pre-wrap}
@@ -173,3 +175,67 @@ body{background:#fff}
 /* Service images are tenant content, editable from the mobile master workspace. */
 .mw-service-thumb{width:64px;height:52px;flex:0 0 64px;border-radius:11px;object-fit:cover;background:#ece9e2}.mw-service-media{display:grid;grid-column:1/-1;grid-template-columns:minmax(150px,240px) 1fr 1fr;gap:10px;align-items:center}.mw-service-media>span{grid-row:1/3;overflow:hidden;height:138px;border-radius:15px;background:#f0ede7}.mw-service-media img{width:100%;height:100%;object-fit:cover}.mw-service-media label,.mw-service-media button{margin:0;cursor:pointer}.mw-service-media small{grid-column:2/-1;color:#72767d;line-height:1.4}
 @media(max-width:520px){.mw-service-media{grid-template-columns:1fr 1fr}.mw-service-media>span{grid-column:1/-1;grid-row:auto}.mw-service-media small{grid-column:1/-1}}
+.mw-review-reply {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0.8rem 0 0;
+    padding: 0.75rem 0.9rem;
+    border-left: 3px solid var(--mw-accent, #ff6b00);
+    border-radius: 0 0.7rem 0.7rem 0;
+    background: rgba(255, 107, 0, 0.08);
+}
+.audit-row {
+    cursor: pointer;
+}
+
+.audit-row:hover,
+.audit-row:focus-visible {
+    background: rgba(255, 107, 0, 0.08);
+    outline: none;
+}
+
+.audit-details {
+    display: grid;
+    gap: 1rem;
+}
+
+.audit-details dl,
+.audit-details section {
+    margin: 0;
+    padding: 1rem;
+    border: 1px solid #414650;
+    border-radius: 0.8rem;
+    background: #202329;
+}
+
+.audit-details dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem;
+}
+
+.audit-details dt {
+    color: #9aa1ad;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+
+.audit-details dd {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0.2rem 0 0;
+}
+
+.audit-details pre {
+    max-height: 20rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: #d8dce4;
+}
+
+@media (max-width: 700px) {
+    .audit-details dl {
+        grid-template-columns: 1fr;
+    }
+}

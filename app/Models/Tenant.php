@@ -133,6 +133,16 @@ class Tenant extends Model
         return $this->hasMany(TenantSocialDraft::class);
     }
 
+    public function resources(): HasMany
+    {
+        return $this->hasMany(TenantResource::class);
+    }
+
+    public function segments(): HasMany
+    {
+        return $this->hasMany(TenantSegment::class);
+    }
+
     public function hasActiveSubscription(): bool
     {
         if ($this->hasManualAccess()) {

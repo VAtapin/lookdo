@@ -149,6 +149,60 @@ class TenantWorkspaceTest extends TestCase
             ->assertJsonCount(1, 'appointments');
     }
 
+    public function test_two_calendar_resources_can_accept_the_same_time_slot(): void
+    {
+        $tenant = $this->tenant('calendar-resources');
+        $owner = $this->owner($tenant);
+        $customer = $tenant->customers()->create(['name' => 'Мария', 'phone' => '+491511111111', 'locale' => 'ru']);
+        $service = $tenant->services()->create([
+            'name' => ['ru' => 'Консультация'],
+            'duration_minutes' => 60,
+            'buffer_before_minutes' => 0,
+            'buffer_after_minutes' => 0,
+            'currency' => 'EUR',
+            'booking_enabled' => true,
+            'media_allowed' => true,
+            'active' => true,
+        ]);
+        $first = $tenant->resources()->create(['name' => 'Мастер 1', 'kind' => 'staff', 'active' => true]);
+        $second = $tenant->resources()->create(['name' => 'Мастер 2', 'kind' => 'staff', 'active' => true]);
+        $date = CarbonImmutable::now('Europe/Berlin')->addDay();
+        while ($date->dayOfWeekIso > 5) {
+            $date = $date->addDay();
+        }
+        $payload = [
+            'customer_id' => $customer->id,
+            'service_id' => $service->id,
+            'starts_at' => $date->setTime(10, 0)->toIso8601String(),
+            'status' => 'confirmed',
+        ];
+
+        $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/calendar/appointments', $payload + ['resource_id' => $first->id])->assertCreated();
+        $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/calendar/appointments', $payload + ['resource_id' => $second->id])->assertCreated();
+        $this->assertDatabaseCount('tenant_appointments', 2);
+    }
+
+    public function test_master_can_create_segments_and_assign_them_to_a_customer(): void
+    {
+        $tenant = $this->tenant('customer-segments');
+        $owner = $this->owner($tenant);
+        $customer = $tenant->customers()->create(['name' => 'Анна', 'phone' => '+491511111111', 'locale' => 'ru']);
+
+        $segment = $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/workspace/segments', [
+            'name' => 'Повторный визит',
+            'color' => '#ff6b00',
+            'active' => true,
+        ])->assertCreated()->json('segment');
+
+        $this->actingAs($owner)->putJson('/api/tenant/'.$tenant->id.'/workspace/customers/'.$customer->id.'/segments', [
+            'segment_ids' => [$segment['id']],
+        ])->assertOk()->assertJsonPath('customer.segments.0.name', 'Повторный визит');
+
+        $this->actingAs($owner)->getJson('/api/tenant/'.$tenant->id.'/workspace/segments')
+            ->assertOk()
+            ->assertJsonPath('segments.0.customers_count', 1);
+    }
+
     public function test_team_limit_and_owner_protection_follow_tariff_entitlement(): void
     {
         $tenant = $this->tenant('team-limit');
@@ -192,9 +246,17 @@ class TenantWorkspaceTest extends TestCase
         $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/reviews', $payload)
             ->assertUnprocessable();
         $payload['publication_confirmed'] = true;
-        $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/reviews', $payload)
+        $created = $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/reviews', $payload)
             ->assertCreated()
             ->assertJsonPath('review.published', true);
+
+        $this->actingAs($owner)->putJson('/api/tenant/'.$tenant->id.'/reviews/'.$created->json('review.id'), $payload + [
+            'master_reply' => 'Спасибо за доверие!',
+        ])->assertOk()->assertJsonPath('review.master_reply', 'Спасибо за доверие!');
+
+        $this->getJson($this->tenantUrl($tenant, '/api/tenant-app/bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('reviews.0.master_reply', 'Спасибо за доверие!');
     }
 
     public function test_master_can_prepare_a_social_publication_from_own_portfolio(): void

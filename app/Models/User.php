@@ -24,4 +24,9 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Tenant::class, 'tenant_users')->withPivot('role')->withTimestamps();
     }
+
+    public function resources()
+    {
+        return $this->hasMany(TenantResource::class);
+    }
 }

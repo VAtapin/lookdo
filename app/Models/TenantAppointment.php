@@ -30,6 +30,11 @@ class TenantAppointment extends Model
         return $this->belongsTo(TenantService::class, 'service_id');
     }
 
+    public function resource(): BelongsTo
+    {
+        return $this->belongsTo(TenantResource::class, 'resource_id');
+    }
+
     public function reminders(): HasMany
     {
         return $this->hasMany(TenantReminder::class, 'appointment_id');

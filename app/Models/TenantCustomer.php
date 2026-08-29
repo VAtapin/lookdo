@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TenantCustomer extends Model
@@ -61,5 +62,10 @@ class TenantCustomer extends Model
     public function pushSubscriptions(): HasMany
     {
         return $this->hasMany(TenantPushSubscription::class, 'customer_id');
+    }
+
+    public function segments(): BelongsToMany
+    {
+        return $this->belongsToMany(TenantSegment::class, 'tenant_customer_segment')->withTimestamps();
     }
 }

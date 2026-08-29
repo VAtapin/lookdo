@@ -109,6 +109,7 @@ class TenantContentController extends Controller
             'rating' => 'required|integer|between:1,5',
             'author_name' => 'nullable|string|max:120',
             'body' => 'nullable|string|max:3000',
+            'master_reply' => 'nullable|string|max:3000',
             'published' => 'required|boolean',
             'publication_confirmed' => 'nullable|boolean',
         ]);
@@ -117,6 +118,11 @@ class TenantContentController extends Controller
             abort(422, 'PUBLICATION_CONSENT_REQUIRED');
         }
         unset($data['publication_confirmed']);
+        if (array_key_exists('master_reply', $data)) {
+            $data['replied_at'] = filled($data['master_reply'])
+                ? (($review && $review->master_reply === $data['master_reply']) ? ($review->replied_at ?: now()) : now())
+                : null;
+        }
         $data['received_at'] = $review?->received_at ?: now();
         $review ? $review->update($data) : $review = $tenant->reviews()->create($data);
 
