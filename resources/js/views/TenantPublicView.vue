@@ -7,10 +7,18 @@ import { useRoute, useRouter } from "vue-router";
 import { ApiError, api } from "../api";
 import { setLocale } from "../i18n";
 import AppIcon from "../tenant-app/AppIcon.vue";
-import RequestFlow from "../tenant-app/RequestFlow.vue";
-import BookingFlow from "../tenant-app/BookingFlow.vue";
 import BeforeAfterSlider from "../tenant-app/BeforeAfterSlider.vue";
+import BookingFlow from "../tenant-app/BookingFlow.vue";
 import { appCopy, type TenantLocale } from "../tenant-app/copy";
+import RequestFlow from "../tenant-app/RequestFlow.vue";
+import TenantActivity from "../tenant-app/TenantActivity.vue";
+import TenantBottomNav from "../tenant-app/TenantBottomNav.vue";
+import TenantContactsSheet from "../tenant-app/TenantContactsSheet.vue";
+import TenantDesktopAside from "../tenant-app/TenantDesktopAside.vue";
+import TenantLogin from "../tenant-app/TenantLogin.vue";
+import TenantMenuOverlay from "../tenant-app/TenantMenuOverlay.vue";
+import TenantPushPrompt from "../tenant-app/TenantPushPrompt.vue";
+import TenantReviews from "../tenant-app/TenantReviews.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -363,6 +371,19 @@ onMounted(() => {
 onBeforeUnmount(() => {
     if (clock) window.clearInterval(clock);
 });
+const loginContext = {
+    app,
+    copy,
+    now,
+    locale,
+    contactName,
+    loginEmail,
+    loginPassword,
+    loginRemember,
+    loginError,
+    loginBusy,
+    login,
+};
 </script>
 
 <template>
@@ -410,74 +431,11 @@ onBeforeUnmount(() => {
                     @close="go('home')"
                     @success="flowSuccess"
                 />
-                <section v-else-if="screen === 'login'" class="ta-login-screen">
-                    <div class="ta-statusbar">
-                        <b>{{
-                            now.toLocaleTimeString(locale, {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                            })
-                        }}</b
-                        ><span class="ta-device-icons"
-                            ><i class="signal"></i><i class="wifi"></i
-                            ><i class="battery"></i
-                        ></span>
-                    </div>
-                    <button class="ta-login-back" @click="go('home')">
-                        <AppIcon name="back" />{{ copy.back }}
-                    </button>
-                    <img
-                        class="ta-login-logo"
-                        :src="app.tenant.logo || '/brand/lookdo-mark.webp'"
-                        alt=""
-                    />
-                    <h1>{{ copy.login }}</h1>
-                    <p>{{ copy.welcome }}, {{ contactName }}</p>
-                    <form @submit.prevent="login">
-                        <label
-                            ><span>{{ copy.emailOrLogin }}</span>
-                            <div>
-                                <AppIcon name="user" /><input
-                                    v-model="loginEmail"
-                                    type="email"
-                                    autocomplete="email"
-                                    required
-                                /></div
-                        ></label>
-                        <label
-                            ><span>{{ copy.password }}</span>
-                            <div>
-                                <AppIcon name="shield" /><input
-                                    v-model="loginPassword"
-                                    type="password"
-                                    autocomplete="current-password"
-                                    required
-                                /></div
-                        ></label>
-                        <div class="ta-login-options">
-                            <label
-                                ><input
-                                    v-model="loginRemember"
-                                    type="checkbox"
-                                />{{ copy.remember }}</label
-                            ><button type="button">{{ copy.forgot }}</button>
-                        </div>
-                        <p v-if="loginError" class="ta-error">
-                            {{ loginError }}
-                        </p>
-                        <button class="ta-gold-button" :disabled="loginBusy">
-                            {{ loginBusy ? "…" : copy.signIn }}
-                        </button>
-                    </form>
-                    <article>
-                        <AppIcon name="shield" :size="34" />
-                        <div>
-                            <h2>{{ copy.adminOnly }}</h2>
-                            <p>{{ copy.adminOnlyText }}</p>
-                        </div>
-                    </article>
-                    <small>{{ copy.powered }}</small>
-                </section>
+                <TenantLogin
+                    v-else-if="screen === 'login'"
+                    :ctx="loginContext"
+                    @home="go('home')"
+                />
                 <template v-else>
                     <div class="ta-statusbar">
                         <b>{{
@@ -933,375 +891,46 @@ onBeforeUnmount(() => {
                             </div>
                         </section>
 
-                        <section
+                        <TenantActivity
                             v-else-if="screen === 'activity'"
-                            class="ta-page ta-activity-page"
-                        >
-                            <div class="ta-page-title">
-                                <small>{{ app.tenant.name }}</small>
-                                <h1>{{ copy.activity }}</h1>
-                            </div>
-                            <div
-                                v-if="activityLoading"
-                                class="ta-loading-line"
-                            ></div>
-                            <div
-                                v-else-if="
-                                    !activity.requests.length &&
-                                    !activity.appointments.length
-                                "
-                                class="ta-empty"
-                            >
-                                <span
-                                    ><AppIcon name="message" :size="42"
-                                /></span>
-                                <h2>{{ copy.noActivity }}</h2>
-                                <p>{{ copy.noActivityText }}</p>
-                                <button
-                                    class="ta-gold-button"
-                                    @click="go(actionScreen)"
-                                >
-                                    {{ app.template.hero.action }}
-                                </button>
-                            </div>
-                            <template v-else>
-                                <div class="ta-activity-list">
-                                    <button
-                                        v-for="item in activity.requests"
-                                        :key="'r' + item.id"
-                                        @click="selectedRequest = item"
-                                    >
-                                        <span class="ta-activity-icon"
-                                            ><AppIcon name="camera" /></span
-                                        ><span
-                                            ><b>#{{ item.number }}</b
-                                            ><small>{{
-                                                new Date(
-                                                    item.created_at,
-                                                ).toLocaleString(locale, {
-                                                    dateStyle: "medium",
-                                                    timeStyle: "short",
-                                                })
-                                            }}</small
-                                            ><em>{{
-                                                item.messages.at(-1)?.body
-                                            }}</em></span
-                                        ><i>{{ statusLabel(item.status) }}</i>
-                                    </button>
-                                    <article
-                                        v-for="item in activity.appointments"
-                                        :key="'a' + item.id"
-                                        class="ta-appointment-card"
-                                    >
-                                        <span class="ta-activity-icon"
-                                            ><AppIcon name="calendar" /></span
-                                        ><span
-                                            ><b>{{ item.service?.name }}</b
-                                            ><small>{{
-                                                new Date(
-                                                    item.starts_at,
-                                                ).toLocaleString(locale, {
-                                                    dateStyle: "long",
-                                                    timeStyle: "short",
-                                                })
-                                            }}</small
-                                            ><em>#{{ item.number }}</em></span
-                                        ><i>{{ statusLabel(item.status) }}</i>
-                                        <footer
-                                            v-if="
-                                                ![
-                                                    'cancelled',
-                                                    'completed',
-                                                    'no_show',
-                                                ].includes(item.status)
-                                            "
-                                        >
-                                            <button
-                                                @click="
-                                                    rescheduleAppointment = item
-                                                "
-                                            >
-                                                {{ copy.reschedule }}</button
-                                            ><button
-                                                @click="cancelAppointment(item)"
-                                            >
-                                                {{ copy.cancelAppointment }}
-                                            </button>
-                                        </footer>
-                                    </article>
-                                </div>
-                                <div v-if="selectedRequest" class="ta-thread">
-                                    <header>
-                                        <button @click="selectedRequest = null">
-                                            <AppIcon name="back" /></button
-                                        ><span
-                                            ><b>#{{ selectedRequest.number }}</b
-                                            ><small>{{
-                                                copy.messages
-                                            }}</small></span
-                                        >
-                                    </header>
-                                    <div class="ta-thread-messages">
-                                        <p
-                                            v-for="item in selectedRequest.messages"
-                                            :key="item.id"
-                                            :class="item.sender"
-                                        >
-                                            <span>{{ item.body }}</span
-                                            ><small>{{
-                                                new Date(
-                                                    item.created_at,
-                                                ).toLocaleTimeString(locale, {
-                                                    hour: "2-digit",
-                                                    minute: "2-digit",
-                                                })
-                                            }}</small>
-                                        </p>
-                                    </div>
-                                    <form @submit.prevent="sendMessage">
-                                        <input
-                                            v-model="message"
-                                            :placeholder="
-                                                copy.messagePlaceholder
-                                            "
-                                        /><button
-                                            :disabled="
-                                                sending || !message.trim()
-                                            "
-                                        >
-                                            <AppIcon name="send" />
-                                        </button>
-                                    </form>
-                                </div>
-                            </template>
-                        </section>
+                            :app="app"
+                            :copy="copy"
+                            :activity="activity"
+                            :loading="activityLoading"
+                            :action-screen="actionScreen"
+                            :locale="locale"
+                            :selected="selectedRequest"
+                            v-model:message="message"
+                            :sending="sending"
+                            :status-label="statusLabel"
+                            @navigate="go"
+                            @select="selectedRequest = $event"
+                            @reschedule="rescheduleAppointment = $event"
+                            @cancel="cancelAppointment"
+                            @send="sendMessage"
+                        />
 
-                        <section
+                        <TenantReviews
                             v-else-if="screen === 'reviews'"
-                            class="ta-page ta-reviews-page"
-                        >
-                            <header class="ta-simple-header">
-                                <button @click="go('home')">
-                                    <AppIcon name="back" />{{ copy.back }}
-                                </button>
-                                <h1>{{ copy.reviews }}</h1>
-                                <div class="ta-contact-shortcuts">
-                                    <a
-                                        v-if="app.tenant.contact.phone"
-                                        :href="
-                                            'tel:' + app.tenant.contact.phone
-                                        "
-                                        ><AppIcon name="phone"
-                                    /></a>
-                                </div>
-                            </header>
-                            <p class="ta-centered">
-                                {{ copy.reviewsSubtitle }}
-                            </p>
-                            <article class="ta-rating-summary">
-                                <div>
-                                    <strong>{{ averageRating }}</strong
-                                    ><span>★★★★★</span
-                                    ><small
-                                        >{{ copy.basedOn }}
-                                        {{ app.reviews.length }}</small
-                                    >
-                                </div>
-                                <div>
-                                    <p v-for="n in [5, 4, 3, 2, 1]" :key="n">
-                                        <b>{{ n }} ★</b
-                                        ><i
-                                            ><span
-                                                :style="{
-                                                    width:
-                                                        (app.reviews.length
-                                                            ? (app.reviews.filter(
-                                                                  (r: any) =>
-                                                                      Math.round(
-                                                                          r.rating,
-                                                                      ) === n,
-                                                              ).length /
-                                                                  app.reviews
-                                                                      .length) *
-                                                              100
-                                                            : 0) + '%',
-                                                }"
-                                            ></span></i
-                                        ><em>{{
-                                            app.reviews.filter(
-                                                (r: any) =>
-                                                    Math.round(r.rating) === n,
-                                            ).length
-                                        }}</em>
-                                    </p>
-                                </div>
-                            </article>
-                            <div class="ta-review-list">
-                                <article
-                                    v-for="review in app.reviews"
-                                    :key="review.id"
-                                >
-                                    <header>
-                                        <img
-                                            :src="'/brand/lookdo-mark.webp'"
-                                            alt=""
-                                        />
-                                        <div>
-                                            <h2>
-                                                {{
-                                                    review.author ||
-                                                    app.tenant.name
-                                                }}
-                                            </h2>
-                                            <span>{{
-                                                "★".repeat(
-                                                    Math.round(review.rating),
-                                                )
-                                            }}</span>
-                                        </div>
-                                        <time>{{
-                                            review.received_at
-                                                ? new Date(
-                                                      review.received_at,
-                                                  ).toLocaleDateString(locale)
-                                                : ""
-                                        }}</time>
-                                    </header>
-                                    <p>{{ review.body }}</p>
-                                    <blockquote v-if="review.master_reply">
-                                        <strong>{{ copy.masterReply }}</strong>
-                                        <span>{{ review.master_reply }}</span>
-                                    </blockquote>
-                                </article>
-                            </div>
-                            <p v-if="reviewNotice" class="ta-review-notice">
-                                {{ reviewNotice }}
-                            </p>
-                            <button
-                                v-if="app.session?.known && !reviewOpen"
-                                class="ta-outline-button"
-                                @click="reviewOpen = true"
-                            >
-                                {{ copy.leaveReview }}
-                            </button>
-                            <article
-                                v-else-if="app.session?.known"
-                                class="ta-review-form"
-                            >
-                                <h2>{{ copy.leaveReview }}</h2>
-                                <label
-                                    ><span>{{ copy.reviewRating }}</span
-                                    ><select v-model.number="reviewForm.rating">
-                                        <option
-                                            v-for="n in [5, 4, 3, 2, 1]"
-                                            :key="n"
-                                            :value="n"
-                                        >
-                                            {{ n }} ★
-                                        </option>
-                                    </select></label
-                                ><label
-                                    ><span>{{ copy.reviewText }}</span
-                                    ><textarea
-                                        v-model="reviewForm.body"
-                                        rows="5"
-                                        maxlength="3000"
-                                    ></textarea>
-                                </label>
-                                <div>
-                                    <button
-                                        class="ta-outline-button"
-                                        @click="reviewOpen = false"
-                                    >
-                                        {{ copy.later }}
-                                    </button>
-                                    <button
-                                        class="ta-gold-button"
-                                        :disabled="
-                                            reviewBusy ||
-                                            !reviewForm.body.trim()
-                                        "
-                                        @click="submitReview"
-                                    >
-                                        {{ copy.reviewSend }}
-                                    </button>
-                                </div>
-                            </article>
-                            <p v-else class="ta-centered">
-                                {{ copy.reviewLoginRequired }}
-                            </p>
-                        </section>
-
-                        <section
+                            :app="app"
+                            :copy="copy"
+                            :locale="locale"
+                            :average-rating="averageRating"
+                            :notice="reviewNotice"
+                            v-model:open="reviewOpen"
+                            :busy="reviewBusy"
+                            :form="reviewForm"
+                            @close="go('home')"
+                            @submit="submitReview"
+                        />
+                        <TenantContactsSheet
                             v-else-if="screen === 'contacts'"
-                            class="ta-page ta-contact-background"
-                        >
-                            <div class="ta-contacts-sheet">
-                                <header>
-                                    <h1>{{ copy.contacts }}</h1>
-                                    <button @click="go('home')">
-                                        <AppIcon name="close" />
-                                    </button>
-                                </header>
-                                <p>{{ copy.contactText }}</p>
-                                <a
-                                    v-if="app.tenant.contact.phone"
-                                    :href="'tel:' + app.tenant.contact.phone"
-                                    ><span><AppIcon name="phone" /></span>
-                                    <div>
-                                        <b>{{ copy.call }} {{ contactName }}</b
-                                        ><em>{{ app.tenant.contact.phone }}</em>
-                                    </div>
-                                    <AppIcon name="arrow"
-                                /></a>
-                                <a
-                                    v-if="app.tenant.contact.vk_url"
-                                    :href="app.tenant.contact.vk_url"
-                                    target="_blank"
-                                    ><span><b>VK</b></span>
-                                    <div>
-                                        <b>{{ copy.socialContact }}</b
-                                        ><em>{{
-                                            app.tenant.contact.vk_url
-                                        }}</em>
-                                    </div>
-                                    <AppIcon name="arrow"
-                                /></a>
-                                <a
-                                    v-if="address"
-                                    :href="
-                                        'https://www.google.com/maps/search/?api=1&query=' +
-                                        encodeURIComponent(address)
-                                    "
-                                    target="_blank"
-                                    ><span><AppIcon name="map" /></span>
-                                    <div>
-                                        <b>{{ copy.workshopAddress }}</b
-                                        ><em>{{ address }}</em>
-                                    </div>
-                                    <AppIcon name="arrow"
-                                /></a>
-                                <article
-                                    v-if="app.tenant.contact.working_hours"
-                                >
-                                    <AppIcon name="clock" />
-                                    <div>
-                                        <b>{{ copy.workingHours }}</b>
-                                        <p>
-                                            {{
-                                                app.tenant.contact.working_hours
-                                            }}
-                                        </p>
-                                    </div>
-                                </article>
-                                <button
-                                    class="ta-outline-button"
-                                    @click="go('home')"
-                                >
-                                    {{ copy.back }}
-                                </button>
-                            </div>
-                        </section>
+                            :app="app"
+                            :copy="copy"
+                            :address="address"
+                            :contact-name="contactName"
+                            @close="go('home')"
+                        />
                         <section v-else class="ta-page ta-empty">
                             <h1>404</h1>
                             <button class="ta-gold-button" @click="go('home')">
@@ -1310,128 +939,34 @@ onBeforeUnmount(() => {
                         </section>
                     </div>
 
-                    <nav class="ta-bottom-nav" :aria-label="copy.navigation">
-                        <button
-                            v-for="item in navItems"
-                            :key="item.key"
-                            :class="{
-                                active: screen === item.key,
-                                central: item.central,
-                            }"
-                            @click="go(item.key)"
-                        >
-                            <span><AppIcon :name="item.icon" /></span
-                            ><small>{{ item.label }}</small>
-                        </button>
-                    </nav>
-                    <div
+                    <TenantBottomNav
+                        :screen="screen"
+                        :items="navItems"
+                        :label="copy.navigation"
+                        @navigate="go"
+                    />
+                    <TenantMenuOverlay
                         v-if="menuOpen"
-                        class="ta-menu-overlay"
-                        @click.self="menuOpen = false"
-                    >
-                        <aside>
-                            <header>
-                                <img
-                                    :src="
-                                        app.tenant.logo ||
-                                        '/brand/lookdo-mark.webp'
-                                    "
-                                    alt=""
-                                />
-                                <div>
-                                    <b>{{ app.tenant.name }}</b
-                                    ><small>{{ app.template.name }}</small>
-                                </div>
-                                <button @click="menuOpen = false">
-                                    <AppIcon name="close" />
-                                </button>
-                            </header>
-                            <nav>
-                                <button v-if="isBrows" @click="go('activity')">
-                                    <AppIcon name="calendar" />{{
-                                        copy.appointments
-                                    }}<AppIcon name="arrow" /></button
-                                ><button @click="go('contacts')">
-                                    <AppIcon name="phone" />{{ copy.contacts
-                                    }}<AppIcon name="arrow" /></button
-                                ><button @click="go('reviews')">
-                                    <AppIcon name="star" />{{ copy.reviews
-                                    }}<AppIcon name="arrow" /></button
-                                ><button @click="share">
-                                    <AppIcon name="share" />{{ copy.share
-                                    }}<AppIcon name="arrow" /></button
-                                ><button @click="go('login')">
-                                    <AppIcon name="shield" />{{ copy.login
-                                    }}<AppIcon name="arrow" />
-                                </button>
-                            </nav>
-                            <label
-                                >{{ copy.language
-                                }}<select
-                                    :value="locale"
-                                    @change="
-                                        changeLocale(
-                                            ($event.target as HTMLSelectElement)
-                                                .value,
-                                        )
-                                    "
-                                >
-                                    <option value="de">Deutsch</option>
-                                    <option value="en">English</option>
-                                    <option value="ru">Русский</option>
-                                    <option value="uk">Українська</option>
-                                </select></label
-                            ><small>{{ copy.powered }}</small>
-                        </aside>
-                    </div>
-                    <div
+                        :app="app"
+                        :copy="copy"
+                        :locale="locale"
+                        :is-brows="isBrows"
+                        @close="menuOpen = false"
+                        @navigate="go"
+                        @share="share"
+                        @change-locale="changeLocale"
+                    />
+                    <TenantPushPrompt
                         v-if="pushPrompt"
-                        class="ta-menu-overlay ta-push-overlay"
-                        @click.self="dismissPush"
-                    >
-                        <aside>
-                            <div class="ta-bell-orbit">
-                                <AppIcon name="bell" :size="80" /><b>1</b>
-                            </div>
-                            <h2>{{ copy.notificationHeadline }}</h2>
-                            <p>{{ copy.notificationText }}</p>
-                            <p v-if="pushStatus" class="ta-notification-status">
-                                {{ pushStatus }}
-                            </p>
-                            <button
-                                class="ta-gold-button"
-                                :disabled="pushBusy"
-                                @click="enablePush"
-                            >
-                                <AppIcon name="bell" />{{
-                                    pushBusy ? copy.sending : copy.notifications
-                                }}</button
-                            ><button
-                                class="ta-outline-button"
-                                @click="dismissPush"
-                            >
-                                {{ copy.later }}
-                            </button>
-                        </aside>
-                    </div>
+                        :copy="copy"
+                        :status="pushStatus"
+                        :busy="pushBusy"
+                        @enable="enablePush"
+                        @dismiss="dismissPush"
+                    />
                 </template>
             </main>
-            <aside class="ta-desktop-aside">
-                <img
-                    :src="app.tenant.logo || '/brand/lookdo-mark.webp'"
-                    alt=""
-                /><small>{{ app.tenant.name }}</small>
-                <h2>{{ copy.desktopTitle }}</h2>
-                <p>{{ copy.desktopText }}</p>
-                <div>
-                    <span><AppIcon name="camera" /></span
-                    ><span><AppIcon name="message" /></span
-                    ><span><AppIcon name="calendar" /></span>
-                </div>
-                <button @click="share">
-                    <AppIcon name="share" />{{ copy.share }}</button
-                ><em>{{ copy.powered }}</em>
-            </aside>
+            <TenantDesktopAside :app="app" :copy="copy" @share="share" />
         </div>
     </div>
 </template>

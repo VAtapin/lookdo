@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { api } from "../api";
+import { buildMonthGrid, eventsOnDay } from "./calendar-utils";
 import ResourceManager from "./ResourceManager.vue";
 const props = defineProps<{
     tenantId: number;
@@ -101,27 +102,9 @@ const events = computed(() =>
         ...data.value.blocks.map((x: any) => ({ ...x, eventType: "block" })),
     ].sort((a, b) => String(a.starts_at).localeCompare(String(b.starts_at))),
 );
-const todayEvents = computed(() =>
-    events.value.filter(
-        (x: any) => String(x.starts_at).slice(0, 10) === day.value,
-    ),
-);
-const monthGrid = computed(() => {
-    const [year, monthNumber] = month.value.split("-").map(Number);
-    const first = new Date(year, monthNumber - 1, 1);
-    const count = new Date(year, monthNumber, 0).getDate();
-    const offset = (first.getDay() + 6) % 7;
-    const dates = Array.from(
-        { length: count },
-        (_, index) =>
-            `${year}-${String(monthNumber).padStart(2, "0")}-${String(index + 1).padStart(2, "0")}`,
-    );
-    return [...Array(offset).fill(null), ...dates] as Array<string | null>;
-});
-const eventCount = (date: string) =>
-    events.value.filter(
-        (event: any) => String(event.starts_at).slice(0, 10) === date,
-    ).length;
+const todayEvents = computed(() => eventsOnDay(events.value, day.value));
+const monthGrid = computed(() => buildMonthGrid(month.value));
+const eventCount = (date: string) => eventsOnDay(events.value, date).length;
 const selectMonthDay = (date: string | null) => {
     if (date) day.value = date;
 };

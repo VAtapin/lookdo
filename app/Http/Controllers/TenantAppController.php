@@ -374,11 +374,12 @@ class TenantAppController extends Controller
     private function configuration(Tenant $tenant): array
     {
         $tenant->loadMissing('businessProfile.template');
-        $configuration = (array) ($tenant->businessProfile?->template?->configuration ?? []);
-        $code = $tenant->businessProfile?->template?->code ?: 'general-services.general';
         $presets = (array) config('tenant_apps.templates', []);
+        $template = $tenant->businessProfile?->template;
 
-        return array_replace_recursive((array) ($presets[$code] ?? $presets['general-services.general'] ?? []), $configuration);
+        return $template
+            ? $template->resolvedConfiguration($presets)
+            : (array) ($presets['general-services.general'] ?? []);
     }
 
     private function locale(Request $request, Tenant $tenant): string
