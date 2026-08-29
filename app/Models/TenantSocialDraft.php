@@ -11,7 +11,7 @@ class TenantSocialDraft extends Model
 
     protected function casts(): array
     {
-        return ['published_at' => 'datetime'];
+        return ['published_at' => 'datetime', 'publish_attempted_at' => 'datetime'];
     }
 
     public function tenant(): BelongsTo
@@ -22,5 +22,10 @@ class TenantSocialDraft extends Model
     public function portfolioItem(): BelongsTo
     {
         return $this->belongsTo(TenantPortfolioItem::class, 'portfolio_item_id');
+    }
+
+    public function connection(): BelongsTo
+    {
+        return $this->belongsTo(TenantSocialConnection::class, 'social_connection_id');
     }
 }

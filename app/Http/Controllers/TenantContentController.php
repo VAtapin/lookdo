@@ -11,6 +11,7 @@ use App\Services\EntitlementService;
 use App\Services\ImageStorageService;
 use App\Services\OpenAiBudgetService;
 use App\Services\OpenAiService;
+use App\Services\SocialPublishingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -30,6 +31,13 @@ class TenantContentController extends Controller
             'portfolio' => $tenant->portfolioItems()->with('service')->orderByDesc('created_at')->get()->each(fn ($item) => $this->urls($item)),
             'reviews' => $tenant->reviews()->with(['customer', 'request'])->latest()->get(),
             'social' => $tenant->socialDrafts()->with('portfolioItem')->latest()->get()->each(fn ($draft) => $this->socialUrl($draft)),
+            'social_connections' => $tenant->socialConnections()->get([
+                'id', 'provider', 'status', 'external_account_id', 'account_name',
+                'expires_at', 'last_validated_at', 'last_error',
+            ]),
+            'social_providers' => collect(SocialPublishingService::DIRECT_PROVIDERS)->mapWithKeys(fn (string $provider) => [
+                $provider => ['configured' => $this->socialProviderConfigured($provider)],
+            ]),
             'entitlements' => $entitlements->all($tenant),
             'share_url' => 'https://'.$tenant->slug.'.'.config('tenancy.platform_domain'),
         ]);
@@ -258,5 +266,15 @@ class TenantContentController extends Controller
         if ($draft->image_path) {
             $draft->setAttribute('image_url', Storage::disk('public')->url($draft->image_path));
         }
+    }
+
+    private function socialProviderConfigured(string $provider): bool
+    {
+        return match ($provider) {
+            'facebook', 'instagram' => filled(config('services.social.meta.client_id')) && filled(config('services.social.meta.client_secret')),
+            'vk' => filled(config('services.social.vk.client_id')) && filled(config('services.social.vk.client_secret')),
+            'telegram' => filled(config('services.telegram.bot_token')) && filled(config('services.telegram.bot_username')) && filled(config('services.telegram.webhook_secret')),
+            default => false,
+        };
     }
 }

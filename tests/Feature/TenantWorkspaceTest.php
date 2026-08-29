@@ -111,6 +111,45 @@ class TenantWorkspaceTest extends TestCase
             ->assertJsonPath('requests.0.id', $second->json('request.id'));
     }
 
+    public function test_master_can_safely_merge_a_detected_duplicate_customer(): void
+    {
+        $tenant = $this->tenant('merge-customer');
+        $owner = $this->owner($tenant);
+        $primary = $tenant->customers()->create([
+            'name' => 'Иван',
+            'phone' => '+49 151 12345678',
+            'phone_normalized' => '+4915112345678',
+            'locale' => 'ru',
+        ]);
+        $duplicate = $tenant->customers()->create([
+            'name' => 'Иван П.',
+            'phone' => '+49 151 12345678',
+            'phone_normalized' => '+4915112345678',
+            'locale' => 'ru',
+            'possible_duplicate_of_id' => $primary->id,
+        ]);
+        $appRequest = $tenant->appRequests()->create([
+            'customer_id' => $duplicate->id,
+            'number' => 'R-MERGE-001',
+            'status' => 'new',
+            'summary' => 'Заявка с нового устройства',
+            'locale' => 'ru',
+        ]);
+
+        $this->actingAs($owner)
+            ->postJson('/api/tenant/'.$tenant->id.'/workspace/customers/'.$primary->id.'/merge', [
+                'source_id' => $duplicate->id,
+            ])
+            ->assertOk()
+            ->assertJsonPath('customer.id', $primary->id);
+
+        $this->assertDatabaseMissing('tenant_customers', ['id' => $duplicate->id]);
+        $this->assertDatabaseHas('tenant_requests', [
+            'id' => $appRequest->id,
+            'customer_id' => $primary->id,
+        ]);
+    }
+
     public function test_calendar_creates_real_appointments_and_rejects_double_booking(): void
     {
         $tenant = $this->tenant('calendar-master');

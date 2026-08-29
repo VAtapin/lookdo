@@ -8,6 +8,7 @@ use App\Models\TenantCustomer;
 use App\Models\TenantPushSubscription;
 use App\Models\TenantRequest;
 use App\Models\User;
+use App\Services\CustomerMergeService;
 use App\Services\EntitlementService;
 use App\Services\SmsService;
 use App\Services\TenantCalendarService;
@@ -15,7 +16,6 @@ use App\Services\TenantWebPushService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -174,22 +174,15 @@ class TenantWorkspaceController extends Controller
         return response()->json(['customer' => $customer->fresh(['possibleDuplicate', 'segments'])]);
     }
 
-    public function mergeCustomer(Request $request, Tenant $tenant, TenantCustomer $customer): JsonResponse
+    public function mergeCustomer(Request $request, Tenant $tenant, TenantCustomer $customer, CustomerMergeService $merger): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($customer->tenant_id === $tenant->id, 404);
         $data = $request->validate(['source_id' => 'required|integer|different:target_id']);
         $source = $tenant->customers()->findOrFail($data['source_id']);
-        DB::transaction(function () use ($tenant, $customer, $source) {
-            foreach (['appRequests' => 'tenant_requests', 'appointments' => 'tenant_appointments', 'messages' => 'tenant_messages', 'clientTokens' => 'tenant_client_tokens', 'pushSubscriptions' => 'tenant_push_subscriptions', 'reminders' => 'tenant_reminders'] as $table) {
-                DB::table($table)->where('tenant_id', $tenant->id)->where('customer_id', $source->id)->update(['customer_id' => $customer->id]);
-            }
-            $customer->update(['name' => $customer->name ?: $source->name, 'phone' => $customer->phone ?: $source->phone, 'email' => $customer->email ?: $source->email, 'possible_duplicate_of_id' => null, 'last_activity_at' => collect([$customer->last_activity_at, $source->last_activity_at])->filter()->sortDesc()->first()]);
-            $tenant->customers()->where('possible_duplicate_of_id', $source->id)->update(['possible_duplicate_of_id' => $customer->id]);
-            $source->delete();
-        });
+        $customer = $merger->merge($customer, $source);
 
-        return response()->json(['customer' => $customer->fresh()]);
+        return response()->json(['customer' => $customer]);
     }
 
     public function subscribePush(Request $request, Tenant $tenant, EntitlementService $entitlements): JsonResponse

@@ -133,6 +133,11 @@ class Tenant extends Model
         return $this->hasMany(TenantSocialDraft::class);
     }
 
+    public function socialConnections(): HasMany
+    {
+        return $this->hasMany(TenantSocialConnection::class);
+    }
+
     public function resources(): HasMany
     {
         return $this->hasMany(TenantResource::class);

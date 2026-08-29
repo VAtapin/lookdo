@@ -61,4 +61,31 @@ return [
         'image_cost_high' => (float) env('OPENAI_IMAGE_COST_HIGH', .211),
     ],
 
+    'social' => [
+        'meta' => [
+            'client_id' => env('META_APP_ID'),
+            'client_secret' => env('META_APP_SECRET'),
+            'version' => env('META_GRAPH_VERSION', 'v21.0'),
+        ],
+        'vk' => [
+            'client_id' => env('VK_APP_ID'),
+            'client_secret' => env('VK_APP_SECRET'),
+            'version' => env('VK_API_VERSION', '5.199'),
+        ],
+    ],
+
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'bot_username' => env('TELEGRAM_BOT_USERNAME'),
+        'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
+    ],
+
+    'plesk' => [
+        'api_url' => env('PLESK_API_URL'),
+        'api_key' => env('PLESK_API_KEY'),
+        'subscription_domain' => env('PLESK_SUBSCRIPTION_DOMAIN', env('APP_DOMAIN', 'lookdo.app')),
+        'letsencrypt_email' => env('PLESK_LETSENCRYPT_EMAIL'),
+        'verify_ssl' => env('PLESK_VERIFY_SSL', true),
+    ],
+
 ];

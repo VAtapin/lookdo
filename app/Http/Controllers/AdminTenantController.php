@@ -251,28 +251,23 @@ class AdminTenantController extends Controller
         return response()->json($domain->fresh());
     }
 
-    public function disableDomain(Tenant $tenant, TenantDomain $domain, AuditService $audit): JsonResponse
+    public function disableDomain(Tenant $tenant, TenantDomain $domain, DomainService $service, AuditService $audit): JsonResponse
     {
         $this->ensureDomainBelongsToTenant($tenant, $domain);
         abort_if($domain->type === 'platform', 422, 'A platform domain cannot be disabled.');
         $before = $domain->toArray();
-        $domain->update(['status' => 'disabled', 'is_primary' => false, 'ssl_status' => 'disabled']);
-        if ($tenant->primary_domain_id === $domain->id) {
-            $platform = $tenant->domains()->where('type', 'platform')->first();
-            $tenant->update(['primary_domain_id' => $platform?->id]);
-            $platform?->update(['is_primary' => true]);
-        }
+        $domain = $service->disable($domain);
         $audit->log('domain.disabled', $domain, $before, $domain->toArray(), $tenant->id);
 
         return response()->json($domain->fresh());
     }
 
-    public function deleteDomain(Tenant $tenant, TenantDomain $domain, AuditService $audit): JsonResponse
+    public function deleteDomain(Tenant $tenant, TenantDomain $domain, DomainService $service, AuditService $audit): JsonResponse
     {
         $this->ensureDomainBelongsToTenant($tenant, $domain);
         abort_if($domain->type === 'platform' || $domain->status === 'active', 422, 'Disable the custom domain before deleting it.');
         $before = $domain->toArray();
-        $domain->delete();
+        $service->remove($domain);
         $audit->log('domain.deleted_by_admin', null, $before, null, $tenant->id);
 
         return response()->json(['ok' => true]);

@@ -13,6 +13,8 @@ const data = ref<any>({
     portfolio: [],
     reviews: [],
     social: [],
+    social_connections: [],
+    social_providers: {},
     entitlements: {},
     share_url: "",
 });
@@ -69,6 +71,8 @@ const channels = [
     "linkedin",
     "x",
 ];
+const directChannels = ["instagram", "facebook", "telegram", "vk"];
+const telegramTarget = ref("");
 const enabled = (key: string) =>
     String(data.value.entitlements?.[key] || "0") === "1";
 const hasBeforeAfter = computed(() => enabled("before_after_enabled")),
@@ -95,6 +99,15 @@ const socialPreview = computed(
         socialWork.value?.before_image_url ||
         "",
 );
+const socialConnection = computed(() =>
+    data.value.social_connections?.find(
+        (item: any) => item.provider === social.channel && item.status === "active",
+    ),
+);
+const providerConfigured = computed(
+    () => !!data.value.social_providers?.[social.channel]?.configured,
+);
+const isDirectChannel = computed(() => directChannels.includes(social.channel));
 
 async function load() {
     busy.value = true;
@@ -312,7 +325,22 @@ async function shareSocial() {
     error.value = "";
     notice.value = "";
     try {
-        await persistSocial("ready");
+        const draft = await persistSocial("ready");
+        if (isDirectChannel.value) {
+            if (!providerConfigured.value)
+                throw new Error(props.t("socialProviderUnavailable"));
+            if (!socialConnection.value)
+                throw new Error(props.t("socialConnectRequired"));
+            const published: any = await api(
+                `/tenant/${props.tenantId}/social-drafts/${draft.id}/publish`,
+                { method: "POST" },
+            );
+            notice.value = props.t("socialPublished");
+            if (published.publication?.url)
+                window.open(published.publication.url, "_blank", "noopener,noreferrer");
+            await load();
+            return;
+        }
         const url = social.booking_url || data.value.share_url;
         const text = [social.caption, url].filter(Boolean).join("\n\n");
         if (social.channel === "share" && navigator.share) {
@@ -333,13 +361,9 @@ async function shareSocial() {
                 encodedTitle = encodeURIComponent(social.caption);
             const links: any = {
                 whatsapp: `https://wa.me/?text=${encodedText}`,
-                telegram: `https://t.me/share/url?url=${encodedUrl}&text=${encodedTitle}`,
                 viber: `viber://forward?text=${encodedText}`,
-                vk: `https://vk.com/share.php?url=${encodedUrl}&title=${encodedTitle}`,
-                facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
                 linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
                 x: `https://x.com/intent/post?url=${encodedUrl}&text=${encodedTitle}`,
-                instagram: "https://www.instagram.com/",
             };
             window.open(
                 links[social.channel] || url,
@@ -350,6 +374,47 @@ async function shareSocial() {
         notice.value = props.t("socialReady");
     } catch (e: any) {
         if (e?.name !== "AbortError") error.value = e.message;
+    } finally {
+        busy.value = false;
+    }
+}
+async function connectSocial(provider: string) {
+    busy.value = true;
+    error.value = "";
+    try {
+        const result: any = await api(
+            `/tenant/${props.tenantId}/social-connections/${provider}/authorize`,
+            {
+                method: "POST",
+                body: JSON.stringify(
+                    provider === "telegram"
+                        ? { target: telegramTarget.value.trim() }
+                        : {},
+                ),
+            },
+        );
+        if (result.connected) {
+            telegramTarget.value = "";
+            await load();
+            return;
+        }
+        window.location.assign(result.authorization_url);
+    } catch (e: any) {
+        error.value = e.message;
+        busy.value = false;
+    }
+}
+async function disconnectSocial(provider: string) {
+    if (!confirm(props.t("socialDisconnectConfirm"))) return;
+    busy.value = true;
+    error.value = "";
+    try {
+        await api(`/tenant/${props.tenantId}/social-connections/${provider}`, {
+            method: "DELETE",
+        });
+        await load();
+    } catch (e: any) {
+        error.value = e.message;
     } finally {
         busy.value = false;
     }
@@ -641,6 +706,40 @@ onMounted(async () => {
             </article>
             <form class="mw-panel mw-form" @submit.prevent="saveSocial">
                 <h2>{{ t("socialComposer") }}</h2>
+                <section class="mw-social-connections full">
+                    <b>{{ t("socialAccounts") }}</b>
+                    <div v-for="provider in directChannels" :key="provider">
+                        <span>
+                            <strong>{{ t(provider) }}</strong>
+                            <small v-if="data.social_connections?.find((item:any) => item.provider === provider && item.status === 'active')">
+                                {{ data.social_connections.find((item:any) => item.provider === provider && item.status === 'active')?.account_name || t("socialConnected") }}
+                            </small>
+                            <small v-else-if="!data.social_providers?.[provider]?.configured">{{ t("socialProviderUnavailable") }}</small>
+                            <small v-else>{{ t("socialNotConnected") }}</small>
+                        </span>
+                        <input
+                            v-if="provider === 'telegram' && !data.social_connections?.find((item:any) => item.provider === provider && item.status === 'active') && data.social_providers?.[provider]?.configured"
+                            v-model="telegramTarget"
+                            type="text"
+                            :placeholder="t('telegramTargetPlaceholder')"
+                            :aria-label="t('telegramTarget')"
+                        />
+                        <button
+                            v-if="data.social_connections?.find((item:any) => item.provider === provider && item.status === 'active')"
+                            type="button"
+                            class="mw-secondary"
+                            :disabled="busy"
+                            @click="disconnectSocial(provider)"
+                        >{{ t("disconnect") }}</button>
+                        <button
+                            v-else
+                            type="button"
+                            class="mw-secondary"
+                            :disabled="busy || !data.social_providers?.[provider]?.configured || (provider === 'telegram' && !telegramTarget.trim())"
+                            @click="connectSocial(provider)"
+                        >{{ t("connect") }}</button>
+                    </div>
+                </section>
                 <label
                     >{{ t("portfolio")
                     }}<select v-model="social.portfolio_item_id">
@@ -702,7 +801,7 @@ onMounted(async () => {
                     :disabled="busy || !social.caption.trim()"
                     @click="shareSocial"
                 >
-                    {{ t("publishNow") }}
+                    {{ isDirectChannel ? t("publishDirect") : t("publishNow") }}
                 </button>
             </form>
             <article class="mw-panel mw-social-drafts">

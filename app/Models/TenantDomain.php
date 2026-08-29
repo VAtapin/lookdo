@@ -11,7 +11,7 @@ class TenantDomain extends Model
 
     protected function casts(): array
     {
-        return ['is_primary' => 'boolean', 'verified_at' => 'datetime', 'ssl_issued_at' => 'datetime', 'last_checked_at' => 'datetime'];
+        return ['is_primary' => 'boolean', 'verified_at' => 'datetime', 'provisioned_at' => 'datetime', 'ssl_issued_at' => 'datetime', 'last_checked_at' => 'datetime'];
     }
 
     public function tenant(): BelongsTo

@@ -170,7 +170,9 @@ class TenantController extends Controller
         $data = $request->validate(['asset' => ['required', Rule::in(['logo', 'hero'])]]);
         $tenant->load(['profile', 'businessProfile.category', 'businessProfile.variation', 'businessProfile.template']);
         $branding = (array) data_get($tenant->profile?->content, 'branding', []);
-        $language = match ($tenant->locale) {'ru' => 'Russian', 'uk' => 'Ukrainian', 'de' => 'German', default => 'English'};
+        $language = match ($tenant->locale) {
+            'ru' => 'Russian', 'uk' => 'Ukrainian', 'de' => 'German', default => 'English'
+        };
         $context = [
             'asset' => $data['asset'],
             'business_name' => $tenant->name,
@@ -220,6 +222,7 @@ class TenantController extends Controller
                 return response()->json(['message' => 'IMAGE_CREDIT_REQUIRED', 'image_generation' => $imageGenerations->status($tenant)], 402);
             }
             report($exception);
+
             return response()->json(['message' => 'IMAGE_GENERATION_FAILED', 'image_generation' => $imageGenerations->status($tenant)], 422);
         }
         $content = (array) $profile->content;
@@ -391,6 +394,7 @@ class TenantController extends Controller
         if (! $path) {
             return null;
         }
+
         return str_starts_with($path, '/') || str_starts_with($path, 'http') ? $path : Storage::disk('public')->url($path);
     }
 
@@ -410,7 +414,7 @@ class TenantController extends Controller
         return response()->json(['tenant' => $tenant->fresh('domains')]);
     }
 
-    public function addDomain(Request $request, Tenant $tenant, EntitlementService $entitlements, AuditService $audit): JsonResponse
+    public function addDomain(Request $request, Tenant $tenant, EntitlementService $entitlements, DomainService $service, AuditService $audit): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
         abort_unless(filter_var($entitlements->get($tenant, 'custom_domain', 0), FILTER_VALIDATE_BOOLEAN), 403, 'Your plan does not include a custom domain.');
@@ -419,7 +423,12 @@ class TenantController extends Controller
         abort_if(str_contains($domain, '/'), 422, 'Enter a hostname without a path.');
         $request->merge(['domain' => $domain]);
         validator(['domain' => $domain], ['domain' => ['required', 'regex:/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/', Rule::unique('tenant_domains', 'domain')]])->validate();
-        $record = $tenant->domains()->create(['domain' => $domain, 'type' => 'custom', 'status' => 'pending', 'verification_token' => Str::random(40)]);
+        $record = $tenant->domains()->create(['domain' => $domain, 'type' => 'custom', 'status' => 'pending', 'provisioning_status' => 'pending', 'verification_token' => Str::random(40)]);
+        try {
+            $record = $service->provision($record);
+        } catch (RuntimeException) {
+            $record = $record->refresh();
+        }
         $audit->log('domain.created', $record, null, $record->toArray(), $tenant->id);
 
         return response()->json(['domain' => $record, 'dns' => ['type' => 'A/AAAA or CNAME', 'target' => parse_url(config('app.url'), PHP_URL_HOST)]], 201);
@@ -436,12 +445,12 @@ class TenantController extends Controller
         return response()->json(['domain' => $domain]);
     }
 
-    public function removeDomain(Request $request, Tenant $tenant, TenantDomain $domain, AuditService $audit): JsonResponse
+    public function removeDomain(Request $request, Tenant $tenant, TenantDomain $domain, DomainService $service, AuditService $audit): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
-        abort_unless($domain->tenant_id === $tenant->id && $domain->type === 'custom' && $domain->status !== 'active', 422);
+        abort_unless($domain->tenant_id === $tenant->id && $domain->type === 'custom', 422);
         $before = $domain->toArray();
-        $domain->delete();
+        $service->remove($domain);
         $audit->log('domain.deleted', null, $before, null, $tenant->id);
 
         return response()->json(['ok' => true]);
