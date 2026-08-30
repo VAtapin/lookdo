@@ -57,7 +57,36 @@ class TenantPresetService
                 }
             }
 
-            return $tenant->fresh(['profile', 'businessProfile.template', 'services']);
+            if ($force) {
+                $obsoleteImages = array_filter((array) data_get($preset, 'configuration.obsolete_portfolio_images', []));
+                if ($obsoleteImages !== []) {
+                    $tenant->portfolioItems()->whereIn('image_path', $obsoleteImages)->delete();
+                }
+            }
+
+            foreach ((array) data_get($preset, 'configuration.starter_portfolio', []) as $index => $item) {
+                $values = [
+                    'title' => $item['title'] ?? [],
+                    'description' => $item['description'] ?? [],
+                    'image_path' => $item['image'] ?? null,
+                    'before_image_path' => $item['before_image'] ?? null,
+                    'after_image_path' => $item['after_image'] ?? null,
+                    'featured' => $item['featured'] ?? false,
+                    'published' => true,
+                    'sort_order' => $index * 10,
+                ];
+                $identity = filled($values['before_image_path']) || filled($values['after_image_path'])
+                    ? ['before_image_path' => $values['before_image_path'], 'after_image_path' => $values['after_image_path']]
+                    : ['image_path' => $values['image_path']];
+                $existing = $tenant->portfolioItems()->where($identity)->first();
+                if (! $existing) {
+                    $tenant->portfolioItems()->create($values);
+                } elseif ($force) {
+                    $existing->update($values);
+                }
+            }
+
+            return $tenant->fresh(['profile', 'businessProfile.template', 'services', 'portfolioItems']);
         });
     }
 

@@ -278,6 +278,47 @@ class TenantAppTest extends TestCase
         $this->assertSame('Musterstr. 5, Templin', $appointment->contact_snapshot['service_address']);
     }
 
+    public function test_leonid_preset_uses_real_work_photos_and_keeps_the_reusable_template_generic(): void
+    {
+        $generic = $this->tenant('generic-steering', 'automotive.steering-wheel-upholstery');
+        $leonid = $this->tenant('leonid', 'automotive.steering-wheel-upholstery');
+        $leonid->portfolioItems()->create([
+            'title' => ['ru' => 'Старый пример'],
+            'image_path' => '/brand/leonid-demo.webp',
+            'published' => true,
+        ]);
+
+        $presets = app(TenantPresetService::class);
+        $presets->apply($leonid, 'leonid-steering', true);
+        $presets->apply($leonid->fresh(), 'leonid-steering', true);
+
+        $this->withHeader('X-Locale', 'de')->getJson($this->url($generic, '/api/tenant-app/bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('template.hero.image', '/brand/steering-wheel-placeholder.svg')
+            ->assertJsonCount(0, 'portfolio');
+
+        $response = $this->withHeader('X-Locale', 'ru')->getJson($this->url($leonid, '/api/tenant-app/bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('tenant.name', 'Перетяжка рулей')
+            ->assertJsonPath('tenant.locale', 'ru')
+            ->assertJsonPath('tenant.branding.hero_image', '/brand/tenants/leonid-steering/hero.webp')
+            ->assertJsonPath('tenant.branding.service_modes.0', 'workshop')
+            ->assertJsonPath('tenant.branding.service_modes.1', 'on_site')
+            ->assertJsonPath('template.code', 'automotive.steering-wheel-upholstery')
+            ->assertJsonPath('template.hero.action', 'Оценить мой руль')
+            ->assertJsonPath('portfolio.0.before_image', '/brand/tenants/leonid-steering/chevrolet-before.webp')
+            ->assertJsonPath('portfolio.0.after_image', '/brand/tenants/leonid-steering/chevrolet-after.webp')
+            ->assertJsonCount(4, 'template.locales')
+            ->assertJsonCount(2, 'services')
+            ->assertJsonCount(10, 'portfolio');
+
+        $this->assertDatabaseMissing('tenant_portfolio_items', [
+            'tenant_id' => $leonid->id,
+            'image_path' => '/brand/leonid-demo.webp',
+        ]);
+        $this->assertSame(10, $leonid->portfolioItems()->count());
+    }
+
     public function test_recent_unpaid_subscription_is_activated_as_full_trial(): void
     {
         $plan = Plan::where('code', 'start')->firstOrFail();

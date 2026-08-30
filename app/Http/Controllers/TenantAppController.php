@@ -43,9 +43,7 @@ class TenantAppController extends Controller
             'tenant' => $this->tenantPayload($tenant, $locale),
             'template' => $this->templatePayload($tenant, $configuration, $locale),
             'services' => $tenant->services()->where('active', true)->orderBy('sort_order')->get()->map(fn (TenantService $service) => $this->servicePayload($service, $locale)),
-            'portfolio' => $tenant->portfolioItems()->where('published', true)->where(function ($query) {
-                $query->where('image_path', '!=', '/brand/leonid-demo.webp')->orWhereNull('image_path')->orWhereNotNull('before_image_path')->orWhereNotNull('after_image_path');
-            })->orderByDesc('featured')->orderBy('sort_order')->get()->map(fn ($item) => [
+            'portfolio' => $tenant->portfolioItems()->where('published', true)->orderByDesc('featured')->orderBy('sort_order')->get()->map(fn ($item) => [
                 'id' => $item->id, 'title' => $item->localized('title', $locale), 'description' => $item->localized('description', $locale),
                 'image' => $this->assetUrl($item->image_path), 'before_image' => $this->assetUrl($item->before_image_path), 'after_image' => $this->assetUrl($item->after_image_path), 'featured' => $item->featured,
             ]),
@@ -439,7 +437,16 @@ class TenantAppController extends Controller
         }
         if ($tenant->portfolioItems()->doesntExist()) {
             foreach ((array) ($configuration['starter_portfolio'] ?? []) as $index => $item) {
-                $tenant->portfolioItems()->create(['title' => $item['title'], 'description' => $item['description'] ?? [], 'image_path' => $item['image'] ?? null, 'featured' => $item['featured'] ?? false, 'published' => true, 'sort_order' => $index * 10]);
+                $tenant->portfolioItems()->create([
+                    'title' => $item['title'] ?? [],
+                    'description' => $item['description'] ?? [],
+                    'image_path' => $item['image'] ?? null,
+                    'before_image_path' => $item['before_image'] ?? null,
+                    'after_image_path' => $item['after_image'] ?? null,
+                    'featured' => $item['featured'] ?? false,
+                    'published' => true,
+                    'sort_order' => $index * 10,
+                ]);
             }
         }
     }

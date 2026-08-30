@@ -2,6 +2,74 @@
 
 return [
     'presets' => [
+        'leonid-steering' => [
+            'template' => 'automotive.steering-wheel-upholstery',
+            'tenant' => [
+                'name' => 'Перетяжка рулей',
+                'locale' => 'ru',
+                'business_description' => 'Профессиональная перетяжка автомобильных рулей. Мастер может принять руль в мастерской или приехать к клиенту, аккуратно демонтировать его, забрать в работу, затем привезти и установить.',
+            ],
+            'profile' => [
+                'primary_color' => '#d9a84e',
+                'secondary_color' => '#07090a',
+                'enabled_locales' => ['ru', 'de', 'en', 'uk'],
+                'branding' => [
+                    'hero_image_path' => '/brand/tenants/leonid-steering/hero.webp',
+                    'confirmed_at' => 'preset',
+                    'services' => 'Перетяжка автомобильных рулей, восстановление поверхности и швов. Возможны приём в мастерской, самостоятельная доставка или выезд мастера для демонтажа, доставки и последующей установки руля.',
+                    'customers' => 'Автовладельцы, которым нужна аккуратная перетяжка руля с понятным согласованием работы по фотографиям.',
+                    'style' => 'Тёмный премиальный интерфейс с золотыми акцентами и реальными фотографиями работ.',
+                    'avoid' => 'Чужие работы, придуманные марки автомобилей, неподтверждённые цены, сроки и гарантии.',
+                    'service_modes' => ['workshop', 'on_site'],
+                    'description_translations' => [
+                        'ru' => 'Профессиональная перетяжка автомобильных рулей. Привезите руль сами или закажите выезд мастера: он аккуратно демонтирует руль, заберёт в мастерскую, а после работы привезёт и установит обратно.',
+                        'de' => 'Professionelle Lenkradaufbereitung. Bringen Sie das Lenkrad selbst vorbei oder buchen Sie den mobilen Service: Der Fachmann baut es sorgfältig aus, nimmt es mit in die Werkstatt und montiert es nach der Arbeit wieder.',
+                        'en' => 'Professional steering-wheel upholstery. Bring the wheel to the workshop or book the mobile service: the specialist removes it carefully, takes it to the workshop, then returns and reinstalls it.',
+                        'uk' => 'Професійна перетяжка автомобільного керма. Привезіть кермо самостійно або замовте виїзд майстра: він акуратно демонтує кермо, забере до майстерні, а після роботи привезе й встановить назад.',
+                    ],
+                    'tagline_translations' => [
+                        'ru' => 'Ваш руль снова может выглядеть как новый',
+                        'de' => 'Ihr Lenkrad kann wieder wie neu aussehen',
+                        'en' => 'Your steering wheel can look new again',
+                        'uk' => 'Ваше кермо знову може виглядати як нове',
+                    ],
+                ],
+            ],
+            'configuration' => [
+                'locales' => ['ru', 'de', 'en', 'uk'],
+                'theme' => ['primary' => '#d9a84e', 'secondary' => '#07090a', 'surface' => '#111315', 'text' => '#f7f4ed'],
+                'hero' => [
+                    'image' => '/brand/tenants/leonid-steering/hero.webp',
+                    'eyebrow' => ['ru' => 'ПЕРЕТЯЖКА РУЛЕЙ', 'de' => 'LENKRADBEZUG', 'en' => 'STEERING WHEEL UPHOLSTERY', 'uk' => 'ПЕРЕТЯЖКА КЕРМА'],
+                    'title' => ['ru' => 'Ваш руль снова может выглядеть как новый', 'de' => 'Ihr Lenkrad kann wieder wie neu aussehen', 'en' => 'Your steering wheel can look new again', 'uk' => 'Ваше кермо знову може виглядати як нове'],
+                    'text' => ['ru' => 'Пришлите фотографии для оценки. Руль можно привезти самостоятельно или заказать выезд мастера с демонтажом и установкой.', 'de' => 'Senden Sie Fotos zur Einschätzung. Sie können das Lenkrad selbst bringen oder den mobilen Aus- und Einbauservice buchen.', 'en' => 'Send photos for an assessment. Bring the wheel yourself or book mobile removal and reinstallation.', 'uk' => 'Надішліть фотографії для оцінки. Кермо можна привезти самостійно або замовити виїзд майстра з демонтажем і встановленням.'],
+                    'action' => ['ru' => 'Оценить мой руль', 'de' => 'Lenkrad bewerten', 'en' => 'Assess my steering wheel', 'uk' => 'Оцінити моє кермо'],
+                ],
+                'trust' => [
+                    ['icon' => 'shield', 'label' => ['ru' => 'Реальные работы', 'de' => 'Echte Arbeiten', 'en' => 'Real work', 'uk' => 'Реальні роботи']],
+                    ['icon' => 'tool', 'label' => ['ru' => 'Аккуратный демонтаж', 'de' => 'Sorgfältiger Ausbau', 'en' => 'Careful removal', 'uk' => 'Акуратний демонтаж']],
+                    ['icon' => 'location', 'label' => ['ru' => 'Мастерская или выезд', 'de' => 'Werkstatt oder mobil', 'en' => 'Workshop or mobile', 'uk' => 'Майстерня або виїзд']],
+                    ['icon' => 'clock', 'label' => ['ru' => 'Ответ после оценки', 'de' => 'Antwort nach Prüfung', 'en' => 'Reply after assessment', 'uk' => 'Відповідь після оцінки']],
+                ],
+                'starter_services' => [
+                    ['duration' => 60, 'image' => '/brand/tenants/leonid-steering/kia-finished.webp', 'name' => ['ru' => 'Перетяжка руля', 'de' => 'Lenkrad neu beziehen', 'en' => 'Steering-wheel upholstery', 'uk' => 'Перетяжка керма'], 'description' => ['ru' => 'Оценка состояния и согласование материала по фотографиям', 'de' => 'Zustand prüfen und Material anhand von Fotos abstimmen', 'en' => 'Condition assessment and material selection from photos', 'uk' => 'Оцінка стану та узгодження матеріалу за фотографіями']],
+                    ['duration' => 60, 'image' => '/brand/tenants/leonid-steering/ford-finished.webp', 'name' => ['ru' => 'Выезд, демонтаж и установка', 'de' => 'Mobiler Aus- und Einbau', 'en' => 'Mobile removal and installation', 'uk' => 'Виїзд, демонтаж і встановлення'], 'description' => ['ru' => 'Мастер снимает руль, забирает в мастерскую и устанавливает после готовности', 'de' => 'Der Fachmann baut das Lenkrad aus, nimmt es mit und montiert es nach Fertigstellung wieder', 'en' => 'The specialist removes the wheel, takes it to the workshop and reinstalls it when ready', 'uk' => 'Майстер знімає кермо, забирає до майстерні та встановлює після готовності']],
+                ],
+                'obsolete_portfolio_images' => ['/brand/leonid-demo.webp'],
+                'starter_portfolio' => [
+                    ['title' => ['ru' => 'Chevrolet — восстановление обода', 'de' => 'Chevrolet – Lenkradkranz erneuert', 'en' => 'Chevrolet — rim restoration', 'uk' => 'Chevrolet — відновлення обода'], 'description' => ['ru' => 'Повреждённая поверхность до работы и аккуратный результат после перетяжки.', 'de' => 'Beschädigte Oberfläche vor der Arbeit und das saubere Ergebnis danach.', 'en' => 'The damaged surface before the work and the clean upholstered result.', 'uk' => 'Пошкоджена поверхня до роботи та акуратний результат після перетяжки.'], 'image' => '/brand/tenants/leonid-steering/chevrolet-after.webp', 'before_image' => '/brand/tenants/leonid-steering/chevrolet-before.webp', 'after_image' => '/brand/tenants/leonid-steering/chevrolet-after.webp', 'featured' => true],
+                    ['title' => ['ru' => 'Hyundai — перетяжка руля', 'de' => 'Hyundai – Lenkrad neu bezogen', 'en' => 'Hyundai — steering-wheel upholstery', 'uk' => 'Hyundai — перетяжка керма'], 'description' => ['ru' => 'Состояние руля до работы и новая отделка после.', 'de' => 'Der Zustand vorher und die neue Oberfläche danach.', 'en' => 'The wheel before the work and its new finish afterwards.', 'uk' => 'Стан керма до роботи та нове оздоблення після.'], 'image' => '/brand/tenants/leonid-steering/hyundai-after.webp', 'before_image' => '/brand/tenants/leonid-steering/hyundai-before.webp', 'after_image' => '/brand/tenants/leonid-steering/hyundai-after.webp', 'featured' => true],
+                    ['title' => ['ru' => 'Toyota — обновление покрытия', 'de' => 'Toyota – Oberfläche erneuert', 'en' => 'Toyota — surface renewal', 'uk' => 'Toyota — оновлення покриття'], 'description' => ['ru' => 'Изношенная зона до ремонта и ровная новая отделка после.', 'de' => 'Die abgenutzte Stelle vorher und die gleichmäßige neue Oberfläche danach.', 'en' => 'The worn area before repair and the even new finish afterwards.', 'uk' => 'Зношена ділянка до ремонту та рівне нове оздоблення після.'], 'image' => '/brand/tenants/leonid-steering/toyota-after.webp', 'before_image' => '/brand/tenants/leonid-steering/toyota-before.webp', 'after_image' => '/brand/tenants/leonid-steering/toyota-after.webp'],
+                    ['title' => ['ru' => 'Kia — восстановление повреждённой кожи', 'de' => 'Kia – beschädigtes Leder erneuert', 'en' => 'Kia — damaged leather restored', 'uk' => 'Kia — відновлення пошкодженої шкіри'], 'description' => ['ru' => 'Сильный износ до работы и новая перетяжка после.', 'de' => 'Starker Verschleiß vorher und der neue Bezug danach.', 'en' => 'Heavy wear before the work and the new upholstery afterwards.', 'uk' => 'Сильний знос до роботи та нова перетяжка після.'], 'image' => '/brand/tenants/leonid-steering/kia-after.webp', 'before_image' => '/brand/tenants/leonid-steering/kia-before.webp', 'after_image' => '/brand/tenants/leonid-steering/kia-after.webp'],
+                    ['title' => ['ru' => 'Ford — полное обновление руля', 'de' => 'Ford – Lenkrad vollständig erneuert', 'en' => 'Ford — complete steering-wheel renewal', 'uk' => 'Ford — повне оновлення керма'], 'description' => ['ru' => 'Изношенный руль до работы и готовый результат после перетяжки.', 'de' => 'Das abgenutzte Lenkrad vorher und das fertige Ergebnis danach.', 'en' => 'The worn wheel before the work and the finished upholstered result.', 'uk' => 'Зношене кермо до роботи та готовий результат після перетяжки.'], 'image' => '/brand/tenants/leonid-steering/ford-after.webp', 'before_image' => '/brand/tenants/leonid-steering/ford-before.webp', 'after_image' => '/brand/tenants/leonid-steering/ford-after.webp'],
+                    ['title' => ['ru' => 'MAN — руль грузового автомобиля', 'de' => 'MAN – Lkw-Lenkrad erneuert', 'en' => 'MAN — truck steering wheel', 'uk' => 'MAN — кермо вантажного автомобіля'], 'description' => ['ru' => 'Руль в автомобиле до работы и результат после восстановления.', 'de' => 'Das Lenkrad im Fahrzeug vorher und das Ergebnis nach der Aufbereitung.', 'en' => 'The wheel in the vehicle before the work and the restored result.', 'uk' => 'Кермо в автомобілі до роботи та результат після відновлення.'], 'image' => '/brand/tenants/leonid-steering/man-after.webp', 'before_image' => '/brand/tenants/leonid-steering/man-before.webp', 'after_image' => '/brand/tenants/leonid-steering/man-after.webp'],
+                    ['title' => ['ru' => 'Renault — готовая работа', 'de' => 'Renault – fertige Arbeit', 'en' => 'Renault — completed work', 'uk' => 'Renault — готова робота'], 'image' => '/brand/tenants/leonid-steering/renault-finished.webp'],
+                    ['title' => ['ru' => 'Peugeot — готовая работа', 'de' => 'Peugeot – fertige Arbeit', 'en' => 'Peugeot — completed work', 'uk' => 'Peugeot — готова робота'], 'image' => '/brand/tenants/leonid-steering/peugeot-finished.webp'],
+                    ['title' => ['ru' => 'Kia — перфорация и ровный шов', 'de' => 'Kia – Perforation und saubere Naht', 'en' => 'Kia — perforation and clean stitching', 'uk' => 'Kia — перфорація та рівний шов'], 'image' => '/brand/tenants/leonid-steering/kia-finished.webp'],
+                    ['title' => ['ru' => 'Ford — готовая перетяжка', 'de' => 'Ford – neuer Lenkradbezug', 'en' => 'Ford — finished upholstery', 'uk' => 'Ford — готова перетяжка'], 'image' => '/brand/tenants/leonid-steering/ford-finished.webp'],
+                ],
+            ],
+        ],
         'ivanna-brows' => [
             'template' => 'beauty.brows',
             'tenant' => [
