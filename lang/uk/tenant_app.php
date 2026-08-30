@@ -18,6 +18,15 @@ return [
         'new_message' => ['title' => 'Нове повідомлення', 'body' => 'У кабінеті майстра чекає нове повідомлення.'],
         'new_appointment' => ['title' => 'Новий запис', 'body' => 'Клієнт створив новий запис.'],
     ],
+    'customer_push' => [
+        'open' => 'Відкрити',
+        'new_message' => ['body' => 'Ви отримали нове повідомлення від майстра.'],
+    ],
+    'sms' => [
+        'request_received' => ':business отримав вашу заявку. Статус: :url',
+        'master_replied' => ':business відповів вам. Відповідь: :url',
+        'work_ready' => 'Ваша робота у :business готова. Докладніше: :url',
+    ],
     'media_slots' => [
         'overall' => 'Кермо повністю',
         'top' => 'Верх керма',

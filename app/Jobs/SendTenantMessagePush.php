@@ -25,14 +25,12 @@ class SendTenantMessagePush implements ShouldQueue
         }
 
         $locale = in_array($message->customer->locale, ['de', 'en', 'ru', 'uk'], true) ? $message->customer->locale : 'de';
-        $actions = ['de' => 'Öffnen', 'en' => 'Open', 'ru' => 'Открыть', 'uk' => 'Відкрити'];
-
         $webPush->sendToCustomer($message->customer, [
             'title' => $message->tenant->name,
-            'body' => $message->body,
+            'body' => trans('tenant_app.customer_push.new_message.body', [], $locale),
             'url' => '/activity',
             'tag' => 'lookdo-message-'.$message->id,
-            'action' => $actions[$locale],
+            'action' => trans('tenant_app.customer_push.open', [], $locale),
         ]);
     }
 }

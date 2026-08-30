@@ -43,7 +43,7 @@ class SmsService
         if ($limit === 0) {
             throw new DomainException('The tenant SMS limit is zero.');
         }
-        $recipient = $this->normalizeRecipient($recipient);
+        $recipient = $this->normalizeRecipient($tenant, $recipient);
         $message = trim($message);
         if ($message === '' || mb_strlen($message) > 1000) {
             throw new DomainException('SMS text must contain between 1 and 1000 characters.');
@@ -85,11 +85,35 @@ class SmsService
         return $record;
     }
 
-    private function normalizeRecipient(string $recipient): string
+    public function localizedMessage(Tenant $tenant, string $locale, string $eventType): string
+    {
+        $locale = in_array($locale, ['de', 'en', 'ru', 'uk'], true) ? $locale : 'de';
+        $domain = $tenant->primaryDomain?->domain ?: $tenant->slug.'.'.config('tenancy.platform_domain');
+
+        return trans('tenant_app.sms.'.$eventType, [
+            'business' => $tenant->name,
+            'url' => 'https://'.$domain.'/activity',
+        ], $locale);
+    }
+
+    private function normalizeRecipient(Tenant $tenant, string $recipient): string
     {
         $recipient = preg_replace('/[\s().-]+/', '', trim($recipient)) ?: '';
         if (str_starts_with($recipient, '00')) {
             $recipient = '+'.substr($recipient, 2);
+        }
+        if (! str_starts_with($recipient, '+')) {
+            $digits = preg_replace('/\D+/', '', $recipient) ?: '';
+            $country = strtoupper((string) ($tenant->country ?: 'DE'));
+            $dialCode = ['DE' => '49', 'RU' => '7', 'UA' => '380', 'GB' => '44', 'US' => '1', 'CA' => '1'][$country] ?? null;
+            if ($country === 'RU' && strlen($digits) === 11 && str_starts_with($digits, '8')) {
+                $digits = '7'.substr($digits, 1);
+            } elseif ($dialCode && str_starts_with($digits, '0')) {
+                $digits = $dialCode.ltrim($digits, '0');
+            } elseif ($dialCode && ! str_starts_with($digits, $dialCode)) {
+                $digits = $dialCode.$digits;
+            }
+            $recipient = '+'.$digits;
         }
         if (! preg_match('/^\+[1-9]\d{7,14}$/', $recipient)) {
             throw new DomainException('The recipient must be in international E.164 format.');

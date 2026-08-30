@@ -18,6 +18,15 @@ return [
         'new_message' => ['title' => 'Neue Nachricht', 'body' => 'Im Kundenbereich wartet eine neue Nachricht.'],
         'new_appointment' => ['title' => 'Neuer Termin', 'body' => 'Ein neuer Termin wurde gebucht.'],
     ],
+    'customer_push' => [
+        'open' => 'Öffnen',
+        'new_message' => ['body' => 'Sie haben eine neue Nachricht vom Betrieb erhalten.'],
+    ],
+    'sms' => [
+        'request_received' => 'Ihre Anfrage bei :business ist eingegangen. Status: :url',
+        'master_replied' => ':business hat geantwortet. Antwort: :url',
+        'work_ready' => 'Ihre Arbeit bei :business ist fertig. Details: :url',
+    ],
     'media_slots' => [
         'overall' => 'Lenkrad komplett',
         'top' => 'Oberer Bereich',

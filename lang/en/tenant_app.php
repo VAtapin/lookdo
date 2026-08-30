@@ -18,6 +18,15 @@ return [
         'new_message' => ['title' => 'New message', 'body' => 'A new message is waiting in the customer workspace.'],
         'new_appointment' => ['title' => 'New appointment', 'body' => 'A new appointment has been booked.'],
     ],
+    'customer_push' => [
+        'open' => 'Open',
+        'new_message' => ['body' => 'You have received a new message from the business.'],
+    ],
+    'sms' => [
+        'request_received' => ':business has received your request. Status: :url',
+        'master_replied' => ':business has replied. Read the reply: :url',
+        'work_ready' => 'Your work at :business is ready. Details: :url',
+    ],
     'media_slots' => [
         'overall' => 'Whole steering wheel',
         'top' => 'Top section',

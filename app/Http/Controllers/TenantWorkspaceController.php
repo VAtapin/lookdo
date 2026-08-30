@@ -12,14 +12,12 @@ use App\Services\CustomerMergeService;
 use App\Services\EntitlementService;
 use App\Services\SmsService;
 use App\Services\TenantCalendarService;
-use App\Services\TenantWebPushService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Throwable;
 
 class TenantWorkspaceController extends Controller
 {
@@ -86,7 +84,7 @@ class TenantWorkspaceController extends Controller
         return response()->json(['request' => $this->requestItem($tenantRequest->fresh(['customer', 'media', 'values', 'messages.senderUser']), true)]);
     }
 
-    public function reply(Request $request, Tenant $tenant, TenantRequest $tenantRequest, TenantWebPushService $push, SmsService $sms): JsonResponse
+    public function reply(Request $request, Tenant $tenant, TenantRequest $tenantRequest, SmsService $sms): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($tenantRequest->tenant_id === $tenant->id, 404);
@@ -96,11 +94,7 @@ class TenantWorkspaceController extends Controller
         $customer = $tenantRequest->customer;
         $delivery = ['push' => null, 'sms' => null];
         if ($customer) {
-            try {
-                $delivery['push'] = $push->sendToCustomer($customer, ['title' => $tenant->name, 'body' => $data['body'], 'url' => '/activity']);
-            } catch (Throwable $e) {
-                $delivery['push'] = ['error' => $e->getMessage()];
-            }
+            $delivery['push'] = ['status' => 'queued'];
             if (filled($customer->phone)) {
                 try {
                     $queued = $sms->queueImportant($tenant, $customer->phone, $data['body'], $data['event'] ?? 'master_replied', 'request-'.$tenantRequest->id.'-message-'.$message->id);

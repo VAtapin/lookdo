@@ -8,6 +8,7 @@ use App\Models\RequestTemplate;
 use App\Models\Tenant;
 use App\Models\TenantMessage;
 use App\Models\User;
+use App\Services\TenantWebPushService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -53,6 +54,28 @@ class TenantAppTest extends TestCase
         ]);
 
         Bus::assertDispatched(SendTenantMessagePush::class, fn ($job) => $job->tenantMessageId === $message->id);
+    }
+
+    public function test_customer_push_is_localized_and_does_not_expose_chat_content(): void
+    {
+        Bus::fake([SendTenantMessagePush::class]);
+        $tenant = $this->tenant('neutral-push', 'automotive.steering-wheel-upholstery');
+        $customer = $tenant->customers()->create(['name' => 'Иван', 'phone' => '+4915112345678', 'locale' => 'ru']);
+        $message = TenantMessage::create([
+            'tenant_id' => $tenant->id,
+            'customer_id' => $customer->id,
+            'sender_type' => 'master',
+            'body' => 'Личный текст и стоимость 999 евро.',
+        ]);
+        $push = \Mockery::mock(TenantWebPushService::class);
+        $push->shouldReceive('sendToCustomer')->once()->withArgs(function ($actualCustomer, array $payload) use ($customer, $message): bool {
+            return $actualCustomer->is($customer)
+                && $payload['body'] === 'Вы получили новое сообщение от мастера.'
+                && $payload['action'] === 'Открыть'
+                && ! str_contains($payload['body'], $message->body);
+        })->andReturn(['sent' => 1, 'failed' => 0, 'expired' => 0, 'skipped' => false]);
+
+        (new SendTenantMessagePush($message->id))->handle($push);
     }
 
     public function test_vapid_command_checks_configuration_without_external_mutation(): void

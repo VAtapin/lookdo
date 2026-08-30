@@ -155,10 +155,20 @@ class TenantSocialConnectionController extends Controller
     private function connectMeta(Request $request, string $provider): array
     {
         $redirect = route('social.callback', ['provider' => $provider]);
-        $token = Http::get('https://graph.facebook.com/'.config('services.social.meta.version').'/oauth/access_token', [
+        $shortLivedToken = Http::get('https://graph.facebook.com/'.config('services.social.meta.version').'/oauth/access_token', [
             'client_id' => config('services.social.meta.client_id'), 'client_secret' => config('services.social.meta.client_secret'),
             'redirect_uri' => $redirect, 'code' => $request->query('code'),
         ])->throw()->json('access_token');
+        if (! is_string($shortLivedToken) || $shortLivedToken === '') {
+            throw new RuntimeException('META_ACCESS_TOKEN_MISSING');
+        }
+        $longLived = Http::get('https://graph.facebook.com/'.config('services.social.meta.version').'/oauth/access_token', [
+            'grant_type' => 'fb_exchange_token',
+            'client_id' => config('services.social.meta.client_id'),
+            'client_secret' => config('services.social.meta.client_secret'),
+            'fb_exchange_token' => $shortLivedToken,
+        ])->throw()->json();
+        $token = (string) ($longLived['access_token'] ?? $shortLivedToken);
         $accounts = Http::withToken($token)->get('https://graph.facebook.com/'.config('services.social.meta.version').'/me/accounts', [
             'fields' => 'id,name,access_token,instagram_business_account{id,username}', 'limit' => 100,
         ])->throw()->json('data', []);
@@ -173,6 +183,7 @@ class TenantSocialConnectionController extends Controller
             'account_name' => (string) ($isInstagram ? data_get($page, 'instagram_business_account.username') : $page['name']),
             'credentials' => ['access_token' => $page['access_token'], 'page_id' => $page['id']],
             'scopes' => $isInstagram ? ['instagram_basic', 'instagram_content_publish'] : ['pages_manage_posts'],
+            'expires_at' => ((int) ($longLived['expires_in'] ?? 0)) > 0 ? now()->addSeconds((int) $longLived['expires_in']) : null,
         ];
     }
 

@@ -12,6 +12,7 @@ use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ExternalIntegrationsTest extends TestCase
@@ -59,6 +60,88 @@ class ExternalIntegrationsTest extends TestCase
             && str_contains($request['text'], 'Новая работа')
             && str_contains($request['text'], 'https://social-api.lookdo.app')
         );
+    }
+
+    public function test_facebook_publication_uses_the_connected_page(): void
+    {
+        config(['services.social.meta.version' => 'v21.0']);
+        Http::fake([
+            'https://graph.facebook.com/v21.0/123/feed' => Http::response(['id' => '123_456']),
+        ]);
+        $tenant = $this->tenant('facebook-api');
+        $connection = $tenant->socialConnections()->create([
+            'provider' => 'facebook', 'status' => 'active', 'external_account_id' => '123',
+            'account_name' => 'LOOKDO Page', 'credentials' => ['access_token' => 'page-token'],
+        ]);
+        $draft = $tenant->socialDrafts()->create([
+            'format' => 'feed', 'channel' => 'facebook', 'locale' => 'ru',
+            'caption' => 'Новая работа', 'booking_url' => 'https://facebook-api.lookdo.app', 'status' => 'ready',
+        ]);
+
+        $result = app(SocialPublishingService::class)->publish($draft, $connection);
+
+        $this->assertSame('123_456', $result['id']);
+        $this->assertSame('https://www.facebook.com/123/posts/456', $result['url']);
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v21.0/123/feed'
+            && $request['message'] === "Новая работа\n\nhttps://facebook-api.lookdo.app"
+            && $request->hasHeader('Authorization', 'Bearer page-token'));
+    }
+
+    public function test_instagram_publication_creates_and_publishes_a_media_container(): void
+    {
+        config(['app.url' => 'https://lookdo.app', 'services.social.meta.version' => 'v21.0']);
+        Storage::fake('public');
+        Http::fake([
+            'https://graph.facebook.com/v21.0/ig-123/media' => Http::response(['id' => 'container-1']),
+            'https://graph.facebook.com/v21.0/ig-123/media_publish' => Http::response(['id' => 'media-1']),
+            'https://graph.facebook.com/v21.0/media-1*' => Http::response(['permalink' => 'https://www.instagram.com/p/example/']),
+        ]);
+        $tenant = $this->tenant('instagram-api');
+        $imagePath = 'tenant-app/'.$tenant->id.'/social/result.jpg';
+        Storage::disk('public')->put($imagePath, 'image');
+        $connection = $tenant->socialConnections()->create([
+            'provider' => 'instagram', 'status' => 'active', 'external_account_id' => 'ig-123',
+            'account_name' => 'lookdo', 'credentials' => ['access_token' => 'page-token'],
+        ]);
+        $draft = $tenant->socialDrafts()->create([
+            'format' => 'feed', 'channel' => 'instagram', 'locale' => 'ru', 'caption' => 'До и после',
+            'booking_url' => 'https://instagram-api.lookdo.app', 'image_path' => $imagePath, 'status' => 'ready',
+        ]);
+
+        $result = app(SocialPublishingService::class)->publish($draft, $connection);
+
+        $this->assertSame('media-1', $result['id']);
+        $this->assertSame('https://www.instagram.com/p/example/', $result['url']);
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v21.0/ig-123/media'
+            && $request['image_url'] === 'https://lookdo.app/storage/'.$imagePath);
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v21.0/ig-123/media_publish'
+            && $request['creation_id'] === 'container-1');
+    }
+
+    public function test_vk_publication_posts_to_the_connected_wall(): void
+    {
+        config(['services.social.vk.version' => '5.199']);
+        Http::fake([
+            'https://api.vk.com/method/wall.post' => Http::response(['response' => ['post_id' => 987]]),
+        ]);
+        $tenant = $this->tenant('vk-api');
+        $connection = $tenant->socialConnections()->create([
+            'provider' => 'vk', 'status' => 'active', 'external_account_id' => '-321',
+            'account_name' => 'LOOKDO VK', 'credentials' => ['access_token' => 'vk-token'],
+        ]);
+        $draft = $tenant->socialDrafts()->create([
+            'format' => 'feed', 'channel' => 'vk', 'locale' => 'ru',
+            'caption' => 'Свежая работа', 'booking_url' => 'https://vk-api.lookdo.app', 'status' => 'ready',
+        ]);
+
+        $result = app(SocialPublishingService::class)->publish($draft, $connection);
+
+        $this->assertSame('987', $result['id']);
+        $this->assertSame('https://vk.com/wall-321_987', $result['url']);
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://api.vk.com/method/wall.post'
+            && $request['owner_id'] === -321
+            && $request['from_group'] === 1
+            && $request['access_token'] === 'vk-token');
     }
 
     public function test_tenant_owner_can_connect_a_telegram_channel_where_the_bot_is_available(): void

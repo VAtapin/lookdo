@@ -22,6 +22,7 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/framework/testing
 /vendor
 /database/verification.sqlite
 /database/database.sqlite

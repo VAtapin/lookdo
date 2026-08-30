@@ -170,6 +170,12 @@ async function load() {
         app.value = await api("/tenant-app/bootstrap", { headers });
         applyTenantLocale(app.value.tenant.locale || "de");
         if (screen.value === "activity") await loadActivity();
+        if (
+            app.value.session?.known &&
+            "Notification" in window &&
+            Notification.permission === "granted"
+        )
+            await syncExistingPushSubscription();
         if (app.value.session?.known && shouldAskPush())
             pushPrompt.value = true;
     } catch (e: any) {
@@ -185,8 +191,25 @@ function shouldAskPush() {
         clientToken.value &&
         "Notification" in window &&
         Notification.permission === "default" &&
-        !localStorage.getItem("lookdo-push-later:" + location.hostname),
+        !sessionStorage.getItem("lookdo-push-later:" + location.hostname),
     );
+}
+async function syncExistingPushSubscription() {
+    if (!app.value?.push?.enabled || !clientToken.value || !("serviceWorker" in navigator))
+        return;
+    try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (!subscription) return;
+        const value = subscription.toJSON();
+        await api("/tenant-app/push-subscriptions", {
+            method: "POST",
+            headers: { "X-Lookdo-Client-Token": clientToken.value },
+            body: JSON.stringify({ endpoint: value.endpoint, keys: value.keys }),
+        });
+    } catch {
+        // A stale browser subscription must never block the application itself.
+    }
 }
 async function loadActivity() {
     if (!clientToken.value) {
@@ -331,7 +354,7 @@ async function enablePush() {
     }
 }
 function dismissPush() {
-    localStorage.setItem("lookdo-push-later:" + location.hostname, "1");
+    sessionStorage.setItem("lookdo-push-later:" + location.hostname, "1");
     pushPrompt.value = false;
 }
 async function login() {

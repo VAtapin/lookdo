@@ -907,9 +907,14 @@ class SaasFoundationTest extends TestCase
         $tenant = Tenant::create(['name' => 'SMS Client', 'slug' => 'sms-client', 'country' => 'DE', 'locale' => 'de', 'status' => 'active']);
         $tenant->subscriptions()->create(['plan_id' => $plan->id, 'provider' => 'manual', 'status' => 'active', 'started_at' => now()]);
 
-        $sms = app(SmsService::class)->queueImportant($tenant, '+4915112345678', 'Ihre Anfrage ist eingegangen.', 'request_received', 'request-1-received');
-        $duplicate = app(SmsService::class)->queueImportant($tenant, '+4915112345678', 'Ihre Anfrage ist eingegangen.', 'request_received', 'request-1-received');
+        $sms = app(SmsService::class)->queueImportant($tenant, '0151 12345678', 'Ihre Anfrage ist eingegangen.', 'request_received', 'request-1-received');
+        $duplicate = app(SmsService::class)->queueImportant($tenant, '0151 12345678', 'Ihre Anfrage ist eingegangen.', 'request_received', 'request-1-received');
         $this->assertSame($sms->id, $duplicate->id);
+        $this->assertSame('+4915112345678', $sms->recipient);
+        $this->assertSame(
+            'Ihre Anfrage bei SMS Client ist eingegangen. Status: https://sms-client.'.config('tenancy.platform_domain').'/activity',
+            app(SmsService::class)->localizedMessage($tenant, 'de', 'request_received'),
+        );
         Queue::assertPushed(SendSmsMessage::class, 1);
 
         (new SendSmsMessage($sms->id))->handle(app(SmsGateway::class));
