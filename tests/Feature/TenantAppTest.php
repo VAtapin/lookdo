@@ -6,8 +6,10 @@ use App\Jobs\SendTenantMessagePush;
 use App\Models\Plan;
 use App\Models\RequestTemplate;
 use App\Models\Tenant;
+use App\Models\TenantAppointment;
 use App\Models\TenantMessage;
 use App\Models\User;
+use App\Services\TenantPresetService;
 use App\Services\TenantWebPushService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
@@ -216,6 +218,64 @@ class TenantAppTest extends TestCase
             ->assertOk()
             ->assertJsonPath('appointment.status', 'cancelled');
         $this->assertDatabaseHas('tenant_appointments', ['id' => $appointmentId, 'status' => 'cancelled']);
+    }
+
+    public function test_ivanna_brows_preset_is_personalized_without_changing_the_reusable_template(): void
+    {
+        $generic = $this->tenant('generic-brows', 'beauty.brows');
+        $ivanna = $this->tenant('ivanna-brows', 'beauty.brows');
+
+        app(TenantPresetService::class)->apply($ivanna, 'ivanna-brows', true);
+
+        $this->withHeader('X-Locale', 'en')->getJson($this->url($generic, '/api/tenant-app/bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('template.code', 'beauty.brows')
+            ->assertJsonCount(4, 'template.locales');
+
+        $response = $this->withHeader('X-Locale', 'en')->getJson($this->url($ivanna, '/api/tenant-app/bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('tenant.name', 'Ivanna Brows')
+            ->assertJsonPath('tenant.locale', 'uk')
+            ->assertJsonPath('tenant.contact.phone', '+49 174 4812109')
+            ->assertJsonPath('tenant.branding.horizontal_logo', '/brand/tenants/ivanna-brows/logo-horizontal.webp')
+            ->assertJsonPath('tenant.branding.service_modes.0', 'workshop')
+            ->assertJsonPath('tenant.branding.service_modes.1', 'on_site')
+            ->assertJsonPath('template.code', 'beauty.brows')
+            ->assertJsonPath('template.hero.action', 'Записатися')
+            ->assertJsonCount(3, 'template.locales')
+            ->assertJsonCount(5, 'services');
+
+        $serviceId = $response->json('services.0.id');
+        $date = CarbonImmutable::now('Europe/Berlin')->addDay();
+        while ($date->dayOfWeekIso > 5) {
+            $date = $date->addDay();
+        }
+        $startsAt = $this->getJson($this->url($ivanna, '/api/tenant-app/availability?service_id='.$serviceId.'&date='.$date->format('Y-m-d')))
+            ->assertOk()
+            ->json('slots.0.starts_at');
+
+        $this->withHeader('X-Locale', 'uk')->postJson($this->url($ivanna, '/api/tenant-app/appointments'), [
+            'service_id' => $serviceId,
+            'starts_at' => $startsAt,
+            'name' => 'Олена',
+            'phone' => '+4915112345678',
+            'service_mode' => 'on_site',
+        ])->assertUnprocessable()->assertJsonValidationErrors('service_address');
+
+        $booking = $this->withHeader('X-Locale', 'uk')->postJson($this->url($ivanna, '/api/tenant-app/appointments'), [
+            'service_id' => $serviceId,
+            'starts_at' => $startsAt,
+            'name' => 'Олена',
+            'phone' => '+4915112345678',
+            'service_mode' => 'on_site',
+            'service_address' => 'Musterstr. 5, Templin',
+        ])->assertCreated()
+            ->assertJsonPath('appointment.service_mode', 'on_site')
+            ->assertJsonPath('appointment.service_address', 'Musterstr. 5, Templin');
+
+        $appointment = TenantAppointment::findOrFail($booking->json('appointment.id'));
+        $this->assertSame('on_site', $appointment->contact_snapshot['service_mode']);
+        $this->assertSame('Musterstr. 5, Templin', $appointment->contact_snapshot['service_address']);
     }
 
     public function test_recent_unpaid_subscription_is_activated_as_full_trial(): void

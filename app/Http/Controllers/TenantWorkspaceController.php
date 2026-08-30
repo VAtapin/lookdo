@@ -299,7 +299,17 @@ class TenantWorkspaceController extends Controller
 
     private function appointment($a): array
     {
-        return ['id' => $a->id, 'number' => $a->number, 'status' => $a->status, 'starts_at' => $a->starts_at?->toIso8601String(), 'ends_at' => $a->ends_at?->toIso8601String(), 'customer' => $a->customer, 'service' => $a->service];
+        return [
+            'id' => $a->id,
+            'number' => $a->number,
+            'status' => $a->status,
+            'starts_at' => $a->starts_at?->toIso8601String(),
+            'ends_at' => $a->ends_at?->toIso8601String(),
+            'service_mode' => data_get($a, 'contact_snapshot.service_mode', 'workshop'),
+            'service_address' => data_get($a, 'contact_snapshot.service_address'),
+            'customer' => $a->customer,
+            'service' => $a->service,
+        ];
     }
 
     private function freeSlots(Tenant $tenant, TenantCalendarService $calendar, string $date): array

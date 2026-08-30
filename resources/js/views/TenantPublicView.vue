@@ -478,14 +478,30 @@ const loginContext = {
                             class="ta-home-screen ta-brows-home"
                         >
                             <header class="ta-brows-header">
-                                <button class="ta-brand" @click="go('home')">
+                                <button
+                                    class="ta-brand"
+                                    :class="{
+                                        'has-horizontal-logo':
+                                            app.tenant.branding
+                                                ?.horizontal_logo,
+                                    }"
+                                    @click="go('home')"
+                                >
                                     <img
                                         :src="
+                                            app.tenant.branding
+                                                ?.horizontal_logo ||
                                             app.tenant.logo ||
                                             '/brand/lookdo-mark.webp'
                                         "
                                         :alt="app.tenant.name"
-                                    /><span>{{ app.tenant.name }}</span>
+                                    /><span
+                                        v-if="
+                                            !app.tenant.branding
+                                                ?.horizontal_logo
+                                        "
+                                        >{{ app.tenant.name }}</span
+                                    >
                                 </button>
                                 <div>
                                     <a

@@ -175,17 +175,22 @@ class TenantWorkspaceTest extends TestCase
             'service_id' => $service->id,
             'starts_at' => $startsAt,
             'status' => 'confirmed',
+            'service_mode' => 'on_site',
+            'service_address' => 'Ringstr. 12, Templin',
         ];
 
         $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/calendar/appointments', $payload)
             ->assertCreated()
-            ->assertJsonPath('appointment.customer.id', $customer->id);
+            ->assertJsonPath('appointment.customer.id', $customer->id)
+            ->assertJsonPath('appointment.contact_snapshot.service_mode', 'on_site')
+            ->assertJsonPath('appointment.contact_snapshot.service_address', 'Ringstr. 12, Templin');
         $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/calendar/appointments', $payload)
             ->assertUnprocessable()
             ->assertJsonValidationErrors('starts_at');
         $this->actingAs($owner)->getJson('/api/tenant/'.$tenant->id.'/calendar?from='.$date->toDateString().'&to='.$date->toDateString())
             ->assertOk()
-            ->assertJsonCount(1, 'appointments');
+            ->assertJsonCount(1, 'appointments')
+            ->assertJsonPath('appointments.0.contact_snapshot.service_mode', 'on_site');
     }
 
     public function test_two_calendar_resources_can_accept_the_same_time_slot(): void

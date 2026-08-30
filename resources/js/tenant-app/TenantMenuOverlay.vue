@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import AppIcon from "./AppIcon.vue";
 
+const localeLabels: Record<string, string> = {
+    de: "Deutsch",
+    en: "English",
+    ru: "Русский",
+    uk: "Українська",
+};
+
 defineProps<{
     app: any;
     copy: Record<string, string>;
@@ -69,10 +76,13 @@ const navigate = (screen: string) => {
                         )
                     "
                 >
-                    <option value="de">Deutsch</option>
-                    <option value="en">English</option>
-                    <option value="ru">Русский</option>
-                    <option value="uk">Українська</option>
+                    <option
+                        v-for="entry in app.template.locales"
+                        :key="entry"
+                        :value="entry"
+                    >
+                        {{ localeLabels[entry] || entry.toUpperCase() }}
+                    </option>
                 </select>
             </label>
             <small>{{ copy.powered }}</small>

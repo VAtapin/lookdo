@@ -27,8 +27,15 @@ const form = reactive({
     email: "",
     comment: "",
     preferred_channel: "whatsapp",
+    service_mode: "workshop",
+    service_address: "",
 });
 const isReschedule = computed(() => Boolean(props.appointment));
+const serviceModes = computed<string[]>(() => {
+    const modes = props.app?.tenant?.branding?.service_modes;
+    return Array.isArray(modes) && modes.length ? modes : ["workshop"];
+});
+const showServiceMode = computed(() => serviceModes.value.length > 1);
 const step = computed(() =>
     stage.value === "service" ? 1 : stage.value === "date" ? 2 : 3,
 );
@@ -162,6 +169,10 @@ async function book() {
         error.value = props.copy.acceptPrivacy;
         return;
     }
+    if (form.service_mode === "on_site" && !form.service_address.trim()) {
+        error.value = props.copy.serviceAddressHint;
+        return;
+    }
     busy.value = true;
     error.value = "";
     try {
@@ -235,6 +246,7 @@ function addCalendar() {
 }
 
 onMounted(() => {
+    form.service_mode = serviceModes.value[0] || "workshop";
     if (props.app.session?.customer) {
         form.name = props.app.session.customer.name || "";
         form.phone = props.app.session.customer.phone || "";
@@ -455,6 +467,33 @@ onMounted(() => {
                         autocomplete="email"
                 /></label>
             </div>
+            <template v-if="showServiceMode">
+                <h2>{{ copy.serviceLocation }}</h2>
+                <div class="ta-service-mode-grid">
+                    <button
+                        v-if="serviceModes.includes('workshop')"
+                        :class="{ active: form.service_mode === 'workshop' }"
+                        @click="form.service_mode = 'workshop'"
+                    >
+                        <AppIcon name="home" />{{ copy.serviceLocationWorkshop }}
+                    </button>
+                    <button
+                        v-if="serviceModes.includes('on_site')"
+                        :class="{ active: form.service_mode === 'on_site' }"
+                        @click="form.service_mode = 'on_site'"
+                    >
+                        <AppIcon name="location" />{{ copy.serviceLocationOnSite }}
+                    </button>
+                </div>
+                <label v-if="form.service_mode === 'on_site'" class="ta-service-address">
+                    <span>{{ copy.serviceAddress }} *</span>
+                    <input
+                        v-model="form.service_address"
+                        autocomplete="street-address"
+                        :placeholder="copy.serviceAddressHint"
+                    />
+                </label>
+            </template>
             <h2>{{ copy.preferredChannel }}</h2>
             <div class="ta-channel-grid">
                 <button

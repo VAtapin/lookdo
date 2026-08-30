@@ -184,6 +184,8 @@ class TenantCalendarController extends Controller
             'status' => ['required', Rule::in(['pending', 'confirmed', 'completed', 'cancelled', 'no_show'])],
             'comment' => 'nullable|string|max:2000',
             'reminder_at' => 'nullable|date',
+            'service_mode' => ['nullable', Rule::in(['workshop', 'on_site'])],
+            'service_address' => 'nullable|required_if:service_mode,on_site|string|max:500',
         ]);
 
         $service = $tenant->services()->findOrFail($data['service_id']);
@@ -192,10 +194,19 @@ class TenantCalendarController extends Controller
 
         DB::transaction(function () use ($tenant, $service, $start, $end, $data, $calendar, $entitlements, &$appointment): void {
             $calendar->assertAvailable($tenant, $service, $start, $end, $appointment?->id, $data['resource_id'] ?? null);
-            $payload = array_merge($data, [
+            $serviceMode = $data['service_mode'] ?? data_get($appointment, 'contact_snapshot.service_mode', 'workshop');
+            $serviceAddress = $serviceMode === 'on_site'
+                ? ($data['service_address'] ?? data_get($appointment, 'contact_snapshot.service_address'))
+                : null;
+            $appointmentData = Arr::except($data, ['service_mode', 'service_address']);
+            $payload = array_merge($appointmentData, [
                 'ends_at' => $end,
                 'number' => $appointment?->number ?: 'A-'.now()->format('ymd').'-'.Str::upper(Str::random(6)),
                 'locale' => $tenant->locale,
+                'contact_snapshot' => array_replace((array) $appointment?->contact_snapshot, [
+                    'service_mode' => $serviceMode,
+                    'service_address' => $serviceAddress,
+                ]),
             ]);
             $appointment ? $appointment->update($payload) : $appointment = $tenant->appointments()->create($payload);
 

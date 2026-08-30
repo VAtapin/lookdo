@@ -202,6 +202,8 @@ class TenantAppController extends Controller
             'phone' => 'required|string|max:50', 'email' => 'nullable|email|max:190', 'comment' => 'nullable|string|max:2000',
             'preferred_channel' => 'nullable|in:phone,whatsapp,viber,telegram,sms,email,push,vk',
             'resource_id' => 'nullable|integer',
+            'service_mode' => 'nullable|in:workshop,on_site',
+            'service_address' => 'nullable|required_if:service_mode,on_site|string|max:500',
         ]);
         $service = $tenant->services()->where('active', true)->where('booking_enabled', true)->findOrFail($data['service_id']);
         $locale = $this->locale($request, $tenant);
@@ -228,7 +230,7 @@ class TenantAppController extends Controller
             return $tenant->appointments()->create([
                 'customer_id' => $customer->id, 'service_id' => $service->id, 'resource_id' => $resourceId, 'number' => $this->number('A'), 'status' => 'pending',
                 'starts_at' => $start, 'ends_at' => $end, 'comment' => $data['comment'] ?? null, 'locale' => $locale,
-                'contact_snapshot' => Arr::only($data, ['name', 'phone', 'email', 'preferred_channel']),
+                'contact_snapshot' => Arr::only($data, ['name', 'phone', 'email', 'preferred_channel', 'service_mode', 'service_address']),
             ]);
         });
 
@@ -373,20 +375,46 @@ class TenantAppController extends Controller
 
     private function configuration(Tenant $tenant): array
     {
-        $tenant->loadMissing('businessProfile.template');
+        $tenant->loadMissing(['businessProfile.template', 'profile']);
         $presets = (array) config('tenant_apps.templates', []);
         $template = $tenant->businessProfile?->template;
 
-        return $template
+        $configuration = $template
             ? $template->resolvedConfiguration($presets)
             : (array) ($presets['general-services.general'] ?? []);
+        $presetCode = (string) data_get($tenant->profile?->content, 'preset.code', '');
+        $tenantPreset = (array) config('tenant_presets.presets.'.$presetCode, []);
+        if (($tenantPreset['template'] ?? null) === ($template?->code ?: 'general-services.general')) {
+            $presetConfiguration = (array) ($tenantPreset['configuration'] ?? []);
+            $configuration = array_replace_recursive($configuration, $presetConfiguration);
+            foreach (['locales', 'navigation', 'trust', 'starter_services', 'starter_portfolio'] as $listKey) {
+                if (array_key_exists($listKey, $presetConfiguration)) {
+                    $configuration[$listKey] = $presetConfiguration[$listKey];
+                }
+            }
+        }
+
+        return array_replace_recursive(
+            $configuration,
+            (array) data_get($tenant->profile?->content, 'app_configuration', []),
+        );
     }
 
     private function locale(Request $request, Tenant $tenant): string
     {
         $locale = strtolower((string) $request->header('X-Locale', $tenant->locale));
+        $allowed = $this->enabledLocales($tenant, $this->configuration($tenant));
 
-        return in_array($locale, ['de', 'en', 'ru', 'uk'], true) ? $locale : $tenant->locale;
+        return in_array($locale, $allowed, true) ? $locale : ($allowed[0] ?? $tenant->locale);
+    }
+
+    private function enabledLocales(Tenant $tenant, array $configuration): array
+    {
+        $configured = array_values(array_unique(array_intersect((array) ($configuration['locales'] ?? ['de', 'en', 'ru', 'uk']), ['de', 'en', 'ru', 'uk'])));
+        $selected = (array) data_get($tenant->profile?->content, 'enabled_locales', $configured);
+        $enabled = array_values(array_intersect($configured, $selected));
+
+        return $enabled !== [] ? $enabled : [in_array($tenant->locale, $configured, true) ? $tenant->locale : ($configured[0] ?? 'de')];
     }
 
     private function enabled(Tenant $tenant, string $key, bool $default): bool
@@ -522,7 +550,7 @@ class TenantAppController extends Controller
 
         return [
             'id' => $tenant->id, 'name' => $tenant->name, 'slug' => $tenant->slug, 'locale' => $locale,
-            'description' => $tenant->business_description, 'logo' => $this->assetUrl($profile?->logo_path),
+            'description' => $this->localized($branding['description_translations'] ?? $tenant->business_description, $locale), 'logo' => $this->assetUrl($profile?->logo_path),
             'colors' => ['primary' => $profile?->primary_color ?: '#ff6b00', 'secondary' => $profile?->secondary_color ?: '#111318'],
             'contact' => [
                 'name' => $profile?->contact_name,
@@ -536,8 +564,10 @@ class TenantAppController extends Controller
             ],
             'branding' => [
                 'confirmed' => filled($branding['confirmed_at'] ?? null),
-                'tagline' => $branding['tagline'] ?? null,
+                'tagline' => $this->localized($branding['tagline_translations'] ?? ($branding['tagline'] ?? null), $locale),
                 'hero_image' => $this->assetUrl($branding['hero_image_path'] ?? null),
+                'horizontal_logo' => $this->assetUrl($branding['horizontal_logo_path'] ?? null),
+                'service_modes' => array_values((array) ($branding['service_modes'] ?? [])),
             ],
         ];
     }
@@ -577,7 +607,7 @@ class TenantAppController extends Controller
 
                 return $action;
             })->values()->all(),
-            'locales' => array_values(array_intersect(['de', 'en', 'ru', 'uk'], $configuration['locales'] ?? ['de', 'en', 'ru', 'uk'])),
+            'locales' => $this->enabledLocales($tenant, $configuration),
             'capabilities' => $configuration['capabilities'] ?? ['request' => true],
         ];
     }
@@ -627,7 +657,7 @@ class TenantAppController extends Controller
 
     private function appointmentPayload(TenantAppointment $appointment, string $locale): array
     {
-        return ['id' => $appointment->id, 'number' => $appointment->number, 'status' => $appointment->status, 'starts_at' => $appointment->starts_at?->toIso8601String(), 'ends_at' => $appointment->ends_at?->toIso8601String(), 'service' => $appointment->service ? $this->servicePayload($appointment->service, $locale) : null];
+        return ['id' => $appointment->id, 'number' => $appointment->number, 'status' => $appointment->status, 'starts_at' => $appointment->starts_at?->toIso8601String(), 'ends_at' => $appointment->ends_at?->toIso8601String(), 'service_mode' => data_get($appointment->contact_snapshot, 'service_mode'), 'service_address' => data_get($appointment->contact_snapshot, 'service_address'), 'service' => $appointment->service ? $this->servicePayload($appointment->service, $locale) : null];
     }
 
     private function messagePayload(TenantMessage $message): array

@@ -31,6 +31,7 @@ defineProps<{ name: string; size?: number }>();
     <template v-else-if="name==='send'"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></template>
     <template v-else-if="name==='heart'"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></template>
     <template v-else-if="name==='map'"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Z"/><path d="M9 3v15M15 6v15"/></template>
+    <template v-else-if="name==='location'"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></template>
     <template v-else><circle cx="12" cy="12" r="8"/></template>
   </svg>
 </template>

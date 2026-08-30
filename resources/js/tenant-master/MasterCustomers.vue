@@ -414,7 +414,11 @@ onMounted(load);
                         >
                         <small
                             >{{ localName(entry.service) }} ·
-                            {{ t(entry.status) }}</small
+                            {{ t(entry.status) }} ·
+                            {{ t(entry.service_mode || "workshop")
+                            }}<template v-if="entry.service_address">
+                                · {{ entry.service_address }}</template
+                            ></small
                         >
                     </article>
                     <article

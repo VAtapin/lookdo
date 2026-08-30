@@ -34,6 +34,8 @@ const appointment = reactive<any>({
     comment: "",
     reminder_at: "",
     resource_id: "",
+    service_mode: "workshop",
+    service_address: "",
 });
 const block = reactive<any>({
     kind: "blocked",
@@ -408,6 +410,8 @@ function resetAppointment() {
         comment: "",
         reminder_at: "",
         resource_id: "",
+        service_mode: "workshop",
+        service_address: "",
     });
     tab.value = "calendar";
 }
@@ -427,6 +431,8 @@ function editEvent(event: any) {
         comment: event.comment || "",
         reminder_at: event.reminder_at ? localInput(event.reminder_at) : "",
         resource_id: event.resource_id || "",
+        service_mode: event.contact_snapshot?.service_mode || "workshop",
+        service_address: event.contact_snapshot?.service_address || "",
     });
     tab.value = "appointment";
 }
@@ -523,6 +529,10 @@ onUnmounted(clearServicePreview);
                                 event.eventType === "appointment"
                                     ? [
                                           localName(event.service),
+                                          event.contact_snapshot?.service_mode
+                                              ? t(event.contact_snapshot.service_mode)
+                                              : null,
+                                          event.contact_snapshot?.service_address,
                                           event.resource?.name,
                                       ]
                                           .filter(Boolean)
@@ -619,6 +629,18 @@ onUnmounted(clearServicePreview);
                         {{ localName(s) }}
                     </option>
                 </select></label
+            ><label
+                >{{ t("serviceLocation")
+                }}<select v-model="appointment.service_mode">
+                    <option value="workshop">{{ t("workshop") }}</option>
+                    <option value="on_site">{{ t("on_site") }}</option>
+                </select></label
+            ><label v-if="appointment.service_mode === 'on_site'"
+                >{{ t("serviceAddress")
+                }}<input
+                    v-model="appointment.service_address"
+                    required
+                    :placeholder="t('serviceAddressHint')" /></label
             ><label
                 >{{ t("date") }} / {{ t("time")
                 }}<input

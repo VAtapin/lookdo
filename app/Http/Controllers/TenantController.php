@@ -49,6 +49,10 @@ class TenantController extends Controller
         if (filled($branding['hero_image_path'] ?? null)) {
             $tenant->profile->setAttribute('hero_image_url', $this->assetUrl($branding['hero_image_path']));
         }
+        if (filled($branding['horizontal_logo_path'] ?? null)) {
+            $tenant->profile->setAttribute('horizontal_logo_url', $this->assetUrl($branding['horizontal_logo_path']));
+        }
+        $tenant->profile?->setAttribute('enabled_locales', array_values((array) data_get($tenant->profile?->content, 'enabled_locales', [$tenant->locale])));
         $tenant->profile?->setAttribute('branding', $branding);
 
         $subscription = $tenant->currentSubscription;
@@ -77,16 +81,26 @@ class TenantController extends Controller
     public function updateProfile(Request $request, Tenant $tenant, AuditService $audit, EntitlementService $entitlements): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
-        $data = $request->validate(['name' => 'required|string|max:160', 'locale' => ['nullable', Rule::in(['de', 'en', 'ru', 'uk'])], 'contact_name' => 'nullable|string|max:120', 'email' => 'nullable|email|max:255', 'phone' => 'nullable|string|max:50', 'street' => 'nullable|string|max:160', 'postal_code' => 'nullable|string|max:30', 'city' => 'nullable|string|max:100', 'primary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'secondary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'notification_preferences' => 'nullable|array', 'notification_preferences.push' => 'nullable|boolean', 'notification_preferences.sms' => 'nullable|boolean', 'notification_preferences.email' => 'nullable|boolean']);
+        $data = $request->validate(['name' => 'required|string|max:160', 'locale' => ['nullable', Rule::in(['de', 'en', 'ru', 'uk'])], 'enabled_locales' => 'nullable|array|min:1|max:4', 'enabled_locales.*' => [Rule::in(['de', 'en', 'ru', 'uk'])], 'contact_name' => 'nullable|string|max:120', 'email' => 'nullable|email|max:255', 'phone' => 'nullable|string|max:50', 'street' => 'nullable|string|max:160', 'postal_code' => 'nullable|string|max:30', 'city' => 'nullable|string|max:100', 'primary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'secondary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'notification_preferences' => 'nullable|array', 'notification_preferences.push' => 'nullable|boolean', 'notification_preferences.sms' => 'nullable|boolean', 'notification_preferences.email' => 'nullable|boolean']);
         $before = $tenant->load('profile')->toArray();
-        $tenant->update(['name' => $data['name'], 'locale' => $data['locale'] ?? $tenant->locale]);
+        $locale = $data['locale'] ?? $tenant->locale;
+        if (isset($data['enabled_locales']) && ! in_array($locale, $data['enabled_locales'], true)) {
+            $data['enabled_locales'][] = $locale;
+        }
+        $tenant->update(['name' => $data['name'], 'locale' => $locale]);
         unset($data['name'], $data['locale']);
         $profile = $tenant->profile()->firstOrNew();
+        if (array_key_exists('enabled_locales', $data)) {
+            $content = (array) ($data['content'] ?? $profile->content);
+            $content['enabled_locales'] = array_values(array_unique($data['enabled_locales']));
+            $data['content'] = $content;
+            unset($data['enabled_locales']);
+        }
         if (array_key_exists('notification_preferences', $data)) {
             if (! filter_var($entitlements->get($tenant, 'sms_enabled', false), FILTER_VALIDATE_BOOL)) {
                 $data['notification_preferences']['sms'] = false;
             }
-            $content = (array) $profile->content;
+            $content = (array) ($data['content'] ?? $profile->content);
             $content['notifications'] = $data['notification_preferences'];
             $data['content'] = $content;
             unset($data['notification_preferences']);
@@ -107,6 +121,12 @@ class TenantController extends Controller
             'style' => 'nullable|string|max:1000',
             'avoid' => 'nullable|string|max:1000',
             'tagline' => 'nullable|string|max:300',
+            'description_translations' => 'nullable|array',
+            'description_translations.*' => 'nullable|string|max:3000',
+            'tagline_translations' => 'nullable|array',
+            'tagline_translations.*' => 'nullable|string|max:300',
+            'service_modes' => 'nullable|array|min:1|max:2',
+            'service_modes.*' => ['required', Rule::in(['workshop', 'on_site'])],
             'vk_url' => 'nullable|url|max:500',
             'working_hours' => 'nullable|string|max:500',
             'confirmed' => 'nullable|boolean',
@@ -132,25 +152,29 @@ class TenantController extends Controller
     {
         $this->authorizeTenant($request, $tenant);
         $data = $request->validate([
-            'asset' => ['required', Rule::in(['logo', 'hero'])],
+            'asset' => ['required', Rule::in(['logo', 'logo_horizontal', 'hero'])],
             'image' => 'required|image|mimes:jpg,jpeg,png,webp|max:20480',
         ]);
         $profile = $tenant->profile()->firstOrCreate();
         $content = (array) $profile->content;
         $branding = (array) ($content['branding'] ?? []);
         $column = $data['asset'] === 'logo' ? 'logo_path' : null;
-        $old = $column ? $profile->{$column} : ($branding['hero_image_path'] ?? null);
+        $brandingKey = $data['asset'] === 'logo_horizontal' ? 'horizontal_logo_path' : 'hero_image_path';
+        $old = $column ? $profile->{$column} : ($branding[$brandingKey] ?? null);
         $path = $images->storeUploaded(
             $data['image'],
             'tenant-app/'.$tenant->id.'/branding',
             'public',
             $data['asset'] === 'logo' ? 1024 : 2048,
-            $data['asset'] === 'logo' ? 1024 : 1600,
+            $data['asset'] === 'logo' ? 1024 : ($data['asset'] === 'logo_horizontal' ? 720 : 1600),
         );
         $this->replaceTenantAsset($old, $path, $tenant->id);
         if ($column) {
             $profile->logo_path = $path;
             $branding['logo_source'] = 'upload';
+        } elseif ($data['asset'] === 'logo_horizontal') {
+            $branding['horizontal_logo_path'] = $path;
+            $branding['horizontal_logo_source'] = 'upload';
         } else {
             $branding['hero_image_path'] = $path;
             $branding['hero_source'] = 'upload';
