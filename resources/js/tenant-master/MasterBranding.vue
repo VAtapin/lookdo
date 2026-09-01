@@ -73,6 +73,9 @@ async function generate(){
     promptOpen.value=false;success.value=props.t('generated');emit('reload');
   }catch(e:any){error.value=e.message}finally{busy.value=false}
 }
+function closePrompt(){
+  if(!busy.value)promptOpen.value=false;
+}
 </script>
 
 <template>
@@ -116,12 +119,12 @@ async function generate(){
   <p v-if="!canConfirm" class="mw-warning">{{t('brandingRequired')}}</p>
   <button v-if="onboarding" class="mw-primary mw-confirm-branding" :disabled="busy||!canConfirm" @click="save(true)">{{t('looksGood')}}</button>
 
-  <div v-if="promptOpen" class="mw-brand-modal" @click.self="promptOpen=false">
+  <div v-if="promptOpen" class="mw-brand-modal" @click.self="closePrompt">
     <form class="mw-panel" @submit.prevent="generate">
-      <header><div><p class="mw-kicker">{{t('generateAi')}}</p><h2>{{t('checkPrompt')}}</h2></div><button type="button" @click="promptOpen=false">×</button></header>
-      <textarea v-model="prompt" rows="12" required minlength="40"></textarea>
+      <header><div><p class="mw-kicker">{{t('generateAi')}}</p><h2>{{t('checkPrompt')}}</h2></div><button type="button" :disabled="busy" @click="closePrompt">×</button></header>
+      <textarea v-model="prompt" rows="12" required minlength="40" :disabled="busy"></textarea>
       <p>{{t('promptWarning')}}</p>
-      <div><button type="button" class="mw-secondary" @click="promptOpen=false">{{t('close')}}</button><button class="mw-primary" :disabled="busy">{{busy?t('generating'):t('generate')}}</button></div>
+      <div><button type="button" class="mw-secondary" :disabled="busy" @click="closePrompt">{{t('close')}}</button><button class="mw-primary" :disabled="busy">{{busy?t('generating'):t('generate')}}</button></div>
     </form>
   </div>
 </section>

@@ -296,3 +296,19 @@ body{background:#fff}
         transform: rotate(360deg);
     }
 }
+
+.mw-brand-modal .mw-primary:disabled {
+    border-color: #aeb0b5;
+    background: #aeb0b5;
+    color: #fff;
+    box-shadow: none;
+    cursor: wait;
+    opacity: 1;
+}
+
+.mw-brand-modal .mw-secondary:disabled,
+.mw-brand-modal textarea:disabled,
+.mw-brand-modal header button:disabled {
+    cursor: wait;
+    opacity: 0.5;
+}
