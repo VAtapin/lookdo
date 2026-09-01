@@ -65,7 +65,7 @@
             : $socialOrigin.'/'.ltrim((string) $socialImageValue, '/');
         $socialUrl = request()->url();
         $socialLocale = ['de' => 'de_DE', 'en' => 'en_GB', 'ru' => 'ru_RU', 'uk' => 'uk_UA'][$socialLocaleCode] ?? 'de_DE';
-        $tenantIconVersion = $socialProfile?->updated_at?->timestamp ?: 1;
+        $tenantIconVersion = ($socialProfile?->updated_at?->timestamp ?: 1).'-'.(@filemtime(app_path('Http/Controllers/PlatformController.php')) ?: 1);
     @endphp
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">

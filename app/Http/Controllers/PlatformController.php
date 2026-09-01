@@ -31,7 +31,7 @@ class PlatformController extends Controller
         $name = $tenant?->name ?: 'LOOKDO';
         $theme = $tenant?->profile?->primary_color ?: '#ff6a00';
         $background = $tenant?->profile?->secondary_color ?: '#111318';
-        $iconVersion = $tenant?->profile?->updated_at?->timestamp ?: 1;
+        $iconVersion = ($tenant?->profile?->updated_at?->timestamp ?: 1).'-'.(@filemtime(__FILE__) ?: 1);
 
         return response()->json([
             'id' => '/', 'name' => $name, 'short_name' => Str::limit($name, 18, ''), 'description' => $tenant?->business_description ?: 'LOOKDO',
