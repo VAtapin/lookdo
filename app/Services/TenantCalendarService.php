@@ -84,18 +84,35 @@ class TenantCalendarService
 
             return $breakStart->lt($to) && $breakEnd->gt($from);
         });
-        if (! $insideHours || $insideBreak || ! $localStart->isFuture()) {
-            throw ValidationException::withMessages(['starts_at' => 'CALENDAR_SLOT_UNAVAILABLE']);
+        if (! $localStart->isFuture()) {
+            $this->unavailable($tenant, 'slot_in_past');
+        }
+        if (! $insideHours) {
+            $this->unavailable($tenant, 'outside_working_hours');
+        }
+        if ($insideBreak) {
+            $this->unavailable($tenant, 'during_break');
         }
 
         $busy = $tenant->appointments()->whereNotIn('status', ['cancelled', 'no_show'])->when($exceptId, fn ($q) => $q->whereKeyNot($exceptId))
             ->when($resourceId, fn ($query) => $query->where(fn ($resources) => $resources->whereNull('resource_id')->orWhere('resource_id', $resourceId)))
             ->where('starts_at', '<', $to)->where('ends_at', '>', $from)->lockForUpdate()->exists();
+        if ($busy) {
+            $this->unavailable($tenant, 'slot_occupied');
+        }
         $blocked = $tenant->calendarBlocks()
             ->when($resourceId, fn ($query) => $query->where(fn ($resources) => $resources->whereNull('resource_id')->orWhere('resource_id', $resourceId)))
             ->where('starts_at', '<', $to)->where('ends_at', '>', $from)->exists();
-        if ($busy || $blocked) {
-            throw ValidationException::withMessages(['starts_at' => 'CALENDAR_SLOT_UNAVAILABLE']);
+        if ($blocked) {
+            $this->unavailable($tenant, 'slot_blocked');
         }
+    }
+
+    private function unavailable(Tenant $tenant, string $reason): never
+    {
+        $locale = in_array($tenant->locale, ['de', 'en', 'ru', 'uk'], true) ? $tenant->locale : 'de';
+        throw ValidationException::withMessages([
+            'starts_at' => trans("calendar.$reason", locale: $locale),
+        ]);
     }
 }
