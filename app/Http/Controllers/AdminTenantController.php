@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password as PasswordBroker;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -181,12 +182,7 @@ class AdminTenantController extends Controller
         DB::transaction(function () use ($audit, $before, $ownerIds, $tenant): void {
             $audit->log('tenant.deleted', null, $before, ['deleted' => true]);
 
-            // MariaDB cannot resolve the tenant_services cascade while appointments
-            // still reference those services through a restrictive foreign key.
-            // Remove the dependent rows first and break the tenant/domain cycle
-            // explicitly before deleting the tenant and its remaining cascades.
-            $tenant->appointments()->delete();
-            $tenant->update(['primary_domain_id' => null]);
+            $this->purgeTenantData($tenant);
             $tenant->delete();
             User::query()->whereIn('id', $ownerIds)->where('is_super_admin', false)->get()
                 ->each(function (User $owner): void {
@@ -201,6 +197,66 @@ class AdminTenantController extends Controller
         }
 
         return response()->json(['deleted' => true]);
+    }
+
+    private function purgeTenantData(Tenant $tenant): void
+    {
+        $tenantId = $tenant->id;
+        $requestIds = DB::table('tenant_requests')->where('tenant_id', $tenantId)->pluck('id');
+        $customerIds = DB::table('tenant_customers')->where('tenant_id', $tenantId)->pluck('id');
+        $subscriptionIds = DB::table('subscriptions')->where('tenant_id', $tenantId)->pluck('id');
+
+        $this->deleteWhereIn('tenant_request_values', 'request_id', $requestIds);
+        $this->deleteWhereIn('subscription_payments', 'subscription_id', $subscriptionIds);
+        $this->deleteWhereIn('tenant_customer_segment', 'tenant_customer_id', $customerIds);
+
+        foreach ([
+            'tenant_reminders',
+            'tenant_reviews',
+            'tenant_social_drafts',
+            'tenant_messages',
+            'tenant_media',
+            'tenant_appointments',
+            'tenant_calendar_blocks',
+            'tenant_push_subscriptions',
+            'tenant_client_tokens',
+            'tenant_requests',
+            'tenant_portfolio_items',
+            'tenant_segments',
+            'tenant_resources',
+            'tenant_working_hours',
+            'tenant_social_connections',
+            'tenant_services',
+            'tenant_customers',
+            'sms_messages',
+            'image_credit_purchases',
+            'legal_acceptances',
+            'tenant_entitlement_overrides',
+            'subscriptions',
+            'tenant_business_profiles',
+            'tenant_profiles',
+        ] as $table) {
+            if (Schema::hasTable($table)) {
+                DB::table($table)->where('tenant_id', $tenantId)->delete();
+            }
+        }
+
+        foreach (['business_classifications', 'ai_usage_records', 'audit_logs'] as $table) {
+            if (Schema::hasTable($table) && Schema::hasColumn($table, 'tenant_id')) {
+                DB::table($table)->where('tenant_id', $tenantId)->update(['tenant_id' => null]);
+            }
+        }
+
+        $tenant->update(['primary_domain_id' => null]);
+        DB::table('tenant_domains')->where('tenant_id', $tenantId)->delete();
+        DB::table('tenant_users')->where('tenant_id', $tenantId)->delete();
+    }
+
+    private function deleteWhereIn(string $table, string $column, $values): void
+    {
+        if (Schema::hasTable($table) && $values->isNotEmpty()) {
+            DB::table($table)->whereIn($column, $values)->delete();
+        }
     }
 
     public function updateOwner(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
