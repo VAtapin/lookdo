@@ -35,7 +35,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
     Route::post('/classify', [AuthController::class, 'classify'])->middleware('throttle:30,1');
     Route::post('/register/availability', [AuthController::class, 'availability'])->middleware('throttle:40,1');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
-    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+    Route::post('/login', [AuthController::class, 'login']);
     Route::post('/forgot-password', [AuthController::class, 'forgot'])->middleware('throttle:5,1');
     Route::post('/reset-password', [AuthController::class, 'reset'])->middleware('throttle:5,1');
     Route::post('/stripe/webhook', StripeWebhookController::class);
