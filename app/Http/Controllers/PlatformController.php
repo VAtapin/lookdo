@@ -51,18 +51,9 @@ class PlatformController extends Controller
         $tenant = $request->attributes->get('tenant');
         $tenant?->loadMissing('profile');
         $path = $tenant?->profile?->logo_path;
-        $contents = null;
-        if ($path && str_starts_with($path, '/')) {
-            $publicPath = public_path(ltrim($path, '/'));
-            $contents = is_file($publicPath) ? file_get_contents($publicPath) : null;
-        } elseif ($path && Storage::disk('public')->exists($path)) {
-            $contents = Storage::disk('public')->get($path);
-        }
-        if (! $contents) {
-            return response()->file(public_path('icons/icon-'.($size === 180 ? 192 : $size).'.png'), [
-                'Cache-Control' => 'public, max-age=86400',
-            ]);
-        }
+        $contents = $this->tenantLogoContents($path)
+            ?: file_get_contents(public_path('brand/lookdo-mark.png'));
+        abort_unless(is_string($contents) && $contents !== '', 404);
         if (! function_exists('imagecreatefromstring')) {
             $imageInfo = @getimagesizefromstring($contents);
 
@@ -72,14 +63,7 @@ class PlatformController extends Controller
             ]);
         }
         $source = @imagecreatefromstring($contents);
-        if (! $source) {
-            $imageInfo = @getimagesizefromstring($contents);
-
-            return response($contents, 200, [
-                'Content-Type' => $imageInfo['mime'] ?? 'image/png',
-                'Cache-Control' => 'public, max-age=86400',
-            ]);
-        }
+        abort_unless($source, 404);
         $canvas = imagecreatetruecolor($size, $size);
         $hex = ltrim((string) ($tenant->profile?->secondary_color ?: '#111318'), '#');
         $background = imagecolorallocate($canvas, hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2)));
@@ -99,6 +83,25 @@ class PlatformController extends Controller
         imagedestroy($canvas);
 
         return response($png, 200, ['Content-Type' => 'image/png', 'Cache-Control' => 'public, max-age=86400']);
+    }
+
+    private function tenantLogoContents(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+        if ($path && str_starts_with($path, '/')) {
+            $publicPath = public_path(ltrim($path, '/'));
+            $contents = is_file($publicPath) ? file_get_contents($publicPath) : null;
+
+            return is_string($contents) && $contents !== '' ? $contents : null;
+        }
+        if (! Storage::disk('public')->exists($path)) {
+            return null;
+        }
+        $contents = Storage::disk('public')->get($path);
+
+        return $contents !== '' ? $contents : null;
     }
 
     public function page(string $key): JsonResponse
