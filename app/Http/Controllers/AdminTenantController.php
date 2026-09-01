@@ -180,6 +180,13 @@ class AdminTenantController extends Controller
 
         DB::transaction(function () use ($audit, $before, $ownerIds, $tenant): void {
             $audit->log('tenant.deleted', null, $before, ['deleted' => true]);
+
+            // MariaDB cannot resolve the tenant_services cascade while appointments
+            // still reference those services through a restrictive foreign key.
+            // Remove the dependent rows first and break the tenant/domain cycle
+            // explicitly before deleting the tenant and its remaining cascades.
+            $tenant->appointments()->delete();
+            $tenant->update(['primary_domain_id' => null]);
             $tenant->delete();
             User::query()->whereIn('id', $ownerIds)->where('is_super_admin', false)->get()
                 ->each(function (User $owner): void {

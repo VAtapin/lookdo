@@ -51,6 +51,16 @@ class AdminTenantManagementTest extends TestCase
             'plan_id' => Plan::where('code', 'start')->value('id'),
             'provider' => 'stripe', 'status' => 'incomplete', 'started_at' => now(),
         ]);
+        $service = $tenant->services()->create([
+            'name' => ['de' => 'Terminservice'],
+            'duration_minutes' => 60,
+        ]);
+        $appointment = $tenant->appointments()->create([
+            'service_id' => $service->id,
+            'number' => 'A-DELETE-1',
+            'starts_at' => now()->addDay(),
+            'ends_at' => now()->addDay()->addHour(),
+        ]);
         Storage::disk('public')->put("tenant-social/{$tenant->id}/share.webp", 'image');
         Storage::disk('public')->put("tenant-app/{$tenant->id}/requests/1/photo.webp", 'image');
 
@@ -60,6 +70,8 @@ class AdminTenantManagementTest extends TestCase
             ->assertJsonPath('deleted', true);
 
         $this->assertDatabaseMissing('tenants', ['id' => $tenant->id]);
+        $this->assertDatabaseMissing('tenant_appointments', ['id' => $appointment->id]);
+        $this->assertDatabaseMissing('tenant_services', ['id' => $service->id]);
         $this->assertDatabaseMissing('users', ['id' => $owner->id]);
         $this->assertDatabaseHas('audit_logs', ['action' => 'tenant.deleted']);
         Storage::disk('public')->assertMissing("tenant-social/{$tenant->id}");
