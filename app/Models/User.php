@@ -13,7 +13,7 @@ class User extends Authenticatable
 
     protected $guarded = [];
 
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = ['password', 'remember_token', 'pending_email_token'];
 
     protected function casts(): array
     {

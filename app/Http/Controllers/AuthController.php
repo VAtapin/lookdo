@@ -10,16 +10,20 @@ use App\Models\RequestTemplate;
 use App\Models\SystemSetting;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Notifications\ConfirmAccountEmailChange;
 use App\Services\AuditService;
 use App\Services\BusinessClassifier;
 use App\Services\StripeService;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password as PasswordRule;
@@ -198,14 +202,33 @@ class AuthController extends Controller
         ]);
         $before = $user->only(['name', 'email']);
         $user->name = $data['name'];
-        $user->email = $data['email'];
+        $emailChanged = mb_strtolower($data['email']) !== mb_strtolower($user->email);
+        if ($emailChanged) {
+            $token = Str::random(48);
+            $user->pending_email = mb_strtolower($data['email']);
+            $user->pending_email_token = hash('sha256', $token);
+        }
         if (! empty($data['password'])) {
             $user->password = $data['password'];
         }
         $user->save();
+        if ($emailChanged) {
+            $url = URL::temporarySignedRoute('account.email-change.confirm', now()->addHour(), ['user' => $user->id, 'token' => $token]);
+            Notification::route('mail', $user->pending_email)->notify(new ConfirmAccountEmailChange($url));
+        }
         $audit->log('account.updated', $user, $before, $user->only(['name', 'email']), $user->tenants()->value('tenants.id'));
 
-        return response()->json(['user' => $user->fresh()]);
+        return response()->json(['user' => $user->fresh(), 'email_pending' => $emailChanged]);
+    }
+
+    public function confirmEmailChange(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($request->hasValidSignature() && filled($user->pending_email), 403);
+        abort_unless(hash_equals((string) $user->pending_email_token, hash('sha256', (string) $request->query('token'))), 403);
+        abort_if(User::where('email', $user->pending_email)->whereKeyNot($user->id)->exists(), 422, 'EMAIL_ALREADY_USED');
+        $user->forceFill(['email' => $user->pending_email, 'pending_email' => null, 'pending_email_token' => null, 'email_verified_at' => now()])->save();
+
+        return redirect('/app/account?email=verified');
     }
 
     private function uniqueSlug(string $value): string

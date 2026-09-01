@@ -17,10 +17,12 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class TenantController extends Controller
@@ -81,14 +83,14 @@ class TenantController extends Controller
     public function updateProfile(Request $request, Tenant $tenant, AuditService $audit, EntitlementService $entitlements): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
-        $data = $request->validate(['name' => 'required|string|max:160', 'locale' => ['nullable', Rule::in(['de', 'en', 'ru', 'uk'])], 'enabled_locales' => 'nullable|array|min:1|max:4', 'enabled_locales.*' => [Rule::in(['de', 'en', 'ru', 'uk'])], 'contact_name' => 'nullable|string|max:120', 'email' => 'nullable|email|max:255', 'phone' => 'nullable|string|max:50', 'street' => 'nullable|string|max:160', 'postal_code' => 'nullable|string|max:30', 'city' => 'nullable|string|max:100', 'primary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'secondary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'notification_preferences' => 'nullable|array', 'notification_preferences.push' => 'nullable|boolean', 'notification_preferences.sms' => 'nullable|boolean', 'notification_preferences.email' => 'nullable|boolean']);
+        $data = $request->validate(['name' => 'required|string|max:160', 'country' => 'nullable|string|size:2', 'timezone' => 'nullable|timezone', 'locale' => ['nullable', Rule::in(['de', 'en', 'ru', 'uk'])], 'enabled_locales' => 'nullable|array|min:1|max:4', 'enabled_locales.*' => [Rule::in(['de', 'en', 'ru', 'uk'])], 'contact_name' => 'nullable|string|max:120', 'email' => 'nullable|email|max:255', 'phone' => 'nullable|string|max:50', 'street' => 'nullable|string|max:160', 'postal_code' => 'nullable|string|max:30', 'city' => 'nullable|string|max:100', 'primary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'secondary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'notification_preferences' => 'nullable|array', 'notification_preferences.push' => 'nullable|boolean', 'notification_preferences.sms' => 'nullable|boolean', 'notification_preferences.email' => 'nullable|boolean']);
         $before = $tenant->load('profile')->toArray();
         $locale = $data['locale'] ?? $tenant->locale;
         if (isset($data['enabled_locales']) && ! in_array($locale, $data['enabled_locales'], true)) {
             $data['enabled_locales'][] = $locale;
         }
-        $tenant->update(['name' => $data['name'], 'locale' => $locale]);
-        unset($data['name'], $data['locale']);
+        $tenant->update(['name' => $data['name'], 'locale' => $locale, 'country' => strtoupper($data['country'] ?? $tenant->country), 'timezone' => $data['timezone'] ?? $tenant->timezone]);
+        unset($data['name'], $data['locale'], $data['country'], $data['timezone']);
         $profile = $tenant->profile()->firstOrNew();
         if (array_key_exists('enabled_locales', $data)) {
             $content = (array) ($data['content'] ?? $profile->content);
@@ -513,5 +515,72 @@ class TenantController extends Controller
         }
 
         return response()->json(['checkout_url' => $url]);
+    }
+
+    public function billingPortal(Request $request, Tenant $tenant, StripeService $stripe): JsonResponse
+    {
+        $this->authorizeTenant($request, $tenant);
+        $subscription = $tenant->subscriptions()->whereNotNull('provider_customer_id')->latest()->first();
+        abort_unless($subscription?->provider_customer_id, 422, 'STRIPE_CUSTOMER_NOT_AVAILABLE');
+
+        try {
+            $url = $stripe->billingPortal(
+                $subscription->provider_customer_id,
+                rtrim(config('app.url'), '/').'/app/billing'
+            );
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json(['url' => $url]);
+    }
+
+    public function exportData(Request $request, Tenant $tenant): StreamedResponse
+    {
+        $this->authorizeTenant($request, $tenant);
+        $tenant->load([
+            'profile', 'domains', 'businessProfile', 'subscriptions.plan', 'subscriptions.payments',
+            'users', 'customers', 'appRequests.media', 'appRequests.values', 'appRequests.messages',
+            'appointments', 'services', 'portfolioItems', 'reviews', 'socialDrafts', 'segments',
+        ]);
+        $filename = 'lookdo-'.$tenant->slug.'-'.now()->format('Y-m-d').'.json';
+
+        return response()->streamDownload(function () use ($tenant): void {
+            echo json_encode(['exported_at' => now()->toIso8601String(), 'tenant' => $tenant->toArray()], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }, $filename, ['Content-Type' => 'application/json; charset=UTF-8']);
+    }
+
+    public function destroyOwnAccount(Request $request, Tenant $tenant, StripeService $stripe, DomainService $domains): JsonResponse
+    {
+        $this->authorizeTenant($request, $tenant);
+        $member = $tenant->users()->whereKey($request->user()->id)->firstOrFail();
+        abort_unless($member->pivot->role === 'owner', 403, 'OWNER_REQUIRED');
+        $data = $request->validate(['password' => 'required|string', 'confirmation' => 'required|string']);
+        abort_unless(Hash::check($data['password'], $request->user()->password), 422, 'INVALID_PASSWORD');
+        abort_unless($data['confirmation'] === $tenant->name, 422, 'CONFIRMATION_DOES_NOT_MATCH');
+
+        foreach ($tenant->subscriptions()->whereNotNull('provider_subscription_id')->get() as $subscription) {
+            $stripe->cancelSubscription($subscription->provider_subscription_id);
+        }
+        foreach ($tenant->domains()->where('type', 'custom')->get() as $domain) {
+            $domains->remove($domain);
+        }
+        $user = $request->user();
+        $tenantId = $tenant->id;
+        DB::transaction(function () use ($tenant): void {
+            $tenant->update(['primary_domain_id' => null]);
+            $tenant->delete();
+        });
+        foreach (["tenant-app/$tenantId", "tenant-social/$tenantId", "tenant-branding/$tenantId", "tenant-services/$tenantId"] as $directory) {
+            Storage::disk('public')->deleteDirectory($directory);
+        }
+        if (! $user->is_super_admin && ! $user->tenants()->exists()) {
+            auth()->logout();
+            $user->delete();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
+
+        return response()->json(['deleted' => true]);
     }
 }

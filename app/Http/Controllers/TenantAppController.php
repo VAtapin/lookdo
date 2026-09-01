@@ -14,16 +14,20 @@ use App\Models\TenantRequestValue;
 use App\Models\TenantService;
 use App\Services\EntitlementService;
 use App\Services\ImageStorageService;
+use App\Services\SmsService;
 use App\Services\TenantCalendarService;
 use Carbon\CarbonImmutable;
+use DomainException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class TenantAppController extends Controller
 {
@@ -349,18 +353,33 @@ class TenantAppController extends Controller
 
     private function notifyMaster(Tenant $tenant, string $event, string $url, string $tag): void
     {
-        if (! $this->enabled($tenant, 'push_enabled', true)) {
-            return;
-        }
-
+        $tenant->loadMissing(['profile', 'users']);
+        $preferences = (array) data_get($tenant->profile?->content, 'notifications', []);
         $locale = in_array($tenant->locale, ['de', 'en', 'ru', 'uk'], true) ? $tenant->locale : 'de';
-        SendTenantMasterPush::dispatch($tenant->id, [
-            'title' => trans("tenant_app.master_push.$event.title", locale: $locale),
-            'body' => trans("tenant_app.master_push.$event.body", locale: $locale),
-            'url' => $url,
-            'tag' => "lookdo-master-$tag",
-            'action' => trans('tenant_app.master_push.open', locale: $locale),
-        ])->afterResponse();
+        $title = trans("tenant_app.master_push.$event.title", locale: $locale);
+        $body = trans("tenant_app.master_push.$event.body", locale: $locale);
+        if (($preferences['push'] ?? true) && $this->enabled($tenant, 'push_enabled', true)) {
+            SendTenantMasterPush::dispatch($tenant->id, [
+                'title' => $title, 'body' => $body, 'url' => $url, 'tag' => "lookdo-master-$tag",
+                'action' => trans('tenant_app.master_push.open', locale: $locale),
+            ])->afterResponse();
+        }
+        if ($preferences['email'] ?? false) {
+            foreach ($tenant->users->where('is_active', true)->pluck('email')->filter()->unique() as $email) {
+                try {
+                    Mail::raw($title."\n\n".$body."\n\n".rtrim(config('app.url'), '/').$url, fn ($mail) => $mail->to($email)->subject($title));
+                } catch (Throwable $exception) {
+                    report($exception);
+                }
+            }
+        }
+        if (($preferences['sms'] ?? false) && $event === 'new_request' && filled($tenant->profile?->phone)) {
+            try {
+                app(SmsService::class)->queueImportant($tenant, $tenant->profile->phone, $title.': '.$body, 'request_received', 'master-'.$tag);
+            } catch (DomainException $exception) {
+                report($exception);
+            }
+        }
     }
 
     private function tenant(Request $request): Tenant
@@ -559,7 +578,7 @@ class TenantAppController extends Controller
     private function availableSlots(Tenant $tenant, TenantService $service, string $date): array
     {
         $booking = (array) data_get($this->configuration($tenant), 'booking', []);
-        $timezone = $booking['timezone'] ?? 'Europe/Berlin';
+        $timezone = $tenant->timezone ?: ($booking['timezone'] ?? 'Europe/Berlin');
         $day = CarbonImmutable::parse($date, $timezone);
         if (! in_array($day->dayOfWeekIso, $booking['days'] ?? [1, 2, 3, 4, 5], true)) {
             return [];

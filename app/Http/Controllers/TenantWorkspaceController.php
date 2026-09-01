@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class TenantWorkspaceController extends Controller
 {
@@ -27,7 +28,7 @@ class TenantWorkspaceController extends Controller
     {
         $this->authorizeWorkspace($request, $tenant);
         $calendar->ensureWorkingHours($tenant);
-        $today = now('Europe/Berlin')->startOfDay();
+        $today = now($tenant->timezone ?: 'Europe/Berlin')->startOfDay();
         $tomorrow = $today->copy()->addDay();
         $appointments = $tenant->appointments()->with(['customer', 'service'])->whereBetween('starts_at', [$today, $tomorrow])->orderBy('starts_at')->get();
         $requests = $tenant->appRequests()->with(['customer', 'media'])->where('created_at', '>=', $today)->latest()->get();
@@ -290,6 +291,35 @@ class TenantWorkspaceController extends Controller
         $tenant->users()->detach($user->id);
 
         return response()->json(['deleted' => true]);
+    }
+
+    public function updateTeamMember(Request $request, Tenant $tenant, User $user): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($this->canManageTeam($request, $tenant), 403, 'OWNER_REQUIRED');
+        $member = $tenant->users()->whereKey($user->id)->firstOrFail();
+        abort_if($member->pivot->role === 'owner', 422, 'OWNER_CANNOT_BE_CHANGED');
+        $data = $request->validate([
+            'name' => 'required|string|max:120',
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'role' => 'required|in:staff,manager',
+            'active' => 'required|boolean',
+        ]);
+        $user->update(['name' => $data['name'], 'email' => mb_strtolower($data['email']), 'is_active' => $data['active']]);
+        $tenant->users()->updateExistingPivot($user->id, ['role' => $data['role']]);
+
+        return response()->json(['member' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'active' => $user->is_active, 'role' => $data['role']]]);
+    }
+
+    public function teamMemberSetupLink(Request $request, Tenant $tenant, User $user): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($this->canManageTeam($request, $tenant), 403, 'OWNER_REQUIRED');
+        $member = $tenant->users()->whereKey($user->id)->firstOrFail();
+        abort_if($member->pivot->role === 'owner', 422, 'OWNER_CANNOT_BE_CHANGED');
+        $token = Password::broker()->createToken($user);
+
+        return response()->json(['setup_url' => url('/reset-password/'.$token).'?email='.urlencode($user->email)]);
     }
 
     private function canManageTeam(Request $request, Tenant $tenant): bool

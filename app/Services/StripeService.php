@@ -59,6 +59,27 @@ class StripeService
         return (string) $response->json('url');
     }
 
+    public function billingPortal(string $customerId, string $returnUrl): string
+    {
+        $response = $this->post('/v1/billing_portal/sessions', [
+            'customer' => $customerId,
+            'return_url' => $returnUrl,
+        ]);
+        if (! $response->json('url')) {
+            throw new RuntimeException('Stripe Billing Portal returned no URL.');
+        }
+
+        return (string) $response->json('url');
+    }
+
+    public function cancelSubscription(string $subscriptionId): void
+    {
+        $response = Http::asForm()->withToken((string) config('services.stripe.secret'))->delete('https://api.stripe.com/v1/subscriptions/'.$subscriptionId);
+        if ($response->failed() && $response->status() !== 404) {
+            throw new RuntimeException($response->json('error.message') ?: 'Stripe subscription cancellation failed.');
+        }
+    }
+
     /** @return array{url:string,session_id:string} */
     public function imageCreditCheckout(Tenant $tenant, string $email, ImageCreditPurchase $purchase): array
     {

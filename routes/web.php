@@ -62,6 +62,9 @@ Route::prefix('api')->middleware('locale')->group(function () {
         Route::post('/tenant/{tenant}/domains/{domain}/verify', [TenantController::class, 'verifyDomain']);
         Route::delete('/tenant/{tenant}/domains/{domain}', [TenantController::class, 'removeDomain']);
         Route::post('/tenant/{tenant}/checkout', [TenantController::class, 'checkout']);
+        Route::post('/tenant/{tenant}/billing-portal', [TenantController::class, 'billingPortal']);
+        Route::get('/tenant/{tenant}/export', [TenantController::class, 'exportData']);
+        Route::delete('/tenant/{tenant}/account', [TenantController::class, 'destroyOwnAccount']);
         Route::get('/tenant/{tenant}/workspace', [TenantWorkspaceController::class, 'bootstrap']);
         Route::get('/tenant/{tenant}/workspace/requests', [TenantWorkspaceController::class, 'requests']);
         Route::put('/tenant/{tenant}/workspace/requests/{tenantRequest}', [TenantWorkspaceController::class, 'updateRequest']);
@@ -76,6 +79,8 @@ Route::prefix('api')->middleware('locale')->group(function () {
         Route::delete('/tenant/{tenant}/workspace/push-subscriptions', [TenantWorkspaceController::class, 'unsubscribePush'])->middleware('throttle:10,1');
         Route::get('/tenant/{tenant}/workspace/team', [TenantWorkspaceController::class, 'team']);
         Route::post('/tenant/{tenant}/workspace/team', [TenantWorkspaceController::class, 'addTeamMember']);
+        Route::put('/tenant/{tenant}/workspace/team/{user}', [TenantWorkspaceController::class, 'updateTeamMember']);
+        Route::post('/tenant/{tenant}/workspace/team/{user}/setup-link', [TenantWorkspaceController::class, 'teamMemberSetupLink']);
         Route::delete('/tenant/{tenant}/workspace/team/{user}', [TenantWorkspaceController::class, 'removeTeamMember']);
         Route::get('/tenant/{tenant}/workspace/resources', [TenantOperationsController::class, 'resources']);
         Route::post('/tenant/{tenant}/workspace/resources', [TenantOperationsController::class, 'saveResource']);
@@ -205,4 +210,5 @@ Route::get('/sitemap.xml', function () {
 });
 Route::get('/robots.txt', fn () => response("User-agent: *\nAllow: /\nDisallow: /app\nDisallow: /control\nDisallow: /api\nSitemap: ".rtrim(config('app.url'), '/')."/sitemap.xml\n", 200, ['Content-Type' => 'text/plain']));
 Route::get('/reset-password/{token}', fn () => view('app'))->middleware('locale')->name('password.reset');
+Route::get('/account/email-change/{user}', [AuthController::class, 'confirmEmailChange'])->middleware('signed')->name('account.email-change.confirm');
 Route::view('/{path?}', 'app')->middleware('locale')->where('path', '^(?!api|up|sitemap\\.xml|robots\\.txt).*$');
