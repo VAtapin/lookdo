@@ -5,7 +5,7 @@ return [
         'automotive.steering-wheel-upholstery' => [
             'engine' => 'request',
             'layout' => 'steering',
-            'navigation' => ['home', 'works', 'action', 'activity', 'contacts'],
+            'navigation' => ['home', 'works', 'action', 'activity', 'reviews'],
             'hero' => [
                 'image' => '/brand/steering-wheel-placeholder.svg',
                 'eyebrow' => ['de' => 'LENKRADBEZUG', 'en' => 'STEERING WHEEL UPHOLSTERY', 'ru' => 'ПЕРЕТЯЖКА РУЛЕЙ', 'uk' => 'ПЕРЕТЯЖКА КЕРМА'],

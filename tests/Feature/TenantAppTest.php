@@ -306,7 +306,7 @@ class TenantAppTest extends TestCase
             ->assertOk()
             ->assertJsonPath('tenant.name', 'Перетяжка рулей')
             ->assertJsonPath('tenant.locale', 'ru')
-            ->assertJsonPath('tenant.branding.hero_image', '/brand/tenants/leonid-steering/hero.webp')
+            ->assertJsonPath('tenant.branding.hero_image', '/brand/tenants/leonid-steering/hero-v2.png')
             ->assertJsonPath('tenant.branding.service_modes.0', 'workshop')
             ->assertJsonPath('tenant.branding.service_modes.1', 'on_site')
             ->assertJsonPath('template.code', 'automotive.steering-wheel-upholstery')

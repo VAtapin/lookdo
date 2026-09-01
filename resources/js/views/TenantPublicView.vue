@@ -124,7 +124,7 @@ const navItems = computed(() => [
                   label: copy.value.book,
                   central: true,
               },
-              { key: "contacts", icon: "phone", label: copy.value.contacts },
+              { key: "reviews", icon: "star", label: copy.value.reviews },
           ]
         : [
               { key: "home", icon: "home", label: copy.value.home },
