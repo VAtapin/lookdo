@@ -184,6 +184,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
 });
 
 Route::get('/manifest.webmanifest', [PlatformController::class, 'manifest']);
+Route::get('/tenant-icon/{size}.png', [PlatformController::class, 'tenantIcon'])->whereIn('size', ['180', '192', '512']);
 Route::get('/sw.js', function () {
     $path = public_path('build/sw.js');
     abort_unless(is_file($path), 404);

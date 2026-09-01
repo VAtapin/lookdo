@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, reactive, ref } from 'vue';
 import { api } from '../api';
 import AppIcon from './AppIcon.vue';
 
@@ -17,8 +17,6 @@ const error=ref('');
 const result=ref<any>(null);
 const notifying=ref(false);
 const notificationStatus=ref('');
-const now=ref(new Date());
-let clock:number|undefined;
 const form=reactive<any>({name:'',phone:'',email:'',summary:'',preferred_channel:'push',fields:{}});
 
 const configuredSlots=computed<any[]>(()=>props.app.template.media_slots||[]);
@@ -95,14 +93,11 @@ function finishSuccess(){
   }
   emit('close');
 }
-onMounted(()=>{clock=window.setInterval(()=>now.value=new Date(),30000);});
-onBeforeUnmount(()=>{if(clock)window.clearInterval(clock);files.value.forEach(item=>URL.revokeObjectURL(item.url));});
+onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));});
 </script>
 
 <template>
   <section class="ta-flow ta-dark-flow">
-    <div class="ta-statusbar"><b>{{now.toLocaleTimeString(locale,{hour:'2-digit',minute:'2-digit'})}}</b><span class="ta-device-icons"><i class="signal"></i><i class="wifi"></i><i class="battery"></i></span></div>
-
     <template v-if="stage==='capture'">
       <header class="ta-flow-title">
         <button class="ta-back" @click="back"><AppIcon name="back"/><span>{{copy.back}}</span></button>

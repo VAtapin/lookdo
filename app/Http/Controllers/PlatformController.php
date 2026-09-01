@@ -11,7 +11,9 @@ use App\Services\PlanFeaturePresenter;
 use App\Support\LegalContentSanitizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\Response;
 
 class PlatformController extends Controller
 {
@@ -29,16 +31,52 @@ class PlatformController extends Controller
         $name = $tenant?->name ?: 'LOOKDO';
         $theme = $tenant?->profile?->primary_color ?: '#ff6a00';
         $background = $tenant?->profile?->secondary_color ?: '#111318';
+        $iconVersion = $tenant?->profile?->updated_at?->timestamp ?: 1;
 
         return response()->json([
             'id' => '/', 'name' => $name, 'short_name' => Str::limit($name, 18, ''), 'description' => $tenant?->business_description ?: 'LOOKDO',
             'start_url' => '/', 'scope' => '/', 'display' => 'standalone', 'display_override' => ['window-controls-overlay', 'standalone'],
             'orientation' => 'portrait-primary', 'background_color' => $background, 'theme_color' => $theme,
             'icons' => [
-                ['src' => '/icons/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any maskable'],
-                ['src' => '/icons/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any maskable'],
+                ['src' => "/tenant-icon/192.png?v=$iconVersion", 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any'],
+                ['src' => "/tenant-icon/512.png?v=$iconVersion", 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any'],
+                ['src' => "/tenant-icon/512.png?v=$iconVersion", 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'maskable'],
             ],
-        ])->header('Content-Type', 'application/manifest+json');
+        ])->header('Content-Type', 'application/manifest+json')->header('Cache-Control', 'no-cache, must-revalidate');
+    }
+
+    public function tenantIcon(Request $request, int $size): Response
+    {
+        abort_unless(in_array($size, [180, 192, 512], true), 404);
+        $tenant = $request->attributes->get('tenant');
+        $tenant?->loadMissing('profile');
+        $path = $tenant?->profile?->logo_path;
+        if (! $path || ! Storage::disk('public')->exists($path) || ! function_exists('imagecreatefromstring')) {
+            return redirect('/icons/icon-'.($size === 180 ? 192 : $size).'.png');
+        }
+        $source = @imagecreatefromstring(Storage::disk('public')->get($path));
+        if (! $source) {
+            return redirect('/icons/icon-'.($size === 180 ? 192 : $size).'.png');
+        }
+        $canvas = imagecreatetruecolor($size, $size);
+        $hex = ltrim((string) ($tenant->profile?->secondary_color ?: '#111318'), '#');
+        $background = imagecolorallocate($canvas, hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2)));
+        imagefill($canvas, 0, 0, $background);
+        $sourceWidth = imagesx($source);
+        $sourceHeight = imagesy($source);
+        $target = (int) round($size * .82);
+        $scale = min($target / $sourceWidth, $target / $sourceHeight);
+        $width = max(1, (int) round($sourceWidth * $scale));
+        $height = max(1, (int) round($sourceHeight * $scale));
+        imagealphablending($canvas, true);
+        imagecopyresampled($canvas, $source, (int) (($size - $width) / 2), (int) (($size - $height) / 2), 0, 0, $width, $height, $sourceWidth, $sourceHeight);
+        ob_start();
+        imagepng($canvas, null, 9);
+        $png = (string) ob_get_clean();
+        imagedestroy($source);
+        imagedestroy($canvas);
+
+        return response($png, 200, ['Content-Type' => 'image/png', 'Cache-Control' => 'public, max-age=86400']);
     }
 
     public function page(string $key): JsonResponse

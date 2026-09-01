@@ -46,8 +46,6 @@ const loginPassword = ref("");
 const loginRemember = ref(true);
 const loginBusy = ref(false);
 const loginError = ref("");
-const now = ref(new Date());
-let clock: number | undefined;
 const tokenKey = "lookdo-client:" + location.hostname;
 const clientToken = ref(localStorage.getItem(tokenKey) || "");
 const localeKey = "lookdo-client-locale:" + location.hostname;
@@ -437,18 +435,15 @@ watch(screen, async (value) => {
     if (value === "activity") await loadActivity();
 });
 onMounted(() => {
-    clock = window.setInterval(() => (now.value = new Date()), 30000);
     window.addEventListener("keydown", handleKeydown);
     load();
 });
 onBeforeUnmount(() => {
-    if (clock) window.clearInterval(clock);
     window.removeEventListener("keydown", handleKeydown);
 });
 const loginContext = {
     app,
     copy,
-    now,
     locale,
     contactName,
     loginEmail,
@@ -511,18 +506,6 @@ const loginContext = {
                     @home="go('home')"
                 />
                 <template v-else>
-                    <div class="ta-statusbar">
-                        <b>{{
-                            now.toLocaleTimeString(locale, {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                            })
-                        }}</b
-                        ><span class="ta-device-icons"
-                            ><i class="signal"></i><i class="wifi"></i
-                            ><i class="battery"></i
-                        ></span>
-                    </div>
                     <div class="ta-scroll-area">
                         <section
                             v-if="screen === 'home' && isBrows"

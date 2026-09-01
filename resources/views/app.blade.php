@@ -65,6 +65,7 @@
             : $socialOrigin.'/'.ltrim((string) $socialImageValue, '/');
         $socialUrl = request()->url();
         $socialLocale = ['de' => 'de_DE', 'en' => 'en_GB', 'ru' => 'ru_RU', 'uk' => 'uk_UA'][$socialLocaleCode] ?? 'de_DE';
+        $tenantIconVersion = $socialProfile?->updated_at?->timestamp ?: 1;
     @endphp
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -99,9 +100,9 @@
     <link rel="alternate" hreflang="ru" href="{{ rtrim(config('app.url'), '/') }}/ru">
     <link rel="alternate" hreflang="uk" href="{{ rtrim(config('app.url'), '/') }}/uk">
     <link rel="alternate" hreflang="x-default" href="{{ rtrim(config('app.url'), '/') }}/de">
-    <link rel="icon" href="/favicon.png" type="image/png">
+    <link rel="icon" href="/tenant-icon/192.png?v={{ $tenantIconVersion }}" type="image/png">
     <link rel="manifest" href="/manifest.webmanifest">
-    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/tenant-icon/180.png?v={{ $tenantIconVersion }}">
     <title>{{ $socialTitle }}</title>
     <script type="application/ld+json">{!! json_encode([
         chr(64).'context' => 'https://schema.org',

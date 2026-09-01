@@ -6,8 +6,6 @@ defineEmits<{ home: [] }>();
 const {
     app,
     copy,
-    now,
-    locale,
     contactName,
     loginEmail,
     loginPassword,
@@ -20,18 +18,6 @@ const {
 
 <template>
     <section class="ta-login-screen">
-        <div class="ta-statusbar">
-            <b>{{
-                now.toLocaleTimeString(locale, {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                })
-            }}</b>
-            <span class="ta-device-icons">
-                <i class="signal"></i><i class="wifi"></i
-                ><i class="battery"></i>
-            </span>
-        </div>
         <button class="ta-login-back" @click="$emit('home')">
             <AppIcon name="back" />{{ copy.back }}
         </button>
