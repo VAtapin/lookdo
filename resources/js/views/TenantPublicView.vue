@@ -126,6 +126,7 @@ const portfolioLabels = computed(() => ({
     favorites: { de: "Favoriten", en: "Favorites", ru: "Избранное", uk: "Обране" }[locale.value],
     filters: { de: "Filter", en: "Filters", ru: "Фильтры", uk: "Фільтри" }[locale.value],
     close: { de: "Schließen", en: "Close", ru: "Закрыть", uk: "Закрити" }[locale.value],
+    lightboxHint: { de: "Außerhalb des Bildes oder auf × tippen, um zu schließen", en: "Tap outside the image or × to close", ru: "Нажмите вне фотографии или на ×, чтобы закрыть", uk: "Натисніть поза фотографією або на ×, щоб закрити" }[locale.value],
 }));
 const navItems = computed(() => [
     ...(isBrows.value
@@ -182,6 +183,9 @@ function selectWorkFilter(value: typeof workFilter.value) {
 }
 function openLightbox(src: string, alt: string) {
     lightbox.value = { src, alt };
+}
+function handleKeydown(event: KeyboardEvent) {
+    if (event.key === "Escape") lightbox.value = null;
 }
 
 function tenantLocale(value: unknown): TenantLocale | null {
@@ -429,10 +433,12 @@ watch(screen, async (value) => {
 });
 onMounted(() => {
     clock = window.setInterval(() => (now.value = new Date()), 30000);
+    window.addEventListener("keydown", handleKeydown);
     load();
 });
 onBeforeUnmount(() => {
     if (clock) window.clearInterval(clock);
+    window.removeEventListener("keydown", handleKeydown);
 });
 const loginContext = {
     app,
@@ -993,7 +999,13 @@ const loginContext = {
                             @click.self="lightbox = null"
                         >
                             <button :aria-label="portfolioLabels.close" @click="lightbox = null"><AppIcon name="close" /></button>
-                            <img :src="lightbox.src" :alt="lightbox.alt" />
+                            <figure>
+                                <img :src="lightbox.src" :alt="lightbox.alt" />
+                                <figcaption>
+                                    <strong>{{ lightbox.alt }}</strong>
+                                    <span>{{ portfolioLabels.lightboxHint }}</span>
+                                </figcaption>
+                            </figure>
                         </div>
 
                         <TenantActivity
