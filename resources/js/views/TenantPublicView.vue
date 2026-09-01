@@ -34,7 +34,9 @@ const menuOpen = ref(false);
 const pushPrompt = ref(false);
 const pushBusy = ref(false);
 const pushStatus = ref("");
-const workFilter = ref<"all" | "featured">("all");
+const workFilter = ref<"all" | "before_after" | "finished" | "favorites">("all");
+const workFilterOpen = ref(false);
+const lightbox = ref<{ src: string; alt: string } | null>(null);
 const reviewOpen = ref(false);
 const reviewBusy = ref(false);
 const reviewNotice = ref("");
@@ -49,6 +51,8 @@ let clock: number | undefined;
 const tokenKey = "lookdo-client:" + location.hostname;
 const clientToken = ref(localStorage.getItem(tokenKey) || "");
 const localeKey = "lookdo-client-locale:" + location.hostname;
+const favoriteKey = "lookdo-portfolio-favorites:" + location.hostname;
+const favoriteIds = ref<string[]>(loadFavoriteIds());
 const savedLocale = localStorage.getItem(localeKey);
 const hasSelectedLocale = ref(
     ["de", "en", "ru", "uk"].includes(savedLocale || ""),
@@ -109,10 +113,20 @@ const averageRating = computed(() => {
 });
 const filteredPortfolio = computed(() => {
     const rows = app.value?.portfolio || [];
-    return workFilter.value === "featured"
-        ? rows.filter((item: any) => item.featured)
-        : rows;
+    if (workFilter.value === "before_after")
+        return rows.filter((item: any) => item.before_image && item.after_image);
+    if (workFilter.value === "finished")
+        return rows.filter((item: any) => !(item.before_image && item.after_image));
+    if (workFilter.value === "favorites")
+        return rows.filter((item: any) => favoriteIds.value.includes(String(item.id)));
+    return rows;
 });
+const portfolioLabels = computed(() => ({
+    finished: { de: "Fertige Arbeiten", en: "Finished work", ru: "Готовые работы", uk: "Готові роботи" }[locale.value],
+    favorites: { de: "Favoriten", en: "Favorites", ru: "Избранное", uk: "Обране" }[locale.value],
+    filters: { de: "Filter", en: "Filters", ru: "Фильтры", uk: "Фільтри" }[locale.value],
+    close: { de: "Schließen", en: "Close", ru: "Закрыть", uk: "Закрити" }[locale.value],
+}));
 const navItems = computed(() => [
     ...(isBrows.value
         ? [
@@ -136,13 +150,39 @@ const navItems = computed(() => [
                   central: true,
               },
               { key: "activity", icon: "message", label: copy.value.activity },
-              { key: "contacts", icon: "phone", label: copy.value.contacts },
+              { key: "reviews", icon: "star", label: copy.value.reviews },
           ]),
 ]);
 const contactName = computed(
     () => app.value?.tenant?.contact?.name || app.value?.tenant?.name,
 );
 const rescheduleAppointment = ref<any>(null);
+
+function loadFavoriteIds(): string[] {
+    try {
+        const value = JSON.parse(localStorage.getItem(favoriteKey) || "[]");
+        return Array.isArray(value) ? value.map(String) : [];
+    } catch {
+        return [];
+    }
+}
+function isFavorite(id: unknown) {
+    return favoriteIds.value.includes(String(id));
+}
+function toggleFavorite(id: unknown) {
+    const value = String(id);
+    favoriteIds.value = isFavorite(value)
+        ? favoriteIds.value.filter((item) => item !== value)
+        : [...favoriteIds.value, value];
+    localStorage.setItem(favoriteKey, JSON.stringify(favoriteIds.value));
+}
+function selectWorkFilter(value: typeof workFilter.value) {
+    workFilter.value = value;
+    workFilterOpen.value = false;
+}
+function openLightbox(src: string, alt: string) {
+    lightbox.value = { src, alt };
+}
 
 function tenantLocale(value: unknown): TenantLocale | null {
     return typeof value === "string" && ["de", "en", "ru", "uk"].includes(value)
@@ -876,17 +916,28 @@ const loginContext = {
                             <div class="ta-filter-row">
                                 <button
                                     :class="{ active: workFilter === 'all' }"
-                                    @click="workFilter = 'all'"
+                                    @click="selectWorkFilter('all')"
                                 >
                                     {{ copy.all }}</button
                                 ><button
                                     :class="{
-                                        active: workFilter === 'featured',
+                                        active: workFilter === 'before_after',
                                     }"
-                                    @click="workFilter = 'featured'"
+                                    @click="selectWorkFilter('before_after')"
                                 >
                                     {{ copy.featured }}</button
-                                ><button><AppIcon name="menu" /></button>
+                                ><div class="ta-work-filter-menu">
+                                    <button
+                                        :class="{ active: workFilter === 'finished' || workFilter === 'favorites' }"
+                                        :aria-label="portfolioLabels.filters"
+                                        :aria-expanded="workFilterOpen"
+                                        @click="workFilterOpen = !workFilterOpen"
+                                    ><AppIcon name="menu" /></button>
+                                    <div v-if="workFilterOpen" class="ta-work-filter-popover">
+                                        <button :class="{active:workFilter==='finished'}" @click="selectWorkFilter('finished')">{{ portfolioLabels.finished }}</button>
+                                        <button :class="{active:workFilter==='favorites'}" @click="selectWorkFilter('favorites')"><AppIcon name="heart" :size="18" />{{ portfolioLabels.favorites }}</button>
+                                    </div>
+                                </div>
                             </div>
                             <div
                                 v-if="filteredPortfolio.length"
@@ -906,19 +957,20 @@ const loginContext = {
                                         :before-label="copy.before"
                                         :after-label="copy.after"
                                         :alt="item.title"
-                                    /><img
+                                        @open="openLightbox($event.src, $event.alt)"
+                                    /><button
                                         v-else
-                                        :src="
-                                            item.image ||
-                                            item.after_image ||
-                                            item.before_image
-                                        "
-                                        :alt="item.title"
-                                    />
+                                        class="ta-portfolio-image-button"
+                                        @click="openLightbox(item.image || item.after_image || item.before_image, item.title)"
+                                    ><img :src="item.image || item.after_image || item.before_image" :alt="item.title" /></button>
                                     <div>
                                         <header>
                                             <h2>{{ item.title }}</h2>
-                                            <button>
+                                            <button
+                                                :class="{ favorite: isFavorite(item.id) }"
+                                                :aria-pressed="isFavorite(item.id)"
+                                                @click="toggleFavorite(item.id)"
+                                            >
                                                 <AppIcon name="heart" />
                                             </button>
                                         </header>
@@ -931,6 +983,18 @@ const loginContext = {
                                 <h2>{{ copy.noActivity }}</h2>
                             </div>
                         </section>
+
+                        <div
+                            v-if="lightbox"
+                            class="ta-image-lightbox"
+                            role="dialog"
+                            aria-modal="true"
+                            :aria-label="lightbox.alt"
+                            @click.self="lightbox = null"
+                        >
+                            <button :aria-label="portfolioLabels.close" @click="lightbox = null"><AppIcon name="close" /></button>
+                            <img :src="lightbox.src" :alt="lightbox.alt" />
+                        </div>
 
                         <TenantActivity
                             v-else-if="screen === 'activity'"
