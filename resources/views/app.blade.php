@@ -7,14 +7,28 @@
             $socialTenant->loadMissing('profile');
         }
         $socialLocaleCode = app()->getLocale();
-        $socialTitle = $socialTenant ? $socialTenant->name.' — LOOKDO' : 'LOOKDO — LOOK. DO.';
+        $socialProfile = $socialTenant?->profile;
+        $socialBranding = (array) data_get($socialProfile?->content, 'branding', []);
+        $localizedSocialValue = static function (mixed $value, string $locale): ?string {
+            if (is_string($value)) {
+                return filled($value) ? $value : null;
+            }
+            if (! is_array($value)) {
+                return null;
+            }
+
+            return $value[$locale] ?? $value['de'] ?? $value['en'] ?? $value['ru'] ?? reset($value) ?: null;
+        };
+        $socialTitle = $socialTenant ? $socialTenant->name : 'LOOKDO — LOOK. DO.';
         $platformDescriptions = [
             'de' => 'Der Helfer für Handwerker, die selbstständig arbeiten. Kunden senden Fotos oder Videos und Sie antworten direkt.',
             'en' => 'The helper for tradespeople who work on their own. Customers send photos or videos and you reply right away.',
             'ru' => 'Помощник для мастера, который работает сам на себя. Клиенты отправляют фото или видео, а вы сразу отвечаете.',
             'uk' => 'Помічник для майстра, який працює сам на себе. Клієнти надсилають фото або відео, а ви одразу відповідаєте.',
         ];
-        $socialDescription = $socialTenant?->business_description ?: ($platformDescriptions[$socialLocaleCode] ?? $platformDescriptions['de']);
+        $socialDescription = $localizedSocialValue($socialBranding['description_translations'] ?? null, $socialLocaleCode)
+            ?: $socialTenant?->business_description
+            ?: ($platformDescriptions[$socialLocaleCode] ?? $platformDescriptions['de']);
         $defaultSocialImages = [
             'de' => '/brand/lookdo-social-de.jpg',
             'en' => '/brand/lookdo-social-en.jpg',
@@ -37,9 +51,14 @@
         if (filled($configuredSocialImage) && ! in_array($configuredSocialImage, $standardWorkspaceImages, true)) {
             $platformSocialImage = $configuredSocialImage;
         }
-        $socialImageValue = $socialTenant?->profile?->social_image_path
-            ? '/storage/'.ltrim($socialTenant->profile->social_image_path, '/')
-            : $platformSocialImage;
+        $tenantSocialImage = $socialProfile?->social_image_path
+            ?: ($socialBranding['horizontal_logo_path'] ?? null)
+            ?: ($socialBranding['hero_image_path'] ?? null)
+            ?: $socialProfile?->logo_path;
+        $socialImageValue = $tenantSocialImage ?: $platformSocialImage;
+        if (filled($socialImageValue) && ! str_starts_with((string) $socialImageValue, 'http') && ! str_starts_with((string) $socialImageValue, '/')) {
+            $socialImageValue = '/storage/'.ltrim((string) $socialImageValue, '/');
+        }
         $socialOrigin = request()->getSchemeAndHttpHost();
         $socialImage = str_starts_with((string) $socialImageValue, 'http')
             ? $socialImageValue
@@ -65,7 +84,7 @@
     <meta property="og:description" content="{{ $socialDescription }}">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ $socialUrl }}">
-    <meta property="og:site_name" content="LOOKDO">
+    <meta property="og:site_name" content="{{ $socialTenant?->name ?: 'LOOKDO' }}">
     <meta property="og:locale" content="{{ $socialLocale }}">
     <meta property="og:image" content="{{ $socialImage }}">
     <meta property="og:image:secure_url" content="{{ $socialImage }}">

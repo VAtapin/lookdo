@@ -996,8 +996,22 @@ class SaasFoundationTest extends TestCase
         $tenant->profile()->create(['social_image_path' => 'tenant-social/'.$tenant->id.'/share.webp', 'social_image_source' => 'upload']);
 
         $this->get('https://golden-wheel.lookdo.app/de')->assertOk()
-            ->assertSee('Golden Wheel — LOOKDO', false)
+            ->assertSee('<meta property="og:title" content="Golden Wheel">', false)
+            ->assertSee('<meta property="og:site_name" content="Golden Wheel">', false)
             ->assertSee('https://golden-wheel.lookdo.app/storage/tenant-social/'.$tenant->id.'/share.webp', false);
+
+        $tenant->profile->update([
+            'social_image_path' => null,
+            'content' => ['branding' => [
+                'horizontal_logo_path' => '/brand/tenants/golden-wheel/wide-logo.webp',
+                'description_translations' => ['de' => 'Handgefertigte Lenkräder aus der eigenen Werkstatt.'],
+            ]],
+        ]);
+
+        $this->get('https://golden-wheel.lookdo.app/de')->assertOk()
+            ->assertSee('https://golden-wheel.lookdo.app/brand/tenants/golden-wheel/wide-logo.webp', false)
+            ->assertSee('Handgefertigte Lenkräder aus der eigenen Werkstatt.', false)
+            ->assertDontSee('lookdo-social-de.jpg', false);
     }
 
     public function test_unpaid_tenant_cannot_use_ai_images_or_add_a_custom_domain(): void

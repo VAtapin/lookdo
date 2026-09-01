@@ -12,8 +12,10 @@ return [
             'profile' => [
                 'primary_color' => '#d9a84e',
                 'secondary_color' => '#07090a',
+                'logo_path' => '/brand/tenants/leonid-steering/avtorul-app-icon.png',
                 'enabled_locales' => ['ru', 'de', 'en', 'uk'],
                 'branding' => [
+                    'horizontal_logo_path' => '/brand/tenants/leonid-steering/avtorul-wide-logo.png',
                     'hero_image_path' => '/brand/tenants/leonid-steering/hero-v2.png',
                     'confirmed_at' => 'preset',
                     'services' => 'Перетяжка автомобильных рулей, восстановление поверхности и швов. Возможны приём в мастерской, самостоятельная доставка или выезд мастера для демонтажа, доставки и последующей установки руля.',
