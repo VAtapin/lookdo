@@ -97,3 +97,6 @@
 .theme-brows .ta-page,.theme-brows .ta-login-screen{padding-top:max(20px,calc(env(safe-area-inset-top) + 12px))}
 .theme-brows .ta-bottom-nav{position:absolute;bottom:0}
 @media(min-width:1500px) and (min-height:800px){.theme-brows .ta-scroll-area{inset:0 0 102px}}
+
+.theme-brows .ta-install-overlay .ta-install-mark,.theme-brows .ta-install-overlay li b{background:var(--ta-brow-primary);color:#fff}.theme-brows .ta-install-overlay li,.theme-brows .ta-install-state{border-color:var(--ta-brow-line);background:#fff;color:var(--ta-brow-ink)}
+@media(max-width:1499px){.theme-brows.tenant-app-viewport{height:auto;min-height:0}.theme-brows .tenant-app-desktop,.theme-brows .tenant-app-shell{position:absolute;inset:0;height:auto;min-height:0}}

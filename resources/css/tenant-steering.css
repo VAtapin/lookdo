@@ -178,3 +178,20 @@
         inset: 0 0 106px;
     }
 }
+
+/* Installation sheet. */
+.ta-install-overlay{z-index:45}
+.ta-install-overlay .ta-install-mark{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;background:linear-gradient(135deg,#efd084,#be8432);color:#08090a}
+.ta-install-overlay>aside>header small{line-height:1.35}
+.ta-install-now{width:100%;margin:22px 0 4px;display:flex;align-items:center;justify-content:center;gap:9px}
+.ta-install-overlay ol{display:grid;gap:10px;margin:20px 0 0;padding:0;list-style:none}
+.ta-install-overlay li{min-height:58px;padding:11px 13px;border:1px solid var(--ta-dark-line);border-radius:13px;background:#151719;display:grid;grid-template-columns:34px 1fr;align-items:center;gap:10px;color:#eee;line-height:1.4}
+.ta-install-overlay li b{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--ta-gold);color:#08090a}
+.ta-install-state{margin:22px 0 0;padding:16px;border:1px solid rgba(224,170,80,.45);border-radius:14px;background:#151719;display:flex;align-items:center;gap:10px;color:var(--ta-gold-soft)}
+.theme-steering .ta-empty-action{width:min(100%,350px);min-height:44px;border-radius:7px;text-transform:uppercase;font-size:13px}
+
+/* In standalone mode the fixed inset, not browser viewport units, owns the screen edges. */
+@media (max-width:1499px) {
+    .theme-steering.tenant-app-viewport{height:auto;min-height:0}
+    .theme-steering .tenant-app-desktop,.theme-steering .tenant-app-shell{position:absolute;inset:0;height:auto;min-height:0}
+}

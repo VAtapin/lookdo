@@ -16,6 +16,7 @@ import TenantBottomNav from "../tenant-app/TenantBottomNav.vue";
 import TenantContactsSheet from "../tenant-app/TenantContactsSheet.vue";
 import TenantDesktopAside from "../tenant-app/TenantDesktopAside.vue";
 import TenantLogin from "../tenant-app/TenantLogin.vue";
+import TenantInstallPrompt from "../tenant-app/TenantInstallPrompt.vue";
 import TenantMenuOverlay from "../tenant-app/TenantMenuOverlay.vue";
 import TenantPushPrompt from "../tenant-app/TenantPushPrompt.vue";
 import TenantReviews from "../tenant-app/TenantReviews.vue";
@@ -31,6 +32,8 @@ const selectedRequest = ref<any>(null);
 const message = ref("");
 const sending = ref(false);
 const menuOpen = ref(false);
+const installOpen = ref(false);
+const installPrompt = ref<any>(null);
 const pushPrompt = ref(false);
 const pushBusy = ref(false);
 const pushStatus = ref("");
@@ -59,6 +62,16 @@ const locale = ref<TenantLocale>(
     (hasSelectedLocale.value ? savedLocale : "de") as TenantLocale,
 );
 const copy = computed(() => appCopy(locale.value));
+const installPlatform = computed<"ios" | "android" | "desktop">(() => {
+    const agent = navigator.userAgent.toLowerCase();
+    if (/iphone|ipad|ipod/.test(agent)) return "ios";
+    if (/android/.test(agent)) return "android";
+    return "desktop";
+});
+const appInstalled = computed(() =>
+    window.matchMedia("(display-mode: standalone)").matches ||
+    Boolean((navigator as any).standalone),
+);
 const screen = computed(() => {
     const parts = route.path
         .split("/")
@@ -175,6 +188,21 @@ function toggleFavorite(id: unknown) {
         : [...favoriteIds.value, value];
     localStorage.setItem(favoriteKey, JSON.stringify(favoriteIds.value));
 }
+function captureInstallPrompt(event: Event) {
+    event.preventDefault();
+    installPrompt.value = event;
+}
+function showInstall() {
+    menuOpen.value = false;
+    installOpen.value = true;
+}
+async function installApp() {
+    if (!installPrompt.value) return;
+    await installPrompt.value.prompt();
+    await installPrompt.value.userChoice;
+    installPrompt.value = null;
+    installOpen.value = false;
+}
 function selectWorkFilter(value: typeof workFilter.value) {
     workFilter.value = value;
     workFilterOpen.value = false;
@@ -183,7 +211,10 @@ function openLightbox(src: string, alt: string) {
     lightbox.value = { src, alt };
 }
 function handleKeydown(event: KeyboardEvent) {
-    if (event.key === "Escape") lightbox.value = null;
+    if (event.key !== "Escape") return;
+    lightbox.value = null;
+    installOpen.value = false;
+    menuOpen.value = false;
 }
 
 function tenantLocale(value: unknown): TenantLocale | null {
@@ -436,10 +467,12 @@ watch(screen, async (value) => {
 });
 onMounted(() => {
     window.addEventListener("keydown", handleKeydown);
+    window.addEventListener("beforeinstallprompt", captureInstallPrompt);
     load();
 });
 onBeforeUnmount(() => {
     window.removeEventListener("keydown", handleKeydown);
+    window.removeEventListener("beforeinstallprompt", captureInstallPrompt);
 });
 const loginContext = {
     app,
@@ -1059,7 +1092,17 @@ const loginContext = {
                         @close="menuOpen = false"
                         @navigate="go"
                         @share="share"
+                        @install="showInstall"
                         @change-locale="changeLocale"
+                    />
+                    <TenantInstallPrompt
+                        v-if="installOpen"
+                        :copy="copy"
+                        :platform="installPlatform"
+                        :can-install="Boolean(installPrompt)"
+                        :installed="appInstalled"
+                        @close="installOpen = false"
+                        @install="installApp"
                     />
                     <TenantPushPrompt
                         v-if="pushPrompt"

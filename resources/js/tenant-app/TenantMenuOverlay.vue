@@ -18,6 +18,7 @@ const emit = defineEmits<{
     close: [];
     navigate: [screen: string];
     share: [];
+    install: [];
     changeLocale: [locale: string];
 }>();
 
@@ -58,6 +59,10 @@ const navigate = (screen: string) => {
                 </button>
                 <button @click="$emit('share')">
                     <AppIcon name="share" />{{ copy.share
+                    }}<AppIcon name="arrow" />
+                </button>
+                <button @click="$emit('install')">
+                    <AppIcon name="install" />{{ copy.install
                     }}<AppIcon name="arrow" />
                 </button>
                 <button @click="navigate('login')">

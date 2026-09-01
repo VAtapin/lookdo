@@ -40,10 +40,10 @@ const emit = defineEmits<{
             <h2>{{ copy.noActivity }}</h2>
             <p>{{ copy.noActivityText }}</p>
             <button
-                class="ta-gold-button"
+                class="ta-gold-button ta-empty-action"
                 @click="$emit('navigate', actionScreen)"
             >
-                {{ app.template.hero.action }}
+                <AppIcon name="camera" />{{ app.template.hero.action }}
             </button>
         </div>
         <template v-else>

@@ -21,6 +21,7 @@ defineProps<{ name: string; size?: number }>();
     <template v-else-if="name==='measure'"><path d="m3 17 14-14 4 4L7 21z"/><path d="m14 6 4 4M11 9l2 2M8 12l2 2M5 15l2 2"/></template>
     <template v-else-if="name==='phone'"><path d="M7 3h4l2 5-3 2a16 16 0 0 0 4 4l2-3 5 2v4c0 2-2 4-4 4A14 14 0 0 1 3 7c0-2 2-4 4-4Z"/></template>
     <template v-else-if="name==='share'"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></template>
+    <template v-else-if="name==='install'"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 19h14"/></template>
     <template v-else-if="name==='check'"><path d="m4 12 5 5L20 6"/></template>
     <template v-else-if="name==='calendar'"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></template>
     <template v-else-if="name==='menu'"><path d="M4 6h16M4 12h16M4 18h16"/></template>
