@@ -162,9 +162,8 @@ async function load() {
     loading.value = true;
     error.value = "";
     try {
-        const headers: any = {
-            "X-Locale": hasSelectedLocale.value ? locale.value : "",
-        };
+        const headers: any = {};
+        if (hasSelectedLocale.value) headers["X-Locale"] = locale.value;
         if (clientToken.value)
             headers["X-Lookdo-Client-Token"] = clientToken.value;
         app.value = await api("/tenant-app/bootstrap", { headers });

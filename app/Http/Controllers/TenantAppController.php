@@ -400,7 +400,8 @@ class TenantAppController extends Controller
 
     private function locale(Request $request, Tenant $tenant): string
     {
-        $locale = strtolower((string) $request->header('X-Locale', $tenant->locale));
+        $requested = trim((string) $request->header('X-Locale', ''));
+        $locale = strtolower($requested !== '' ? $requested : $tenant->locale);
         $allowed = $this->enabledLocales($tenant, $this->configuration($tenant));
 
         return in_array($locale, $allowed, true) ? $locale : ($allowed[0] ?? $tenant->locale);

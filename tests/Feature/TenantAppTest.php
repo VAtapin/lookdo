@@ -116,6 +116,11 @@ class TenantAppTest extends TestCase
     {
         $tenant = $this->tenant('golden-wheel', 'automotive.steering-wheel-upholstery');
 
+        $this->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('tenant.locale', 'ru')
+            ->assertJsonPath('template.hero.action', 'Оценить мой руль');
+
         $this->withHeader('X-Locale', 'ru')->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
             ->assertOk()
             ->assertJsonPath('tenant.name', 'Golden Wheel')
