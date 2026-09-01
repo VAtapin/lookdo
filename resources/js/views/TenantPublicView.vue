@@ -136,6 +136,7 @@ const navItems = computed(() => [
                   central: true,
               },
               { key: "activity", icon: "message", label: copy.value.activity },
+              { key: "contacts", icon: "phone", label: copy.value.contacts },
           ]),
 ]);
 const contactName = computed(
@@ -655,15 +656,17 @@ const loginContext = {
                                 <header class="ta-hero-header">
                                     <button
                                         class="ta-brand"
+                                        :class="{'has-horizontal-logo':app.tenant.branding?.horizontal_logo}"
                                         @click="go('home')"
                                     >
                                         <img
                                             :src="
+                                                app.tenant.branding?.horizontal_logo ||
                                                 app.tenant.logo ||
                                                 '/brand/lookdo-mark.webp'
                                             "
                                             :alt="app.tenant.name"
-                                        /><span>{{ app.tenant.name }}</span>
+                                        /><span v-if="!app.tenant.branding?.horizontal_logo">{{ app.tenant.name }}</span>
                                     </button>
                                     <span class="ta-service-name">{{
                                         app.template.hero.eyebrow

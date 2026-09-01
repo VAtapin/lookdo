@@ -128,7 +128,7 @@ class TenantAppTest extends TestCase
             ->assertJsonPath('template.layout', 'steering')
             ->assertJsonPath('template.hero.action', 'Оценить мой руль')
             ->assertJsonPath('entitlements.video', false)
-            ->assertJsonCount(4, 'template.navigation')
+            ->assertJsonCount(5, 'template.navigation')
             ->assertJsonCount(0, 'portfolio');
 
         $this->assertDatabaseCount('tenant_portfolio_items', 0);

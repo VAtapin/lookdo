@@ -37,6 +37,7 @@ return [
             ],
             'configuration' => [
                 'locales' => ['ru', 'de', 'en', 'uk'],
+                'navigation' => ['home', 'works', 'action', 'activity', 'contacts'],
                 'theme' => ['primary' => '#d9a84e', 'secondary' => '#07090a', 'surface' => '#111315', 'text' => '#f7f4ed'],
                 'hero' => [
                     'image' => '/brand/tenants/leonid-steering/hero.webp',
