@@ -66,11 +66,17 @@
         $socialUrl = request()->url();
         $socialLocale = ['de' => 'de_DE', 'en' => 'en_GB', 'ru' => 'ru_RU', 'uk' => 'uk_UA'][$socialLocaleCode] ?? 'de_DE';
         $tenantIconVersion = ($socialProfile?->updated_at?->timestamp ?: 1).'-'.(@filemtime(app_path('Http/Controllers/PlatformController.php')) ?: 1);
+        $tenantChromeColor = preg_match('/^#[0-9a-f]{6}$/i', (string) $socialProfile?->secondary_color)
+            ? $socialProfile->secondary_color
+            : '#111318';
     @endphp
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="{{ $socialTenant?->profile?->primary_color ?: '#ff6a00' }}">
+    <meta name="theme-color" content="{{ $socialTenant ? $tenantChromeColor : '#ff6a00' }}">
+    @if($socialTenant)
+        <style>html[data-tenant-host="true"],html[data-tenant-host="true"] body,html[data-tenant-host="true"] #app{background:{{ $tenantChromeColor }}!important}</style>
+    @endif
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
