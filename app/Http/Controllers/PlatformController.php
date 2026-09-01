@@ -51,12 +51,34 @@ class PlatformController extends Controller
         $tenant = $request->attributes->get('tenant');
         $tenant?->loadMissing('profile');
         $path = $tenant?->profile?->logo_path;
-        if (! $path || ! Storage::disk('public')->exists($path) || ! function_exists('imagecreatefromstring')) {
-            return redirect('/icons/icon-'.($size === 180 ? 192 : $size).'.png');
+        $contents = null;
+        if ($path && str_starts_with($path, '/')) {
+            $publicPath = public_path(ltrim($path, '/'));
+            $contents = is_file($publicPath) ? file_get_contents($publicPath) : null;
+        } elseif ($path && Storage::disk('public')->exists($path)) {
+            $contents = Storage::disk('public')->get($path);
         }
-        $source = @imagecreatefromstring(Storage::disk('public')->get($path));
+        if (! $contents) {
+            return response()->file(public_path('icons/icon-'.($size === 180 ? 192 : $size).'.png'), [
+                'Cache-Control' => 'public, max-age=86400',
+            ]);
+        }
+        if (! function_exists('imagecreatefromstring')) {
+            $imageInfo = @getimagesizefromstring($contents);
+
+            return response($contents, 200, [
+                'Content-Type' => $imageInfo['mime'] ?? 'image/png',
+                'Cache-Control' => 'public, max-age=86400',
+            ]);
+        }
+        $source = @imagecreatefromstring($contents);
         if (! $source) {
-            return redirect('/icons/icon-'.($size === 180 ? 192 : $size).'.png');
+            $imageInfo = @getimagesizefromstring($contents);
+
+            return response($contents, 200, [
+                'Content-Type' => $imageInfo['mime'] ?? 'image/png',
+                'Cache-Control' => 'public, max-age=86400',
+            ]);
         }
         $canvas = imagecreatetruecolor($size, $size);
         $hex = ltrim((string) ($tenant->profile?->secondary_color ?: '#111318'), '#');
