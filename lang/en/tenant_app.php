@@ -2,6 +2,7 @@
 
 return [
     'review_received' => 'Thank you. Your review will be published after moderation.',
+    'review_requires_completed_request' => 'A review can only be submitted after completed work.',
     'inactive' => 'This application has been disabled by the provider.',
     'subscription_inactive' => 'The trial has ended or the subscription is not active.',
     'requests_disabled' => 'Requests are not included in this plan.',

@@ -120,6 +120,8 @@ export default {
     reviewThanks: "Thank you! Your review is awaiting approval.",
     reviewLoginRequired:
         "You can leave a review after a request or booking from this device.",
+    reviewCompletedRequired:
+        "A review can only be submitted after completed work.",
     menu: "Menu",
     login: "Administrator login",
     welcome: "Welcome",

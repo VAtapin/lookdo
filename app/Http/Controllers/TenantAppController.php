@@ -61,7 +61,11 @@ class TenantAppController extends Controller
                 'video' => $this->enabled($tenant, 'video_enabled', false), 'push' => $this->enabled($tenant, 'push_enabled', true),
             ],
             'push' => ['enabled' => $this->enabled($tenant, 'push_enabled', true) && filled(config('services.webpush.vapid_public_key')), 'public_key' => (string) config('services.webpush.vapid_public_key', '')],
-            'session' => ['known' => (bool) $customer, 'customer' => $customer ? ['name' => $customer->name, 'phone' => $customer->phone, 'locale' => $customer->locale] : null],
+            'session' => [
+                'known' => (bool) $customer,
+                'customer' => $customer ? ['name' => $customer->name, 'phone' => $customer->phone, 'locale' => $customer->locale] : null,
+                'review' => $this->reviewState($tenant, $customer),
+            ],
         ]);
     }
 
@@ -294,26 +298,53 @@ class TenantAppController extends Controller
         $this->ensureAvailable($request, $tenant);
         $customer = $this->requireCustomer($request, $tenant);
         $data = $request->validate([
-            'request_id' => 'nullable|integer',
             'rating' => 'required|integer|between:1,5',
             'body' => 'required|string|max:3000',
             'author_name' => 'nullable|string|max:120',
         ]);
-        $tenantRequest = filled($data['request_id'] ?? null)
-            ? $tenant->appRequests()->where('customer_id', $customer->id)->findOrFail($data['request_id'])
-            : null;
-        $review = $tenant->reviews()->updateOrCreate(
-            ['customer_id' => $customer->id, 'request_id' => $tenantRequest?->id],
-            [
-                'rating' => $data['rating'],
-                'body' => $data['body'],
-                'author_name' => $data['author_name'] ?: $customer->name,
-                'published' => false,
-                'received_at' => now(),
-            ],
-        );
+        $reviewedRequestIds = $tenant->reviews()->where('customer_id', $customer->id)->whereNotNull('request_id')->pluck('request_id');
+        $tenantRequest = $tenant->appRequests()
+            ->where('customer_id', $customer->id)
+            ->where('status', 'completed')
+            ->when($reviewedRequestIds->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $reviewedRequestIds))
+            ->latest('completed_at')
+            ->latest('id')
+            ->first();
+        if (! $tenantRequest) {
+            $this->apiError($request, $tenant, 'TENANT_APP_REVIEW_REQUIRES_COMPLETED_REQUEST', 'tenant_app.review_requires_completed_request', 403);
+        }
+        $review = $tenant->reviews()->create([
+            'customer_id' => $customer->id,
+            'request_id' => $tenantRequest->id,
+            'rating' => $data['rating'],
+            'body' => $data['body'],
+            'author_name' => ($data['author_name'] ?? null) ?: $customer->name,
+            'published' => false,
+            'received_at' => now(),
+        ]);
 
         return response()->json(['review' => $review, 'message' => trans('tenant_app.review_received', locale: $this->locale($request, $tenant))], 201);
+    }
+
+    private function reviewState(Tenant $tenant, ?TenantCustomer $customer): array
+    {
+        if (! $customer) {
+            return ['can_submit' => false, 'submitted' => false, 'request_id' => null];
+        }
+        $reviewedRequestIds = $tenant->reviews()->where('customer_id', $customer->id)->whereNotNull('request_id')->pluck('request_id');
+        $request = $tenant->appRequests()
+            ->where('customer_id', $customer->id)
+            ->where('status', 'completed')
+            ->when($reviewedRequestIds->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $reviewedRequestIds))
+            ->latest('completed_at')
+            ->latest('id')
+            ->first();
+
+        return [
+            'can_submit' => (bool) $request,
+            'submitted' => $reviewedRequestIds->isNotEmpty(),
+            'request_id' => $request?->id,
+        ];
     }
 
     private function notifyMaster(Tenant $tenant, string $event, string $url, string $tag): void

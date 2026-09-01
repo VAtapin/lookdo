@@ -86,13 +86,13 @@ const ratingWidth = (rating: number) =>
         </div>
         <p v-if="notice" class="ta-review-notice">{{ notice }}</p>
         <button
-            v-if="app.session?.known && !open"
+            v-if="app.session?.review?.can_submit && !open"
             class="ta-outline-button"
             @click="$emit('update:open', true)"
         >
             {{ copy.leaveReview }}
         </button>
-        <article v-else-if="app.session?.known" class="ta-review-form">
+        <article v-else-if="app.session?.review?.can_submit" class="ta-review-form">
             <h2>{{ copy.leaveReview }}</h2>
             <label>
                 <span>{{ copy.reviewRating }}</span>
@@ -126,6 +126,11 @@ const ratingWidth = (rating: number) =>
                 </button>
             </div>
         </article>
-        <p v-else class="ta-centered">{{ copy.reviewLoginRequired }}</p>
+        <p v-else-if="app.session?.review?.submitted" class="ta-centered">
+            {{ copy.reviewThanks }}
+        </p>
+        <p v-else-if="app.session?.known" class="ta-centered">
+            {{ copy.reviewCompletedRequired }}
+        </p>
     </section>
 </template>

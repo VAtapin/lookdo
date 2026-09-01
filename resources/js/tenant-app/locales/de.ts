@@ -121,6 +121,8 @@ export default {
     reviewThanks: "Vielen Dank! Die Bewertung wird geprüft.",
     reviewLoginRequired:
         "Eine Bewertung ist nach einer Anfrage oder Buchung auf diesem Gerät möglich.",
+    reviewCompletedRequired:
+        "Eine Bewertung ist erst nach einem abgeschlossenen Auftrag möglich.",
     menu: "Menü",
     login: "Administrator-Anmeldung",
     welcome: "Willkommen",

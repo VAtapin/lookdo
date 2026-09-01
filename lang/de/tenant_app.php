@@ -2,6 +2,7 @@
 
 return [
     'review_received' => 'Vielen Dank. Ihre Bewertung wird nach der Prüfung veröffentlicht.',
+    'review_requires_completed_request' => 'Eine Bewertung ist erst nach einem abgeschlossenen Auftrag möglich.',
     'inactive' => 'Diese Anwendung wurde vom Anbieter deaktiviert.',
     'subscription_inactive' => 'Der Testzeitraum ist abgelaufen oder das Abonnement ist nicht aktiv.',
     'requests_disabled' => 'Anfragen sind in diesem Tarif nicht enthalten.',

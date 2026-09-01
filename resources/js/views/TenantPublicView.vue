@@ -335,6 +335,11 @@ async function submitReview() {
         reviewForm.value = { rating: 5, body: "" };
         reviewNotice.value = result.message || copy.value.reviewThanks;
         reviewOpen.value = false;
+        if (app.value?.session?.review) {
+            app.value.session.review.can_submit = false;
+            app.value.session.review.submitted = true;
+            app.value.session.review.request_id = null;
+        }
     } catch (e: any) {
         reviewNotice.value = e.message;
     } finally {

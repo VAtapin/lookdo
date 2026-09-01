@@ -172,6 +172,53 @@ class TenantAppTest extends TestCase
         $this->assertDatabaseHas('tenant_push_subscriptions', ['tenant_id' => $tenant->id, 'endpoint_hash' => hash('sha256', $endpoint)]);
     }
 
+    public function test_only_customer_with_unreviewed_completed_request_can_submit_review(): void
+    {
+        $tenant = $this->tenant('review-eligibility', 'automotive.steering-wheel-upholstery');
+        $customer = $tenant->customers()->create(['name' => 'Иван', 'phone' => '+4915112345678', 'locale' => 'ru']);
+        $token = 'review-device-token';
+        $customer->tokens()->create([
+            'tenant_id' => $tenant->id,
+            'token_hash' => hash('sha256', $token),
+            'expires_at' => now()->addYear(),
+        ]);
+        $tenantRequest = $tenant->appRequests()->create([
+            'customer_id' => $customer->id,
+            'request_template_id' => $tenant->businessProfile->request_template_id,
+            'number' => 'R-REVIEW-001',
+            'status' => 'in_progress',
+            'summary' => 'Перетяжка руля',
+            'locale' => 'ru',
+        ]);
+        $headers = ['X-Lookdo-Client-Token' => $token, 'X-Locale' => 'ru'];
+
+        $this->withHeaders($headers)->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('session.review.can_submit', false);
+        $this->withHeaders($headers)->postJson($this->url($tenant, '/api/tenant-app/reviews'), [
+            'rating' => 5,
+            'body' => 'Отличная работа',
+        ])->assertForbidden()->assertJsonPath('code', 'TENANT_APP_REVIEW_REQUIRES_COMPLETED_REQUEST');
+
+        $tenantRequest->update(['status' => 'completed', 'completed_at' => now()]);
+
+        $this->withHeaders($headers)->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('session.review.can_submit', true)
+            ->assertJsonPath('session.review.request_id', $tenantRequest->id);
+        $this->withHeaders($headers)->postJson($this->url($tenant, '/api/tenant-app/reviews'), [
+            'rating' => 5,
+            'body' => 'Отличная работа',
+        ])->assertCreated()
+            ->assertJsonPath('review.request_id', $tenantRequest->id)
+            ->assertJsonPath('review.author_name', 'Иван');
+
+        $this->withHeaders($headers)->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('session.review.can_submit', false)
+            ->assertJsonPath('session.review.submitted', true);
+    }
+
     public function test_brow_template_seeds_services_and_books_only_free_slots(): void
     {
         $tenant = $this->tenant('brow-studio', 'beauty.brows');
