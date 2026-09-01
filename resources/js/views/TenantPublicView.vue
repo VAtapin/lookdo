@@ -995,24 +995,6 @@ const loginContext = {
                             </div>
                         </section>
 
-                        <div
-                            v-if="lightbox"
-                            class="ta-image-lightbox"
-                            role="dialog"
-                            aria-modal="true"
-                            :aria-label="lightbox.alt"
-                            @click.self="lightbox = null"
-                        >
-                            <button :aria-label="portfolioLabels.close" @click="lightbox = null"><AppIcon name="close" /></button>
-                            <figure>
-                                <img :src="lightbox.src" :alt="lightbox.alt" />
-                                <figcaption>
-                                    <strong>{{ lightbox.alt }}</strong>
-                                    <span>{{ portfolioLabels.lightboxHint }}</span>
-                                </figcaption>
-                            </figure>
-                        </div>
-
                         <TenantActivity
                             v-else-if="screen === 'activity'"
                             :app="app"
@@ -1059,6 +1041,24 @@ const loginContext = {
                                 {{ copy.home }}
                             </button>
                         </section>
+
+                        <div
+                            v-if="lightbox"
+                            class="ta-image-lightbox"
+                            role="dialog"
+                            aria-modal="true"
+                            :aria-label="lightbox.alt"
+                            @click.self="lightbox = null"
+                        >
+                            <button :aria-label="portfolioLabels.close" @click="lightbox = null"><AppIcon name="close" /></button>
+                            <figure>
+                                <img :src="lightbox.src" :alt="lightbox.alt" />
+                                <figcaption>
+                                    <strong>{{ lightbox.alt }}</strong>
+                                    <span>{{ portfolioLabels.lightboxHint }}</span>
+                                </figcaption>
+                            </figure>
+                        </div>
                     </div>
 
                     <TenantBottomNav
