@@ -53,11 +53,14 @@ class TenantWorkspaceTest extends TestCase
         ]);
         $appRequest = $tenant->appRequests()->create([
             'customer_id' => $customer->id,
+            'request_template_id' => $tenant->businessProfile->request_template_id,
             'number' => 'R-TEST-001',
             'status' => 'new',
             'summary' => 'Нужно перетянуть руль',
             'locale' => 'ru',
+            'contact_snapshot' => ['name' => 'Иван', 'phone' => '+49 151 12345678', 'preferred_channel' => 'push'],
         ]);
+        $appRequest->values()->create(['field_key' => 'vehicle_brand', 'value' => ['value' => 'BMW']]);
         $appRequest->messages()->create([
             'tenant_id' => $tenant->id,
             'customer_id' => $customer->id,
@@ -68,7 +71,23 @@ class TenantWorkspaceTest extends TestCase
         $this->actingAs($owner)->getJson('/api/tenant/'.$tenant->id.'/workspace/requests')
             ->assertOk()
             ->assertJsonPath('items.data.0.id', $appRequest->id)
-            ->assertJsonPath('items.data.0.messages.0.body', 'Когда можно привезти?');
+            ->assertJsonPath('items.data.0.messages.0.body', 'Когда можно привезти?')
+            ->assertJsonPath('items.data.0.details.1.value', '+49 151 12345678')
+            ->assertJsonPath('items.data.0.details.5.label', 'Марка автомобиля')
+            ->assertJsonPath('items.data.0.details.5.value', 'BMW')
+            ->assertJsonPath('items.data.0.details.6.label', 'Модель')
+            ->assertJsonPath('items.data.0.details.6.value', null);
+
+        $this->actingAs($owner)->getJson('/api/tenant/'.$tenant->id.'/workspace')
+            ->assertOk()
+            ->assertJsonPath('counts.messages', 1);
+
+        $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/workspace/requests/'.$appRequest->id.'/read')
+            ->assertOk()
+            ->assertJsonPath('marked', 1)
+            ->assertJsonPath('unread', 0);
+
+        $this->assertNotNull($appRequest->messages()->where('sender_type', 'customer')->firstOrFail()->read_at);
 
         $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/workspace/requests/'.$appRequest->id.'/reply', [
             'body' => 'Можно завтра в 10:00.',

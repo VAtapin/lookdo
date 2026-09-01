@@ -28,7 +28,8 @@ const canNotify=computed(()=>Boolean(props.app.push?.enabled&&props.app.push?.pu
 const address=computed(()=>[props.app.tenant.contact.street,[props.app.tenant.contact.postal_code,props.app.tenant.contact.city].filter(Boolean).join(' ')].filter(Boolean).join(', '));
 const contactName=computed(()=>props.app.tenant.contact.name||props.app.tenant.name);
 const fields=computed<any[]>(()=>props.app.template.fields||[]);
-const vehicleModelField=computed(()=>fields.value.find(item=>item.key==='vehicle_model'||item.key==='vehicle_brand'));
+const vehicleBrandField=computed(()=>fields.value.find(item=>item.key==='vehicle_brand'));
+const vehicleModelField=computed(()=>fields.value.find(item=>item.key==='vehicle_model'));
 const vehicleYearField=computed(()=>fields.value.find(item=>item.key==='vehicle_year'));
 const extraFields=computed(()=>fields.value.filter(item=>!['phone','vehicle_brand','vehicle_model','vehicle_year'].includes(item.key)));
 const progress=computed(()=>stage.value==='capture'?1:stage.value==='details'?2:stage.value==='success'?3:4);
@@ -151,9 +152,10 @@ onBeforeUnmount(()=>{if(clock)window.clearInterval(clock);files.value.forEach(it
           <h2>1. {{copy.photos}} <em>*</em></h2><p>{{copy.requestHint}}</p>
           <div class="ta-detail-photos"><button v-for="(_,index) in slots" :key="index" @click="choose(index)"><img v-if="slotItem(index)" :src="slotItem(index)?.url" alt=""><template v-else><AppIcon name="camera"/><span>{{copy.addPhoto}}</span></template></button></div>
         </section>
-        <section v-if="vehicleModelField||vehicleYearField" class="ta-dark-card">
+        <section v-if="vehicleBrandField||vehicleModelField||vehicleYearField" class="ta-dark-card">
           <h2>2. {{copy.vehicle}}</h2>
           <div class="ta-field-grid">
+            <label v-if="vehicleBrandField"><span>{{fieldLabel(vehicleBrandField)}}</span><input v-model="form.fields.vehicle_brand" :placeholder="vehicleBrandField.placeholder"></label>
             <label v-if="vehicleModelField"><span>{{copy.vehicleModel}}</span><input v-model="form.fields.vehicle_model" :placeholder="vehicleModelField.placeholder"></label>
             <label v-if="vehicleYearField"><span>{{copy.vehicleYear}}</span><input v-model="form.fields.vehicle_year" inputmode="numeric" :placeholder="vehicleYearField.placeholder"></label>
           </div>

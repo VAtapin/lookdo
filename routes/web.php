@@ -64,6 +64,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
         Route::get('/tenant/{tenant}/workspace', [TenantWorkspaceController::class, 'bootstrap']);
         Route::get('/tenant/{tenant}/workspace/requests', [TenantWorkspaceController::class, 'requests']);
         Route::put('/tenant/{tenant}/workspace/requests/{tenantRequest}', [TenantWorkspaceController::class, 'updateRequest']);
+        Route::post('/tenant/{tenant}/workspace/requests/{tenantRequest}/read', [TenantWorkspaceController::class, 'markRequestRead']);
         Route::post('/tenant/{tenant}/workspace/requests/{tenantRequest}/reply', [TenantWorkspaceController::class, 'reply']);
         Route::get('/tenant/{tenant}/workspace/conversations', [TenantWorkspaceController::class, 'conversations']);
         Route::get('/tenant/{tenant}/workspace/customers', [TenantWorkspaceController::class, 'customers']);

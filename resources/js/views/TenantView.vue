@@ -41,6 +41,7 @@ async function load(){
   }finally{loading.value=false}
 }
 function go(target:string){router.push(`/app/${target}`)}
+function updateUnread(count:number){if(!workspace.value)return;workspace.value.counts.messages=count;workspace.value.today.unread=count}
 async function logout(){await api('/logout',{method:'POST'});router.push('/login')}
 async function stop(){await api('/impersonation/stop',{method:'POST'});location.href='/control/tenants'}
 onMounted(load);
@@ -68,7 +69,7 @@ onMounted(load);
     <template v-else-if="workspace&&account">
       <MasterBranding v-if="brandingRequired||section==='branding'" :tenant-id="tenantId" :account="account" :locale="locale" :t="t" :onboarding="brandingRequired" @reload="load" @complete="load"/>
       <MasterToday v-else-if="section==='today'" :data="workspace" :t="t" @navigate="go"/>
-      <MasterRequests v-else-if="section==='requests'||section==='messages'" :tenant-id="tenantId" :mode="section as 'requests'|'messages'" :locale="locale" :entitlements="workspace.access.entitlements" :t="t"/>
+      <MasterRequests v-else-if="section==='requests'||section==='messages'" :tenant-id="tenantId" :mode="section as 'requests'|'messages'" :locale="locale" :entitlements="workspace.access.entitlements" :t="t" @unread-changed="updateUnread"/>
       <MasterCalendar v-else-if="section==='calendar'||section==='services'" :key="section" :tenant-id="tenantId" :locale="locale" :initial-tab="section==='services'?'services':'calendar'" :t="t"/>
       <MasterCustomers v-else-if="section==='customers'" :tenant-id="tenantId" :locale="locale" :t="t"/>
       <MasterWork v-else-if="section==='work'" :tenant-id="tenantId" :locale="locale" :t="t"/>

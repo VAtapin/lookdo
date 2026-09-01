@@ -59,7 +59,7 @@ class TenantWorkspaceController extends Controller
     public function requests(Request $request, Tenant $tenant): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
-        $q = $tenant->appRequests()->with(['customer', 'media', 'values', 'messages.senderUser']);
+        $q = $tenant->appRequests()->with(['customer', 'media', 'values', 'messages.senderUser', 'template']);
         if ($request->filled('status')) {
             $q->where('status', $request->string('status'));
         }
@@ -81,7 +81,18 @@ class TenantWorkspaceController extends Controller
         }
         $tenantRequest->update($data);
 
-        return response()->json(['request' => $this->requestItem($tenantRequest->fresh(['customer', 'media', 'values', 'messages.senderUser']), true)]);
+        return response()->json(['request' => $this->requestItem($tenantRequest->fresh(['customer', 'media', 'values', 'messages.senderUser', 'template']), true)]);
+    }
+
+    public function markRequestRead(Request $request, Tenant $tenant, TenantRequest $tenantRequest): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($tenantRequest->tenant_id === $tenant->id, 404);
+        $readAt = now();
+        $marked = $tenantRequest->messages()->where('sender_type', 'customer')->whereNull('read_at')->update(['read_at' => $readAt]);
+        $unread = $tenant->messages()->where('sender_type', 'customer')->whereNull('read_at')->count();
+
+        return response()->json(['marked' => $marked, 'unread' => $unread, 'read_at' => $readAt->toIso8601String()]);
     }
 
     public function reply(Request $request, Tenant $tenant, TenantRequest $tenantRequest, SmsService $sms): JsonResponse
@@ -292,9 +303,56 @@ class TenantWorkspaceController extends Controller
         if ($full) {
             $base['values'] = $r->values;
             $base['messages'] = $r->messages;
+            $base['details'] = $this->requestDetails($r);
         }
 
         return $base;
+    }
+
+    private function requestDetails(TenantRequest $tenantRequest): array
+    {
+        $locale = $tenantRequest->locale ?: 'de';
+        $contact = (array) $tenantRequest->contact_snapshot;
+        $labels = [
+            'name' => ['de' => 'Name', 'en' => 'Name', 'ru' => 'Имя', 'uk' => 'Ім’я'],
+            'phone' => ['de' => 'Telefon', 'en' => 'Phone', 'ru' => 'Телефон', 'uk' => 'Телефон'],
+            'email' => ['de' => 'E-Mail', 'en' => 'Email', 'ru' => 'Электронная почта', 'uk' => 'Електронна пошта'],
+            'preferred_channel' => ['de' => 'Bevorzugter Kontakt', 'en' => 'Preferred contact', 'ru' => 'Способ связи', 'uk' => 'Спосіб зв’язку'],
+            'summary' => ['de' => 'Aufgabe', 'en' => 'Request', 'ru' => 'Что нужно сделать', 'uk' => 'Що потрібно зробити'],
+        ];
+        $details = collect(['name', 'phone', 'email', 'preferred_channel'])->map(fn (string $key) => [
+            'key' => $key,
+            'label' => $labels[$key][$locale] ?? $labels[$key]['de'],
+            'value' => $contact[$key] ?? null,
+        ])->all();
+        $details[] = ['key' => 'summary', 'label' => $labels['summary'][$locale] ?? $labels['summary']['de'], 'value' => $tenantRequest->summary];
+
+        $values = $tenantRequest->values->keyBy('field_key');
+        $configuration = $tenantRequest->template?->resolvedConfiguration((array) config('tenant_apps.templates', [])) ?? [];
+        foreach ((array) ($configuration['fields'] ?? []) as $field) {
+            $key = (string) ($field['key'] ?? '');
+            if ($key === '' || $key === 'phone') {
+                continue;
+            }
+            $stored = $values->get($key)?->value;
+            $value = is_array($stored) && array_key_exists('value', $stored) ? $stored['value'] : $stored;
+            $details[] = [
+                'key' => $key,
+                'label' => $this->localized($field['label'] ?? $key, $locale),
+                'value' => $value,
+            ];
+        }
+
+        return $details;
+    }
+
+    private function localized(mixed $value, string $locale): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        return $value[$locale] ?? $value['de'] ?? $value['en'] ?? $value['ru'] ?? reset($value);
     }
 
     private function appointment($a): array
