@@ -317,13 +317,19 @@ class TenantAppTest extends TestCase
             ->assertJsonPath('portfolio.0.after_image', '/brand/tenants/leonid-steering/chevrolet-after.webp')
             ->assertJsonCount(4, 'template.locales')
             ->assertJsonCount(2, 'services')
-            ->assertJsonCount(10, 'portfolio');
+            ->assertJsonCount(10, 'portfolio')
+            ->assertJsonCount(18, 'reviews')
+            ->assertJsonPath('reviews.0.author', 'Александр')
+            ->assertJsonPath('reviews.0.rating', 5)
+            ->assertJsonPath('reviews.0.received_at', '2026-07-07T09:00:00+00:00');
 
         $this->assertDatabaseMissing('tenant_portfolio_items', [
             'tenant_id' => $leonid->id,
             'image_path' => '/brand/leonid-demo.webp',
         ]);
         $this->assertSame(10, $leonid->portfolioItems()->count());
+        $this->assertSame(18, $leonid->reviews()->count());
+        $this->assertSame(18, $leonid->reviews()->where('rating', 5)->count());
     }
 
     public function test_recent_unpaid_subscription_is_activated_as_full_trial(): void

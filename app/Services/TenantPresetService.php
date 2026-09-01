@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\RequestTemplate;
 use App\Models\Tenant;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -81,6 +82,29 @@ class TenantPresetService
                 $existing = $tenant->portfolioItems()->where($identity)->first();
                 if (! $existing) {
                     $tenant->portfolioItems()->create($values);
+                } elseif ($force) {
+                    $existing->update($values);
+                }
+            }
+
+            foreach ((array) data_get($preset, 'configuration.starter_reviews', []) as $review) {
+                $receivedAt = CarbonImmutable::parse($review['received_at']);
+                $values = [
+                    'rating' => (int) ($review['rating'] ?? 5),
+                    'body' => $review['body'] ?? null,
+                    'master_reply' => $review['master_reply'] ?? null,
+                    'published' => true,
+                    'replied_at' => filled($review['master_reply'] ?? null) ? $receivedAt : null,
+                ];
+                $existing = $tenant->reviews()
+                    ->where('author_name', $review['author_name'])
+                    ->where('received_at', $receivedAt)
+                    ->first();
+                if (! $existing) {
+                    $tenant->reviews()->create($values + [
+                        'author_name' => $review['author_name'],
+                        'received_at' => $receivedAt,
+                    ]);
                 } elseif ($force) {
                     $existing->update($values);
                 }
