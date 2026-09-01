@@ -31,7 +31,12 @@ class TenantWorkspaceController extends Controller
         $today = now($tenant->timezone ?: 'Europe/Berlin')->startOfDay();
         $tomorrow = $today->copy()->addDay();
         $appointments = $tenant->appointments()->with(['customer', 'service'])->whereBetween('starts_at', [$today, $tomorrow])->orderBy('starts_at')->get();
-        $requests = $tenant->appRequests()->with(['customer', 'media'])->where('created_at', '>=', $today)->latest()->get();
+        $requests = $tenant->appRequests()
+            ->with(['customer', 'media'])
+            ->where('status', 'new')
+            ->whereBetween('created_at', [$today, $tomorrow])
+            ->latest()
+            ->get();
         $unread = $tenant->messages()->where('sender_type', 'customer')->whereNull('read_at')->count();
         $repeat = $tenant->appointments()
             ->with('service:id,repeat_interval_days')
