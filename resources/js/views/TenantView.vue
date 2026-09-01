@@ -23,7 +23,7 @@ const brandingRequired=computed(()=>Boolean(account.value&&!account.value?.tenan
 const t=(key:string)=>masterText(locale.value,key);
 const desktopNav=computed(()=>[['today','home'],['requests','briefcase'],['calendar','calendar'],['messages','chat'],['customers','user'],['work','photo'],['services','tools'],['more','grid']]);
 const mobileNav=computed(()=>[['today','home'],['requests','briefcase'],['calendar','calendar'],['messages','chat'],['more','grid']]);
-const accountSections=['business','branding','billing','domain','team','settings'];
+const accountSections=['account','business','branding','billing','domain','team','settings'];
 const mobileMoreSections=['customers','work','services',...accountSections];
 
 async function load(){
@@ -73,7 +73,7 @@ onMounted(load);
       <MasterCalendar v-else-if="section==='calendar'||section==='services'" :key="section" :tenant-id="tenantId" :locale="locale" :initial-tab="section==='services'?'services':'calendar'" :t="t"/>
       <MasterCustomers v-else-if="section==='customers'" :tenant-id="tenantId" :locale="locale" :t="t"/>
       <MasterWork v-else-if="section==='work'" :tenant-id="tenantId" :locale="locale" :t="t"/>
-      <MasterAccount v-else :tenant-id="tenantId" :account="account" :workspace="workspace" :plans="plans" :section="section" :locale="locale" :t="t" @reload="load" @navigate="go"/>
+      <MasterAccount v-else :tenant-id="tenantId" :user="me.user" :account="account" :workspace="workspace" :plans="plans" :section="section" :locale="locale" :t="t" @reload="load" @navigate="go"/>
     </template>
   </main>
   <nav class="master-bottom-nav">

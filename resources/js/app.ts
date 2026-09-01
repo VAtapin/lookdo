@@ -22,7 +22,7 @@ const platformRoutes: RouteRecordRaw[] = [
     { path: '/:locale(de|en|ru|uk)/login', component: LoginView },
     { path: '/register', component: RegisterView },
     { path: '/:locale(de|en|ru|uk)/register', component: RegisterView },
-    { path: '/app/:section(today|requests|calendar|messages|customers|work|services|more|business|branding|domain|billing|team|settings)?', component: TenantView, meta: { private: true } },
+    { path: '/app/:section(today|requests|calendar|messages|customers|work|services|more|account|business|branding|domain|billing|team|settings)?', component: TenantView, meta: { private: true } },
     { path: '/control/settings/:settingsGroup?', component: ControlView, meta: { private: true, control: true } },
     { path: '/control/:section(dashboard|tenants|administrators|subscriptions|plans|stripe|sms|templates|ai|classifications|content|backups|audit)?', component: ControlView, meta: { private: true, control: true } },
     { path: '/:key(impressum|datenschutz|agb|kontakt)', component: LegalView },

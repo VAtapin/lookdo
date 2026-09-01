@@ -187,6 +187,27 @@ class AuthController extends Controller
         return response()->json(['user' => $user, 'tenants' => $user?->tenants()->with(['profile', 'primaryDomain', 'currentSubscription.plan', 'businessProfile.category', 'businessProfile.variation'])->get() ?? [], 'impersonating' => (bool) $request->session()->get('impersonator_id')]);
     }
 
+    public function updateAccount(Request $request, AuditService $audit): JsonResponse
+    {
+        $user = $request->user();
+        $data = $request->validate([
+            'name' => 'required|string|max:120',
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'current_password' => ['nullable', 'required_with:password', 'current_password'],
+            'password' => ['nullable', 'confirmed', PasswordRule::min(10)],
+        ]);
+        $before = $user->only(['name', 'email']);
+        $user->name = $data['name'];
+        $user->email = $data['email'];
+        if (! empty($data['password'])) {
+            $user->password = $data['password'];
+        }
+        $user->save();
+        $audit->log('account.updated', $user, $before, $user->only(['name', 'email']), $user->tenants()->value('tenants.id'));
+
+        return response()->json(['user' => $user->fresh()]);
+    }
+
     private function uniqueSlug(string $value): string
     {
         $base = $this->slugBase($value);

@@ -45,6 +45,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
 
     Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
+        Route::put('/account', [AuthController::class, 'updateAccount']);
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/tenant/{tenant}', [TenantController::class, 'show']);
         Route::put('/tenant/{tenant}/profile', [TenantController::class, 'updateProfile']);
