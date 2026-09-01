@@ -26,6 +26,7 @@ const logoUrl=ref(props.account?.tenant?.profile?.logo_url||'');
 const horizontalLogoUrl=ref(props.account?.tenant?.profile?.horizontal_logo_url||'');
 const heroUrl=ref(props.account?.tenant?.profile?.hero_image_url||'');
 const promptOpen=ref(false),prompt=ref(''),promptAsset=ref<'logo'|'hero'>('hero');
+const preparingAsset=ref<'logo'|'hero'|null>(null);
 const mainLocale=computed(()=>props.account?.tenant?.locale||props.locale);
 const localizedDescription=computed(()=>form.description_translations[props.locale]||form.description_translations[mainLocale.value]||form.business_description||'');
 const localizedTagline=computed(()=>form.tagline_translations[props.locale]||form.tagline_translations[mainLocale.value]||form.tagline||props.account?.tenant?.name||'');
@@ -57,12 +58,12 @@ async function upload(asset:'logo'|'logo_horizontal'|'hero',event:Event){
   }catch(e:any){error.value=e.message}finally{busy.value=false;input.value=''}
 }
 async function prepare(asset:'logo'|'hero'){
-  busy.value=true;error.value='';success.value='';
+  busy.value=true;preparingAsset.value=asset;error.value='';success.value='';
   try{
     await api(`/tenant/${props.tenantId}/branding`,{method:'PUT',body:JSON.stringify(brandingPayload())});
     const result:any=await api(`/tenant/${props.tenantId}/branding/prompt`,{method:'POST',body:JSON.stringify({asset})});
     promptAsset.value=asset;prompt.value=result.prompt;promptOpen.value=true;
-  }catch(e:any){error.value=e.message}finally{busy.value=false}
+  }catch(e:any){error.value=e.message}finally{busy.value=false;preparingAsset.value=null}
 }
 async function generate(){
   busy.value=true;error.value='';
@@ -93,8 +94,8 @@ async function generate(){
     <div class="mw-stack">
       <article class="mw-panel mw-brand-assets">
         <h2>{{t('logo')}}</h2>
-        <div class="mw-logo-preview"><img v-if="logoUrl" :src="logoUrl" alt=""><LineIcon v-else name="photo"/></div>
-        <div class="mw-asset-actions"><label class="mw-secondary">{{t('upload')}}<input hidden type="file" accept="image/jpeg,image/png,image/webp" @change="upload('logo',$event)"></label><button class="mw-primary" :disabled="busy" @click="prepare('logo')">{{t('generateAi')}}</button></div>
+        <div class="mw-logo-preview" :class="{'mw-asset-preparing':preparingAsset==='logo'}"><img v-if="logoUrl" :src="logoUrl" alt=""><LineIcon v-else name="photo"/><span v-if="preparingAsset==='logo'"><i></i>{{t('preparingPrompt')}}</span></div>
+        <div class="mw-asset-actions"><label class="mw-secondary">{{t('upload')}}<input hidden type="file" accept="image/jpeg,image/png,image/webp" @change="upload('logo',$event)"></label><button class="mw-primary" :disabled="busy" @click="prepare('logo')">{{preparingAsset==='logo'?t('preparingPrompt'):t('generateAi')}}</button></div>
       </article>
       <article class="mw-panel mw-brand-assets">
         <h2>{{t('horizontalLogo')}}</h2>
@@ -103,8 +104,8 @@ async function generate(){
       </article>
       <article class="mw-panel mw-brand-assets">
         <h2>{{t('heroImage')}}</h2>
-        <div class="mw-hero-preview"><img v-if="heroUrl" :src="heroUrl" alt=""><LineIcon v-else name="photo"/></div>
-        <div class="mw-asset-actions"><label class="mw-secondary">{{t('upload')}}<input hidden type="file" accept="image/jpeg,image/png,image/webp" @change="upload('hero',$event)"></label><button class="mw-primary" :disabled="busy" @click="prepare('hero')">{{t('generateAi')}}</button></div>
+        <div class="mw-hero-preview" :class="{'mw-asset-preparing':preparingAsset==='hero'}"><img v-if="heroUrl" :src="heroUrl" alt=""><LineIcon v-else name="photo"/><span v-if="preparingAsset==='hero'"><i></i>{{t('preparingPrompt')}}</span></div>
+        <div class="mw-asset-actions"><label class="mw-secondary">{{t('upload')}}<input hidden type="file" accept="image/jpeg,image/png,image/webp" @change="upload('hero',$event)"></label><button class="mw-primary" :disabled="busy" @click="prepare('hero')">{{preparingAsset==='hero'?t('preparingPrompt'):t('generateAi')}}</button></div>
       </article>
     </div>
   </div>

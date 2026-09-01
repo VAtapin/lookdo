@@ -254,3 +254,45 @@ body{background:#fff}
     min-height: 40px;
     padding: 0.55rem 0.8rem;
 }
+
+.mw-logo-preview,
+.mw-hero-preview {
+    position: relative;
+}
+
+.mw-asset-preparing::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: rgba(247, 244, 238, 0.9);
+    backdrop-filter: blur(2px);
+}
+
+.mw-asset-preparing > span {
+    position: absolute;
+    z-index: 2;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: #34353a;
+    font-size: 13px;
+    font-weight: 850;
+}
+
+.mw-asset-preparing > span i {
+    width: 22px;
+    height: 22px;
+    border: 3px solid #ffc59c;
+    border-top-color: #ff6b00;
+    border-radius: 50%;
+    animation: mw-spin 0.75s linear infinite;
+}
+
+@keyframes mw-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
