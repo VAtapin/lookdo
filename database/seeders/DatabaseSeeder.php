@@ -31,6 +31,9 @@ class DatabaseSeeder extends Seeder
             foreach ($entitlements as $key => $value) {
                 $plan->entitlements()->firstOrCreate(['key' => $key], ['value' => $value]);
             }
+            if ($plan->code === 'business') {
+                $plan->entitlements()->firstOrCreate(['key' => 'design_consultation_included'], ['value' => '1']);
+            }
         }
 
         $categoryDefinitions = [

@@ -39,6 +39,11 @@ const mainLocale=computed(()=>props.account?.tenant?.locale||props.locale);
 const localizedDescription=computed(()=>form.description_translations[props.locale]||form.description_translations[mainLocale.value]||form.business_description||'');
 const localizedTagline=computed(()=>form.tagline_translations[props.locale]||form.tagline_translations[mainLocale.value]||form.tagline||props.account?.tenant?.name||'');
 const canConfirm=computed(()=>Boolean(localizedDescription.value.trim()&&logoUrl.value&&heroUrl.value&&form.service_modes.length));
+const designConsultationIncluded=computed(()=>String(props.account?.entitlements?.design_consultation_included||'0')==='1');
+const designRequestUrl=computed(()=>{
+  const body=[props.t('designRequestGreeting'),'',`${props.t('business')}: ${props.account?.tenant?.name||''}`,`LOOKDO: ${props.account?.platform_url||location.origin}`,'',props.t('designRequestQuestions')].join('\n');
+  return `mailto:support@lookdo.app?subject=${encodeURIComponent(props.t('designRequestSubject'))}&body=${encodeURIComponent(body)}`;
+});
 
 function brandingPayload(){
   return {...form,business_description:form.description_translations[mainLocale.value]||form.business_description,tagline:form.tagline_translations[mainLocale.value]||form.tagline};
@@ -89,6 +94,10 @@ function closePrompt(){
 <template>
 <section class="mw-stack mw-branding">
   <header class="mw-page-head"><div><p class="mw-kicker">LOOKDO APP</p><h1>{{t('branding')}}</h1><p>{{t(onboarding?'brandingOnboarding':'brandingIntro')}}</p></div></header>
+  <article class="mw-design-service">
+    <div><p class="mw-kicker">LOOKDO DESIGN</p><h2>{{t('designServiceTitle')}}</h2><p>{{t(designConsultationIncluded?'designServiceBusiness':'designServicePaid')}}</p></div>
+    <a class="mw-primary" :href="designRequestUrl">{{t('contactLookdoDesigners')}}</a>
+  </article>
   <p v-if="error" class="mw-error">{{error}}</p><p v-if="success" class="mw-success">{{success}}</p>
   <div class="mw-branding-layout">
     <form class="mw-panel mw-branding-form" @submit.prevent="save()">

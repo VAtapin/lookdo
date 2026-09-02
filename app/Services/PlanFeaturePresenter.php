@@ -37,6 +37,7 @@ class PlanFeaturePresenter
             $this->row('languages', true, $this->label($languages === 1 ? 'languages_one' : 'languages_many', $locale, ['value' => $languages])),
             $this->row('video', $video, $video ? $this->label('video', $locale, ['seconds' => $number('video_max_seconds'), 'size' => $number('video_max_mb')]) : $this->label('video_disabled', $locale)),
             $this->row('custom_domain', $enabled('custom_domain'), $this->label('custom_domain', $locale)),
+            $this->row('design_consultation', $enabled('design_consultation_included'), $this->label('design_consultation', $locale)),
             $this->row('retention', $retention, $this->label($advancedRetention ? 'retention_advanced' : ($retention ? 'retention' : 'retention_disabled'), $locale)),
             $this->row('ai', $ai, $this->label($ai ? 'ai' : 'ai_disabled', $locale)),
             $this->row('integrations', $integrations !== [], $integrations === [] ? $this->label('integrations_disabled', $locale) : $this->label('integrations', $locale, ['value' => implode(' + ', $integrations)])),
