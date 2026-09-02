@@ -15,7 +15,11 @@ defineEmits<{ navigate: [screen: string] }>();
 </script>
 
 <template>
-    <nav class="ta-bottom-nav" :aria-label="label">
+    <nav
+        class="ta-bottom-nav"
+        :aria-label="label"
+        style="grid-template-columns: repeat(5, minmax(0, 1fr))"
+    >
         <button
             v-for="item in items"
             :key="item.key"
