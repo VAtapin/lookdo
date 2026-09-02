@@ -305,20 +305,50 @@ async function saveSocial() {
     }
 }
 async function previewFile() {
-    if (social.image) return social.image;
-    if (!socialPreview.value) return null;
+    let source: Blob | null = social.image;
+    if (!source && !socialPreview.value) return null;
     try {
-        const response = await fetch(socialPreview.value);
-        if (!response.ok) return null;
-        const blob = await response.blob();
-        const extension =
-            blob.type.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
-        return new File([blob], `lookdo-work.${extension}`, {
-            type: blob.type || "image/jpeg",
-        });
+        if (!source) {
+            const response = await fetch(socialPreview.value);
+            if (!response.ok) return null;
+            source = await response.blob();
+        }
+
+        const objectUrl = URL.createObjectURL(source);
+        const image = new Image();
+        image.src = objectUrl;
+        await image.decode();
+        const canvas = document.createElement("canvas");
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const context = canvas.getContext("2d");
+        if (!context) return null;
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0);
+        const jpeg = await new Promise<Blob | null>((resolve) =>
+            canvas.toBlob(resolve, "image/jpeg", 0.92),
+        );
+        URL.revokeObjectURL(objectUrl);
+        if (!jpeg) return null;
+        const tenantName = String(data.value.tenant?.name || "lookdo")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "") || "lookdo";
+        return new File([jpeg], `${tenantName}.jpg`, { type: "image/jpeg" });
     } catch {
         return null;
     }
+}
+function shareText(caption: string, url: string) {
+    const canonicalUrl = String(url || "").replace(/\/+$/, "");
+    if (!canonicalUrl) return caption.trim();
+    const escapedUrl = canonicalUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const cleanCaption = caption
+        .replace(new RegExp(`${escapedUrl}/?`, "gi"), "")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+    return [cleanCaption, canonicalUrl].filter(Boolean).join("\n\n");
 }
 async function shareSocial() {
     if (!social.caption.trim()) return;
@@ -343,13 +373,12 @@ async function shareSocial() {
             return;
         }
         const url = social.booking_url || data.value.share_url;
-        const text = [social.caption, url].filter(Boolean).join("\n\n");
+        const text = shareText(social.caption, url);
         if (social.channel === "share" && navigator.share) {
             const payload: any = {
                 title:
                     localized(socialWork.value?.title) || data.value.share_url,
                 text,
-                url,
             };
             const file = await previewFile();
             if (file && navigator.canShare?.({ files: [file] }))
