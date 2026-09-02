@@ -19,6 +19,7 @@ import TenantLogin from "../tenant-app/TenantLogin.vue";
 import TenantInstallPrompt from "../tenant-app/TenantInstallPrompt.vue";
 import TenantMenuOverlay from "../tenant-app/TenantMenuOverlay.vue";
 import TenantPushPrompt from "../tenant-app/TenantPushPrompt.vue";
+import TenantPushNudge from "../tenant-app/TenantPushNudge.vue";
 import TenantReviews from "../tenant-app/TenantReviews.vue";
 
 const route = useRoute();
@@ -38,6 +39,9 @@ const installPrompt = ref<any>(null);
 const pushPrompt = ref(false);
 const pushBusy = ref(false);
 const pushStatus = ref("");
+type PushState = "unsupported" | "install_required" | "default" | "subscribed" | "repair" | "denied";
+const pushState = ref<PushState>("unsupported");
+const pushNudge = ref(false);
 const workFilter = ref<"all" | "before_after" | "finished" | "favorites">("all");
 const workFilterOpen = ref(false);
 const lightbox = ref<{ src: string; alt: string } | null>(null);
@@ -73,6 +77,15 @@ const appInstalled = computed(() =>
     window.matchMedia("(display-mode: standalone)").matches ||
     Boolean((navigator as any).standalone),
 );
+const isIos = computed(() => /iphone|ipad|ipod/i.test(navigator.userAgent));
+const pushStateLabel = computed(() => ({
+    unsupported: copy.value.notificationUnsupported,
+    install_required: copy.value.notificationInstallRequired,
+    default: copy.value.notificationNotConfigured,
+    subscribed: copy.value.notificationEnabled,
+    repair: copy.value.notificationNeedsRepair,
+    denied: copy.value.notificationBlocked,
+}[pushState.value]));
 const screen = computed(() => {
     const parts = route.path
         .split("/")
@@ -244,14 +257,12 @@ async function load() {
         app.value = await api("/tenant-app/bootstrap", { headers });
         applyTenantLocale(app.value.tenant.locale || "de");
         if (screen.value === "activity") await loadActivity();
-        if (
-            app.value.session?.known &&
-            "Notification" in window &&
-            Notification.permission === "granted"
-        )
-            await syncExistingPushSubscription();
-        if (app.value.session?.known && shouldAskPush())
-            pushPrompt.value = true;
+        await refreshPushState();
+        if (pushState.value === "subscribed") await syncExistingPushSubscription();
+        if (app.value.session?.known && shouldNudgePush()) {
+            pushNudge.value = true;
+            localStorage.setItem("lookdo-push-nudge:" + location.hostname, localDayKey());
+        }
     } catch (e: any) {
         if (e instanceof ApiError) applyTenantLocale(e.payload.locale);
         error.value = e.message;
@@ -259,14 +270,27 @@ async function load() {
         loading.value = false;
     }
 }
-function shouldAskPush() {
+function shouldNudgePush() {
+    const today = localDayKey();
     return Boolean(
-        app.value?.push?.enabled &&
-        clientToken.value &&
-        "Notification" in window &&
-        Notification.permission === "default" &&
-        !sessionStorage.getItem("lookdo-push-later:" + location.hostname),
+        ["default", "install_required"].includes(pushState.value) && clientToken.value &&
+        localStorage.getItem("lookdo-push-nudge:" + location.hostname) !== today,
     );
+}
+function localDayKey() {
+    const now = new Date();
+    return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
+}
+async function refreshPushState() {
+    if (!app.value?.push?.enabled || !clientToken.value) { pushState.value = "unsupported"; return; }
+    if (isIos.value && !appInstalled.value) { pushState.value = "install_required"; return; }
+    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) { pushState.value = "unsupported"; return; }
+    if (Notification.permission === "denied") { pushState.value = "denied"; return; }
+    if (Notification.permission === "default") { pushState.value = "default"; return; }
+    try {
+        const registration = await navigator.serviceWorker.ready;
+        pushState.value = await registration.pushManager.getSubscription() ? "subscribed" : "repair";
+    } catch { pushState.value = "repair"; }
 }
 async function syncExistingPushSubscription() {
     if (!app.value?.push?.enabled || !clientToken.value || !("serviceWorker" in navigator))
@@ -311,6 +335,7 @@ function flowSuccess(payload: any) {
         clientToken.value = payload.token;
         localStorage.setItem(tokenKey, payload.token);
     }
+    void refreshPushState();
     loadActivity();
 }
 async function cancelAppointment(item: any) {
@@ -425,16 +450,37 @@ async function enablePush() {
             }),
         });
         pushStatus.value = copy.value.notificationEnabled;
+        pushState.value = "subscribed";
         window.setTimeout(() => (pushPrompt.value = false), 700);
     } catch (e: any) {
-        pushStatus.value = e.message;
+        pushStatus.value = /applicationServerKey|P-256|public key/i.test(String(e?.message || "")) ? copy.value.notificationConfigurationError : copy.value.notificationDenied;
+        await refreshPushState();
     } finally {
         pushBusy.value = false;
     }
 }
 function dismissPush() {
-    sessionStorage.setItem("lookdo-push-later:" + location.hostname, "1");
     pushPrompt.value = false;
+}
+function dismissPushNudge() {
+    localStorage.setItem("lookdo-push-nudge:" + location.hostname, localDayKey());
+    pushNudge.value = false;
+}
+async function openPushSettings() {
+    menuOpen.value = false;
+    pushNudge.value = false;
+    await refreshPushState();
+    if (pushState.value === "install_required") { showInstall(); return; }
+    pushStatus.value = "";
+    pushPrompt.value = true;
+}
+async function handleVisibilityChange() {
+    if (document.visibilityState !== "visible") return;
+    await refreshPushState();
+    if (app.value?.session?.known && shouldNudgePush()) {
+        pushNudge.value = true;
+        localStorage.setItem("lookdo-push-nudge:" + location.hostname, localDayKey());
+    }
 }
 async function login() {
     loginBusy.value = true;
@@ -469,11 +515,13 @@ watch(screen, async (value) => {
 onMounted(() => {
     window.addEventListener("keydown", handleKeydown);
     window.addEventListener("beforeinstallprompt", captureInstallPrompt);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     load();
 });
 onBeforeUnmount(() => {
     window.removeEventListener("keydown", handleKeydown);
     window.removeEventListener("beforeinstallprompt", captureInstallPrompt);
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
 });
 const loginContext = {
     app,
@@ -1098,10 +1146,12 @@ const loginContext = {
                         :copy="copy"
                         :locale="locale"
                         :is-brows="isBrows"
+                        :push-state-label="pushStateLabel"
                         @close="menuOpen = false"
                         @navigate="go"
                         @share="share"
                         @install="showInstall"
+                        @notifications="openPushSettings"
                         @change-locale="changeLocale"
                     />
                     <TenantInstallPrompt
@@ -1118,8 +1168,16 @@ const loginContext = {
                         :copy="copy"
                         :status="pushStatus"
                         :busy="pushBusy"
+                        :state="pushState"
                         @enable="enablePush"
                         @dismiss="dismissPush"
+                    />
+                    <TenantPushNudge
+                        v-if="pushNudge && !pushPrompt && !menuOpen"
+                        :copy="copy"
+                        :state="pushState"
+                        @open="openPushSettings"
+                        @dismiss="dismissPushNudge"
                     />
                 </template>
             </main>

@@ -13,12 +13,14 @@ defineProps<{
     copy: Record<string, string>;
     locale: string;
     isBrows: boolean;
+    pushStateLabel: string;
 }>();
 const emit = defineEmits<{
     close: [];
     navigate: [screen: string];
     share: [];
     install: [];
+    notifications: [];
     changeLocale: [locale: string];
 }>();
 
@@ -64,6 +66,9 @@ const navigate = (screen: string) => {
                 <button @click="$emit('install')">
                     <AppIcon name="install" />{{ copy.install
                     }}<AppIcon name="arrow" />
+                </button>
+                <button @click="$emit('notifications')">
+                    <AppIcon name="bell" /><span><b>{{ copy.notificationsMenu }}</b><small>{{ pushStateLabel }}</small></span><AppIcon name="arrow" />
                 </button>
                 <button @click="navigate('login')">
                     <AppIcon name="shield" />{{ copy.login
