@@ -17,6 +17,7 @@ import TenantContactsSheet from "../tenant-app/TenantContactsSheet.vue";
 import TenantDesktopAside from "../tenant-app/TenantDesktopAside.vue";
 import TenantLogin from "../tenant-app/TenantLogin.vue";
 import TenantInstallPrompt from "../tenant-app/TenantInstallPrompt.vue";
+import TenantLanguagePrompt from "../tenant-app/TenantLanguagePrompt.vue";
 import TenantMenuOverlay from "../tenant-app/TenantMenuOverlay.vue";
 import TenantPushPrompt from "../tenant-app/TenantPushPrompt.vue";
 import TenantPushNudge from "../tenant-app/TenantPushNudge.vue";
@@ -36,6 +37,7 @@ const menuOpen = ref(false);
 const contactOpen = ref(false);
 const installOpen = ref(false);
 const installPrompt = ref<any>(null);
+const languageOpen = ref(false);
 const pushPrompt = ref(false);
 const pushBusy = ref(false);
 const pushStatus = ref("");
@@ -241,6 +243,8 @@ async function load() {
             headers["X-Lookdo-Client-Token"] = clientToken.value;
         app.value = await api("/tenant-app/bootstrap", { headers });
         applyTenantLocale(app.value.tenant.locale || "de");
+        if (!hasSelectedLocale.value && (app.value.template.locales || []).length > 1)
+            languageOpen.value = true;
         if (screen.value === "activity") await loadActivity();
         await refreshPushState();
         if (pushState.value === "subscribed") await syncExistingPushSubscription();
@@ -258,7 +262,7 @@ async function load() {
 function shouldNudgePush() {
     const today = localDayKey();
     return Boolean(
-        ["default", "install_required"].includes(pushState.value) &&
+        hasSelectedLocale.value && ["default", "install_required"].includes(pushState.value) &&
         localStorage.getItem("lookdo-push-nudge:" + location.hostname) !== today,
     );
 }
@@ -341,6 +345,7 @@ async function changeLocale(value: string) {
     hasSelectedLocale.value = true;
     localStorage.setItem(localeKey, locale.value);
     setLocale(locale.value);
+    languageOpen.value = false;
     await load();
 }
 async function sendMessage() {
@@ -606,6 +611,7 @@ const loginContext = {
                                     >
                                 </button>
                                 <div>
+                                    <button class="ta-language-trigger" @click="languageOpen = true">{{ locale.toUpperCase() }}</button>
                                     <a
                                         v-if="app.tenant.contact.phone"
                                         :href="
@@ -774,6 +780,7 @@ const loginContext = {
                                         app.template.hero.eyebrow
                                     }}</span>
                                     <div>
+                                        <button class="ta-language-trigger" @click="languageOpen = true">{{ locale.toUpperCase() }}</button>
                                         <button
                                             v-if="app.tenant.contact.phone || app.tenant.contact.max_url || app.tenant.contact.vk_url"
                                             class="ta-contact-trigger"
@@ -1148,6 +1155,13 @@ const loginContext = {
                         :installed="appInstalled"
                         @close="installOpen = false"
                         @install="installApp"
+                    />
+                    <TenantLanguagePrompt
+                        v-if="languageOpen"
+                        :locales="app.template.locales"
+                        :current="locale"
+                        @select="changeLocale"
+                        @close="languageOpen = false"
                     />
                     <TenantPushPrompt
                         v-if="pushPrompt"
