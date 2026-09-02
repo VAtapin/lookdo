@@ -100,6 +100,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
         Route::get('/tenant/{tenant}/calendar/slots', [TenantCalendarController::class, 'slots']);
         Route::post('/tenant/{tenant}/services', [TenantCalendarController::class, 'saveService']);
         Route::put('/tenant/{tenant}/services/{service}', [TenantCalendarController::class, 'saveService']);
+        Route::post('/tenant/{tenant}/services/{service}/translate', [TenantCalendarController::class, 'translateService'])->middleware('throttle:20,1');
         Route::post('/tenant/{tenant}/services/{service}/image', [TenantCalendarController::class, 'uploadServiceImage']);
         Route::delete('/tenant/{tenant}/services/{service}/image', [TenantCalendarController::class, 'removeServiceImage']);
         Route::delete('/tenant/{tenant}/services/{service}', [TenantCalendarController::class, 'deleteService']);

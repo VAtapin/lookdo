@@ -22,7 +22,9 @@ const data = ref<any>({
     }),
     tab = ref(initialQuery.get("tab") || props.initialTab || "calendar"),
     busy = ref(false),
-    error = ref("");
+    error = ref(""),
+    translatingService = ref(false),
+    translationStatus = ref("");
 const month = ref(new Date().toISOString().slice(0, 7)),
     day = ref(new Date().toISOString().slice(0, 10));
 const appointment = reactive<any>({
@@ -178,7 +180,11 @@ async function saveService() {
             : `/tenant/${props.tenantId}/services`;
         const saved: any = await api(url, {
             method: service.id ? "PUT" : "POST",
-            body: JSON.stringify({ ...service, image: undefined }),
+            body: JSON.stringify({
+                ...service,
+                image: undefined,
+                source_locale: props.locale,
+            }),
         });
         if (service.image) {
             const body = new FormData();
@@ -194,6 +200,37 @@ async function saveService() {
         error.value = e.message;
     } finally {
         busy.value = false;
+    }
+}
+async function translateCurrentService() {
+    if (!service.id) return;
+    translatingService.value = true;
+    translationStatus.value = "";
+    error.value = "";
+    try {
+        const saved: any = await api(
+            `/tenant/${props.tenantId}/services/${service.id}/translate`,
+            {
+                method: "POST",
+                body: JSON.stringify({
+                    source_locale: props.locale,
+                    name: service.name,
+                    description: service.description,
+                }),
+            },
+        );
+        Object.assign(service, {
+            ...saved.service,
+            name: { de: "", en: "", ru: "", uk: "", ...saved.service.name },
+            description: { ...(saved.service.description || {}) },
+            image: null,
+        });
+        translationStatus.value = props.t("serviceTranslated");
+        await load();
+    } catch (e: any) {
+        error.value = e.message;
+    } finally {
+        translatingService.value = false;
     }
 }
 function clearServicePreview() {
@@ -853,8 +890,27 @@ onUnmounted(clearServicePreview);
                     }}<textarea
                         v-model="serviceDescription"
                         rows="7"
-                    ></textarea></label
-                ><label
+                    ></textarea>
+                </label>
+                <div class="mw-service-translation">
+                    <button
+                        v-if="service.id"
+                        type="button"
+                        class="mw-secondary"
+                        :disabled="busy || translatingService"
+                        @click="translateCurrentService"
+                    >
+                        {{
+                            translatingService
+                                ? t("serviceTranslating")
+                                : t("translateService")
+                        }}
+                    </button>
+                    <small>{{
+                        translationStatus || t("serviceTranslationHint")
+                    }}</small>
+                </div>
+                <label
                     >{{ t("duration")
                     }}<input
                         v-model.number="service.duration_minutes"

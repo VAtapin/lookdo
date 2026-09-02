@@ -6,7 +6,8 @@ const copy: Record<MasterLocale, Record<string, string>> = {
         socialAccounts: "Verbundene Konten",
         socialConnected: "Verbunden",
         socialNotConnected: "Noch nicht verbunden",
-        socialProviderUnavailable: "Der Kanal ist in LOOKDO noch nicht konfiguriert.",
+        socialProviderUnavailable:
+            "Der Kanal ist in LOOKDO noch nicht konfiguriert.",
         socialConnectRequired: "Verbinden Sie zuerst das Konto dieses Kanals.",
         socialPublished: "Die Veröffentlichung wurde über die API gesendet.",
         socialDisconnectConfirm: "Dieses Social-Media-Konto trennen?",
@@ -14,7 +15,8 @@ const copy: Record<MasterLocale, Record<string, string>> = {
         disconnect: "Trennen",
         publishDirect: "Jetzt direkt veröffentlichen",
         telegramTarget: "Telegram-Kanal",
-        telegramTargetPlaceholder: "@kanal — Bot vorher als Administrator hinzufügen",
+        telegramTargetPlaceholder:
+            "@kanal — Bot vorher als Administrator hinzufügen",
         today: "Heute",
         requests: "Anfragen",
         calendar: "Kalender",
@@ -62,7 +64,8 @@ const copy: Record<MasterLocale, Record<string, string>> = {
         publicationConsent: "Veröffentlichung erlaubt",
         workingHours: "Arbeitszeiten",
         contacts: "Kontakte im Kunden-App",
-        contactsHint: "Nur ausgefüllte Kontaktwege werden den Kunden angezeigt.",
+        contactsHint:
+            "Nur ausgefüllte Kontaktwege werden den Kunden angezeigt.",
         website: "Website",
         blocks: "Blockierungen",
         addBlock: "Zeit blockieren",
@@ -110,6 +113,11 @@ const copy: Record<MasterLocale, Record<string, string>> = {
         channel: "Kanal",
         format: "Format",
         aiAssist: "Mit KI vorbereiten",
+        translateService: "Erneut automatisch übersetzen",
+        serviceTranslating: "KI übersetzt…",
+        serviceTranslated: "Übersetzungen wurden aktualisiert.",
+        serviceTranslationHint:
+            "Beim Speichern werden Name und Beschreibung automatisch aus der aktuellen Verwaltungssprache übersetzt.",
         aiReply: "Antwort vorschlagen",
         aiSocial: "Social-Text erstellen",
         aiReminder: "Erinnerung schreiben",
@@ -149,7 +157,8 @@ const copy: Record<MasterLocale, Record<string, string>> = {
         socialAccounts: "Connected accounts",
         socialConnected: "Connected",
         socialNotConnected: "Not connected yet",
-        socialProviderUnavailable: "This channel is not configured in LOOKDO yet.",
+        socialProviderUnavailable:
+            "This channel is not configured in LOOKDO yet.",
         socialConnectRequired: "Connect this channel account first.",
         socialPublished: "The post was published through the API.",
         socialDisconnectConfirm: "Disconnect this social account?",
@@ -157,7 +166,8 @@ const copy: Record<MasterLocale, Record<string, string>> = {
         disconnect: "Disconnect",
         publishDirect: "Publish directly now",
         telegramTarget: "Telegram channel",
-        telegramTargetPlaceholder: "@channel — add the bot as an administrator first",
+        telegramTargetPlaceholder:
+            "@channel — add the bot as an administrator first",
         today: "Today",
         requests: "Requests",
         calendar: "Calendar",
@@ -253,6 +263,11 @@ const copy: Record<MasterLocale, Record<string, string>> = {
         channel: "Channel",
         format: "Format",
         aiAssist: "Prepare with AI",
+        translateService: "Translate again automatically",
+        serviceTranslating: "AI is translating…",
+        serviceTranslated: "Translations have been updated.",
+        serviceTranslationHint:
+            "On save, the name and description are translated automatically from the current admin language.",
         aiReply: "Suggest reply",
         aiSocial: "Create social caption",
         aiReminder: "Write reminder",
@@ -298,7 +313,8 @@ const copy: Record<MasterLocale, Record<string, string>> = {
         disconnect: "Отключить",
         publishDirect: "Опубликовать сейчас",
         telegramTarget: "Канал Telegram",
-        telegramTargetPlaceholder: "@канал — сначала добавьте бота администратором",
+        telegramTargetPlaceholder:
+            "@канал — сначала добавьте бота администратором",
         today: "Сегодня",
         requests: "Заявки",
         calendar: "Календарь",
@@ -346,7 +362,8 @@ const copy: Record<MasterLocale, Record<string, string>> = {
         publicationConsent: "Разрешена публикация",
         workingHours: "Рабочее время",
         contacts: "Контакты в приложении клиента",
-        contactsHint: "Клиент увидит только те способы связи, которые вы заполните.",
+        contactsHint:
+            "Клиент увидит только те способы связи, которые вы заполните.",
         website: "Сайт",
         blocks: "Блокировки",
         addBlock: "Заблокировать время",
@@ -394,6 +411,11 @@ const copy: Record<MasterLocale, Record<string, string>> = {
         channel: "Канал",
         format: "Формат",
         aiAssist: "Подготовить с ИИ",
+        translateService: "Перевести заново автоматически",
+        serviceTranslating: "ИИ переводит…",
+        serviceTranslated: "Переводы обновлены.",
+        serviceTranslationHint:
+            "При сохранении название и описание автоматически переводятся с текущего языка админки.",
         aiReply: "Предложить ответ",
         aiSocial: "Создать текст публикации",
         aiReminder: "Написать напоминание",
@@ -440,7 +462,8 @@ const copy: Record<MasterLocale, Record<string, string>> = {
         disconnect: "Відключити",
         publishDirect: "Опублікувати зараз",
         telegramTarget: "Канал Telegram",
-        telegramTargetPlaceholder: "@канал — спочатку додайте бота адміністратором",
+        telegramTargetPlaceholder:
+            "@канал — спочатку додайте бота адміністратором",
         today: "Сьогодні",
         requests: "Заявки",
         calendar: "Календар",
@@ -488,7 +511,8 @@ const copy: Record<MasterLocale, Record<string, string>> = {
         publicationConsent: "Дозволена публікація",
         workingHours: "Робочий час",
         contacts: "Контакти в застосунку клієнта",
-        contactsHint: "Клієнт побачить лише ті способи зв’язку, які ви заповните.",
+        contactsHint:
+            "Клієнт побачить лише ті способи зв’язку, які ви заповните.",
         website: "Сайт",
         blocks: "Блокування",
         addBlock: "Заблокувати час",
@@ -536,6 +560,11 @@ const copy: Record<MasterLocale, Record<string, string>> = {
         channel: "Канал",
         format: "Формат",
         aiAssist: "Підготувати з ШІ",
+        translateService: "Перекласти заново автоматично",
+        serviceTranslating: "ШІ перекладає…",
+        serviceTranslated: "Переклади оновлено.",
+        serviceTranslationHint:
+            "Під час збереження назва й опис автоматично перекладаються з поточної мови адмінки.",
         aiReply: "Запропонувати відповідь",
         aiSocial: "Створити текст публікації",
         aiReminder: "Написати нагадування",
@@ -573,7 +602,8 @@ const copy: Record<MasterLocale, Record<string, string>> = {
 const extra: Record<MasterLocale, Record<string, string>> = {
     de: {
         email: "E-Mail",
-        accountIntro: "Hier ändern Sie Ihre persönlichen Anmeldedaten. Die öffentlichen Firmendaten bleiben davon getrennt.",
+        accountIntro:
+            "Hier ändern Sie Ihre persönlichen Anmeldedaten. Die öffentlichen Firmendaten bleiben davon getrennt.",
         ownerName: "Name des Kontoinhabers",
         loginEmail: "E-Mail für die Anmeldung",
         changePassword: "Passwort ändern (optional)",
@@ -588,15 +618,19 @@ const extra: Record<MasterLocale, Record<string, string>> = {
         paymentHistory: "Zahlungsverlauf",
         activeAccess: "Zugang aktiv",
         newSetupLink: "Neuen Einrichtungslink",
-        emailConfirmationSent: "Bestätigungslink wurde an die neue E-Mail-Adresse gesendet.",
+        emailConfirmationSent:
+            "Bestätigungslink wurde an die neue E-Mail-Adresse gesendet.",
         pendingEmail: "Bestätigung ausstehend",
         yourData: "Ihre Daten",
-        exportIntro: "Laden Sie Kunden, Anfragen, Arbeiten, Termine, Bewertungen und Zahlungen als Archiv herunter.",
+        exportIntro:
+            "Laden Sie Kunden, Anfragen, Arbeiten, Termine, Bewertungen und Zahlungen als Archiv herunter.",
         exportData: "Alle Daten exportieren",
         deleteAccount: "App und Konto löschen",
-        deleteAccountIntro: "Stripe-Abonnements werden beendet und die App mit allen lokalen Daten dauerhaft gelöscht.",
+        deleteAccountIntro:
+            "Stripe-Abonnements werden beendet und die App mit allen lokalen Daten dauerhaft gelöscht.",
         typeBusinessName: "Firmenname zur Bestätigung eingeben",
-        deleteAccountWarning: "App, Daten und gegebenenfalls das letzte Benutzerkonto wirklich dauerhaft löschen?",
+        deleteAccountWarning:
+            "App, Daten und gegebenenfalls das letzte Benutzerkonto wirklich dauerhaft löschen?",
         phone: "Telefon",
         city: "Stadt",
         street: "Straße",
@@ -616,9 +650,11 @@ const extra: Record<MasterLocale, Record<string, string>> = {
         domainSslPending: "DNS bestätigt, SSL wird eingerichtet",
         domainFailed: "Einrichtung fehlgeschlagen",
         domainDisabled: "Domain deaktiviert",
-        domainConfigurationRequired: "Plesk-Verbindung muss eingerichtet werden",
+        domainConfigurationRequired:
+            "Plesk-Verbindung muss eingerichtet werden",
         domainVerify: "DNS und SSL prüfen",
-        domainDnsHint: "Richten Sie DNS auf LOOKDO und starten Sie danach die Prüfung. Domain und SSL werden automatisch in Plesk eingerichtet.",
+        domainDnsHint:
+            "Richten Sie DNS auf LOOKDO und starten Sie danach die Prüfung. Domain und SSL werden automatisch in Plesk eingerichtet.",
         featureUnavailable:
             "Diese Funktion ist in Ihrem Tarif nicht enthalten.",
         name: "Name",
@@ -704,7 +740,8 @@ const extra: Record<MasterLocale, Record<string, string>> = {
     },
     en: {
         email: "Email",
-        accountIntro: "Change your personal sign-in details here. Public business details are managed separately.",
+        accountIntro:
+            "Change your personal sign-in details here. Public business details are managed separately.",
         ownerName: "Account owner name",
         loginEmail: "Sign-in email",
         changePassword: "Change password (optional)",
@@ -719,15 +756,19 @@ const extra: Record<MasterLocale, Record<string, string>> = {
         paymentHistory: "Payment history",
         activeAccess: "Access active",
         newSetupLink: "New setup link",
-        emailConfirmationSent: "A confirmation link was sent to the new email address.",
+        emailConfirmationSent:
+            "A confirmation link was sent to the new email address.",
         pendingEmail: "Confirmation pending",
         yourData: "Your data",
-        exportIntro: "Download customers, requests, work, appointments, reviews and payments as an archive.",
+        exportIntro:
+            "Download customers, requests, work, appointments, reviews and payments as an archive.",
         exportData: "Export all data",
         deleteAccount: "Delete app and account",
-        deleteAccountIntro: "Stripe subscriptions will be cancelled and the app with all local data will be permanently deleted.",
+        deleteAccountIntro:
+            "Stripe subscriptions will be cancelled and the app with all local data will be permanently deleted.",
         typeBusinessName: "Enter the business name to confirm",
-        deleteAccountWarning: "Permanently delete the app, its data and, if applicable, the last user account?",
+        deleteAccountWarning:
+            "Permanently delete the app, its data and, if applicable, the last user account?",
         phone: "Phone",
         city: "City",
         street: "Street",
@@ -748,7 +789,8 @@ const extra: Record<MasterLocale, Record<string, string>> = {
         domainDisabled: "Domain disabled",
         domainConfigurationRequired: "The Plesk connection must be configured",
         domainVerify: "Check DNS and SSL",
-        domainDnsHint: "Point DNS to LOOKDO, then start the check. The domain and SSL are provisioned automatically in Plesk.",
+        domainDnsHint:
+            "Point DNS to LOOKDO, then start the check. The domain and SSL are provisioned automatically in Plesk.",
         featureUnavailable: "This feature is not included in your plan.",
         name: "Name",
         role: "Role",
@@ -831,7 +873,8 @@ const extra: Record<MasterLocale, Record<string, string>> = {
     },
     ru: {
         email: "Электронная почта",
-        accountIntro: "Здесь изменяются личные данные для входа. Публичные данные фирмы настраиваются отдельно.",
+        accountIntro:
+            "Здесь изменяются личные данные для входа. Публичные данные фирмы настраиваются отдельно.",
         ownerName: "Имя владельца аккаунта",
         loginEmail: "Email для входа",
         changePassword: "Изменить пароль (необязательно)",
@@ -846,15 +889,19 @@ const extra: Record<MasterLocale, Record<string, string>> = {
         paymentHistory: "История платежей",
         activeAccess: "Доступ активен",
         newSetupLink: "Новая ссылка для пароля",
-        emailConfirmationSent: "На новый email отправлена ссылка для подтверждения.",
+        emailConfirmationSent:
+            "На новый email отправлена ссылка для подтверждения.",
         pendingEmail: "Ожидает подтверждения",
         yourData: "Ваши данные",
-        exportIntro: "Скачайте клиентов, заявки, работы, записи, отзывы и платежи одним архивом.",
+        exportIntro:
+            "Скачайте клиентов, заявки, работы, записи, отзывы и платежи одним архивом.",
         exportData: "Экспортировать все данные",
         deleteAccount: "Удалить приложение и аккаунт",
-        deleteAccountIntro: "Подписка Stripe будет отменена, приложение и все локальные данные будут удалены безвозвратно.",
+        deleteAccountIntro:
+            "Подписка Stripe будет отменена, приложение и все локальные данные будут удалены безвозвратно.",
         typeBusinessName: "Для подтверждения введите название фирмы",
-        deleteAccountWarning: "Безвозвратно удалить приложение, данные и, если это последний доступ, аккаунт пользователя?",
+        deleteAccountWarning:
+            "Безвозвратно удалить приложение, данные и, если это последний доступ, аккаунт пользователя?",
         phone: "Телефон",
         city: "Город",
         street: "Улица",
@@ -875,7 +922,8 @@ const extra: Record<MasterLocale, Record<string, string>> = {
         domainDisabled: "Домен отключён",
         domainConfigurationRequired: "Нужно настроить подключение к Plesk",
         domainVerify: "Проверить DNS и SSL",
-        domainDnsHint: "Направьте DNS на LOOKDO и запустите проверку. Домен и SSL будут автоматически созданы в Plesk.",
+        domainDnsHint:
+            "Направьте DNS на LOOKDO и запустите проверку. Домен и SSL будут автоматически созданы в Plesk.",
         featureUnavailable: "Эта функция не входит в ваш тариф.",
         name: "Имя",
         role: "Роль",
@@ -958,7 +1006,8 @@ const extra: Record<MasterLocale, Record<string, string>> = {
     },
     uk: {
         email: "Електронна пошта",
-        accountIntro: "Тут змінюються особисті дані для входу. Публічні дані компанії налаштовуються окремо.",
+        accountIntro:
+            "Тут змінюються особисті дані для входу. Публічні дані компанії налаштовуються окремо.",
         ownerName: "Ім’я власника акаунта",
         loginEmail: "Email для входу",
         changePassword: "Змінити пароль (необов’язково)",
@@ -973,15 +1022,19 @@ const extra: Record<MasterLocale, Record<string, string>> = {
         paymentHistory: "Історія платежів",
         activeAccess: "Доступ активний",
         newSetupLink: "Нове посилання для пароля",
-        emailConfirmationSent: "На новий email надіслано посилання для підтвердження.",
+        emailConfirmationSent:
+            "На новий email надіслано посилання для підтвердження.",
         pendingEmail: "Очікує підтвердження",
         yourData: "Ваші дані",
-        exportIntro: "Завантажте клієнтів, заявки, роботи, записи, відгуки та платежі одним архівом.",
+        exportIntro:
+            "Завантажте клієнтів, заявки, роботи, записи, відгуки та платежі одним архівом.",
         exportData: "Експортувати всі дані",
         deleteAccount: "Видалити застосунок і акаунт",
-        deleteAccountIntro: "Підписку Stripe буде скасовано, застосунок і всі локальні дані буде видалено назавжди.",
+        deleteAccountIntro:
+            "Підписку Stripe буде скасовано, застосунок і всі локальні дані буде видалено назавжди.",
         typeBusinessName: "Для підтвердження введіть назву компанії",
-        deleteAccountWarning: "Назавжди видалити застосунок, дані та, якщо це останній доступ, акаунт користувача?",
+        deleteAccountWarning:
+            "Назавжди видалити застосунок, дані та, якщо це останній доступ, акаунт користувача?",
         phone: "Телефон",
         city: "Місто",
         street: "Вулиця",
@@ -1000,9 +1053,11 @@ const extra: Record<MasterLocale, Record<string, string>> = {
         domainSslPending: "DNS підтверджено, випускається SSL",
         domainFailed: "Не вдалося підключити домен",
         domainDisabled: "Домен вимкнено",
-        domainConfigurationRequired: "Потрібно налаштувати підключення до Plesk",
+        domainConfigurationRequired:
+            "Потрібно налаштувати підключення до Plesk",
         domainVerify: "Перевірити DNS і SSL",
-        domainDnsHint: "Спрямуйте DNS на LOOKDO і запустіть перевірку. Домен і SSL будуть автоматично створені у Plesk.",
+        domainDnsHint:
+            "Спрямуйте DNS на LOOKDO і запустіть перевірку. Домен і SSL будуть автоматично створені у Plesk.",
         featureUnavailable: "Ця функція не входить до вашого тарифу.",
         name: "Ім’я",
         role: "Роль",
@@ -1110,30 +1165,45 @@ const workExtra: Record<MasterLocale, Record<string, string>> = {
         x: "X",
         status: "Status",
         configure: "Einrichten",
-        socialProviderNeedsSetup: "Öffnen Sie die Einrichtung und tragen Sie Ihre Zugangsdaten ein.",
+        socialProviderNeedsSetup:
+            "Öffnen Sie die Einrichtung und tragen Sie Ihre Zugangsdaten ein.",
         socialProviderSetup: "Kanal einrichten",
-        socialProviderSaved: "Die Kanaleinstellungen wurden sicher gespeichert.",
+        socialProviderSaved:
+            "Die Kanaleinstellungen wurden sicher gespeichert.",
         socialProviderHelpTitle: "So erhalten Sie die Zugangsdaten",
         openOfficialInstructions: "Offizielle Anleitung öffnen",
         applicationId: "App-ID / Client-ID",
         applicationSecret: "App-Geheimnis / sicherer Schlüssel",
         telegramBotToken: "Bot-Token von BotFather",
         callbackUrl: "Callback-URL",
-        callbackUrlHint: "Fügen Sie diese URL in den OAuth-Einstellungen der App als zulässige Weiterleitungs-URL ein.",
-        secretStorageHint: "Geheimnisse werden verschlüsselt und gelten nur für diesen Betrieb.",
+        callbackUrlHint:
+            "Fügen Sie diese URL in den OAuth-Einstellungen der App als zulässige Weiterleitungs-URL ein.",
+        secretStorageHint:
+            "Geheimnisse werden verschlüsselt und gelten nur für diesen Betrieb.",
         saveAndConnect: "Speichern und verbinden",
-        socialProviderHelp_instagram_1: "Öffnen Sie Meta for Developers und erstellen Sie eine Business-App.",
-        socialProviderHelp_instagram_2: "Fügen Sie Instagram Graph API hinzu und kopieren Sie App-ID und App-Geheimnis.",
-        socialProviderHelp_instagram_3: "Tragen Sie die unten angezeigte Callback-URL bei den gültigen OAuth-URLs ein.",
-        socialProviderHelp_facebook_1: "Öffnen Sie Meta for Developers und erstellen Sie eine Business-App.",
-        socialProviderHelp_facebook_2: "Fügen Sie Facebook Login hinzu und kopieren Sie App-ID und App-Geheimnis.",
-        socialProviderHelp_facebook_3: "Tragen Sie die unten angezeigte Callback-URL bei den gültigen OAuth-URLs ein.",
+        socialProviderHelp_instagram_1:
+            "Öffnen Sie Meta for Developers und erstellen Sie eine Business-App.",
+        socialProviderHelp_instagram_2:
+            "Fügen Sie Instagram Graph API hinzu und kopieren Sie App-ID und App-Geheimnis.",
+        socialProviderHelp_instagram_3:
+            "Tragen Sie die unten angezeigte Callback-URL bei den gültigen OAuth-URLs ein.",
+        socialProviderHelp_facebook_1:
+            "Öffnen Sie Meta for Developers und erstellen Sie eine Business-App.",
+        socialProviderHelp_facebook_2:
+            "Fügen Sie Facebook Login hinzu und kopieren Sie App-ID und App-Geheimnis.",
+        socialProviderHelp_facebook_3:
+            "Tragen Sie die unten angezeigte Callback-URL bei den gültigen OAuth-URLs ein.",
         socialProviderHelp_vk_1: "Erstellen Sie in VK ID eine neue Anwendung.",
-        socialProviderHelp_vk_2: "Kopieren Sie die Anwendungs-ID und den geschützten Schlüssel.",
-        socialProviderHelp_vk_3: "Tragen Sie die unten angezeigte Callback-URL in den App-Einstellungen ein.",
-        socialProviderHelp_telegram_1: "Öffnen Sie @BotFather in Telegram und senden Sie /newbot.",
-        socialProviderHelp_telegram_2: "Folgen Sie den Schritten und kopieren Sie den ausgegebenen Bot-Token.",
-        socialProviderHelp_telegram_3: "Fügen Sie den Bot als Administrator zu Ihrem Kanal hinzu und tragen Sie danach @kanal ein.",
+        socialProviderHelp_vk_2:
+            "Kopieren Sie die Anwendungs-ID und den geschützten Schlüssel.",
+        socialProviderHelp_vk_3:
+            "Tragen Sie die unten angezeigte Callback-URL in den App-Einstellungen ein.",
+        socialProviderHelp_telegram_1:
+            "Öffnen Sie @BotFather in Telegram und senden Sie /newbot.",
+        socialProviderHelp_telegram_2:
+            "Folgen Sie den Schritten und kopieren Sie den ausgegebenen Bot-Token.",
+        socialProviderHelp_telegram_3:
+            "Fügen Sie den Bot als Administrator zu Ihrem Kanal hinzu und tragen Sie danach @kanal ein.",
     },
     en: {
         socialSaved: "Draft saved.",
@@ -1160,7 +1230,8 @@ const workExtra: Record<MasterLocale, Record<string, string>> = {
         x: "X",
         status: "Status",
         configure: "Set up",
-        socialProviderNeedsSetup: "Open setup and enter the credentials for this channel.",
+        socialProviderNeedsSetup:
+            "Open setup and enter the credentials for this channel.",
         socialProviderSetup: "Set up channel",
         socialProviderSaved: "Channel settings were stored securely.",
         socialProviderHelpTitle: "How to get the credentials",
@@ -1169,21 +1240,33 @@ const workExtra: Record<MasterLocale, Record<string, string>> = {
         applicationSecret: "App secret / secure key",
         telegramBotToken: "Bot token from BotFather",
         callbackUrl: "Callback URL",
-        callbackUrlHint: "Add this URL to the app's allowed OAuth redirect URLs.",
-        secretStorageHint: "Secrets are encrypted and apply only to this business.",
+        callbackUrlHint:
+            "Add this URL to the app's allowed OAuth redirect URLs.",
+        secretStorageHint:
+            "Secrets are encrypted and apply only to this business.",
         saveAndConnect: "Save and connect",
-        socialProviderHelp_instagram_1: "Open Meta for Developers and create a Business app.",
-        socialProviderHelp_instagram_2: "Add Instagram Graph API and copy the App ID and App Secret.",
-        socialProviderHelp_instagram_3: "Add the callback URL shown below to the valid OAuth redirect URLs.",
-        socialProviderHelp_facebook_1: "Open Meta for Developers and create a Business app.",
-        socialProviderHelp_facebook_2: "Add Facebook Login and copy the App ID and App Secret.",
-        socialProviderHelp_facebook_3: "Add the callback URL shown below to the valid OAuth redirect URLs.",
+        socialProviderHelp_instagram_1:
+            "Open Meta for Developers and create a Business app.",
+        socialProviderHelp_instagram_2:
+            "Add Instagram Graph API and copy the App ID and App Secret.",
+        socialProviderHelp_instagram_3:
+            "Add the callback URL shown below to the valid OAuth redirect URLs.",
+        socialProviderHelp_facebook_1:
+            "Open Meta for Developers and create a Business app.",
+        socialProviderHelp_facebook_2:
+            "Add Facebook Login and copy the App ID and App Secret.",
+        socialProviderHelp_facebook_3:
+            "Add the callback URL shown below to the valid OAuth redirect URLs.",
         socialProviderHelp_vk_1: "Create a new application in VK ID.",
         socialProviderHelp_vk_2: "Copy the application ID and secure key.",
-        socialProviderHelp_vk_3: "Add the callback URL shown below in the application settings.",
-        socialProviderHelp_telegram_1: "Open @BotFather in Telegram and send /newbot.",
-        socialProviderHelp_telegram_2: "Follow the prompts and copy the bot token it gives you.",
-        socialProviderHelp_telegram_3: "Add the bot to your channel as an administrator, then enter @channel.",
+        socialProviderHelp_vk_3:
+            "Add the callback URL shown below in the application settings.",
+        socialProviderHelp_telegram_1:
+            "Open @BotFather in Telegram and send /newbot.",
+        socialProviderHelp_telegram_2:
+            "Follow the prompts and copy the bot token it gives you.",
+        socialProviderHelp_telegram_3:
+            "Add the bot to your channel as an administrator, then enter @channel.",
     },
     ru: {
         socialSaved: "Черновик сохранён.",
@@ -1210,7 +1293,8 @@ const workExtra: Record<MasterLocale, Record<string, string>> = {
         x: "X",
         status: "Статус",
         configure: "Настроить",
-        socialProviderNeedsSetup: "Откройте настройку и добавьте данные этого канала.",
+        socialProviderNeedsSetup:
+            "Откройте настройку и добавьте данные этого канала.",
         socialProviderSetup: "Настройка канала",
         socialProviderSaved: "Настройки канала защищённо сохранены.",
         socialProviderHelpTitle: "Как получить необходимые данные",
@@ -1219,21 +1303,33 @@ const workExtra: Record<MasterLocale, Record<string, string>> = {
         applicationSecret: "Секрет приложения / защищённый ключ",
         telegramBotToken: "Токен бота от BotFather",
         callbackUrl: "Адрес возврата (Callback URL)",
-        callbackUrlHint: "Добавьте этот адрес в разрешённые OAuth Redirect URL в настройках приложения.",
-        secretStorageHint: "Секреты хранятся в зашифрованном виде и относятся только к этому мастеру.",
+        callbackUrlHint:
+            "Добавьте этот адрес в разрешённые OAuth Redirect URL в настройках приложения.",
+        secretStorageHint:
+            "Секреты хранятся в зашифрованном виде и относятся только к этому мастеру.",
         saveAndConnect: "Сохранить и подключить",
-        socialProviderHelp_instagram_1: "Откройте Meta for Developers и создайте приложение типа Business.",
-        socialProviderHelp_instagram_2: "Добавьте Instagram Graph API и скопируйте ID и секрет приложения.",
-        socialProviderHelp_instagram_3: "Добавьте указанный ниже Callback URL в список разрешённых OAuth-адресов.",
-        socialProviderHelp_facebook_1: "Откройте Meta for Developers и создайте приложение типа Business.",
-        socialProviderHelp_facebook_2: "Добавьте Facebook Login и скопируйте ID и секрет приложения.",
-        socialProviderHelp_facebook_3: "Добавьте указанный ниже Callback URL в список разрешённых OAuth-адресов.",
+        socialProviderHelp_instagram_1:
+            "Откройте Meta for Developers и создайте приложение типа Business.",
+        socialProviderHelp_instagram_2:
+            "Добавьте Instagram Graph API и скопируйте ID и секрет приложения.",
+        socialProviderHelp_instagram_3:
+            "Добавьте указанный ниже Callback URL в список разрешённых OAuth-адресов.",
+        socialProviderHelp_facebook_1:
+            "Откройте Meta for Developers и создайте приложение типа Business.",
+        socialProviderHelp_facebook_2:
+            "Добавьте Facebook Login и скопируйте ID и секрет приложения.",
+        socialProviderHelp_facebook_3:
+            "Добавьте указанный ниже Callback URL в список разрешённых OAuth-адресов.",
         socialProviderHelp_vk_1: "Создайте новое приложение в кабинете VK ID.",
         socialProviderHelp_vk_2: "Скопируйте ID приложения и защищённый ключ.",
-        socialProviderHelp_vk_3: "Добавьте указанный ниже Callback URL в настройках приложения.",
-        socialProviderHelp_telegram_1: "Откройте @BotFather в Telegram и отправьте команду /newbot.",
-        socialProviderHelp_telegram_2: "Выполните его подсказки и скопируйте выданный токен бота.",
-        socialProviderHelp_telegram_3: "Добавьте бота администратором канала, затем укажите @имя_канала.",
+        socialProviderHelp_vk_3:
+            "Добавьте указанный ниже Callback URL в настройках приложения.",
+        socialProviderHelp_telegram_1:
+            "Откройте @BotFather в Telegram и отправьте команду /newbot.",
+        socialProviderHelp_telegram_2:
+            "Выполните его подсказки и скопируйте выданный токен бота.",
+        socialProviderHelp_telegram_3:
+            "Добавьте бота администратором канала, затем укажите @имя_канала.",
     },
     uk: {
         socialSaved: "Чернетку збережено.",
@@ -1260,7 +1356,8 @@ const workExtra: Record<MasterLocale, Record<string, string>> = {
         x: "X",
         status: "Статус",
         configure: "Налаштувати",
-        socialProviderNeedsSetup: "Відкрийте налаштування та додайте дані цього каналу.",
+        socialProviderNeedsSetup:
+            "Відкрийте налаштування та додайте дані цього каналу.",
         socialProviderSetup: "Налаштування каналу",
         socialProviderSaved: "Налаштування каналу захищено збережено.",
         socialProviderHelpTitle: "Як отримати необхідні дані",
@@ -1269,21 +1366,33 @@ const workExtra: Record<MasterLocale, Record<string, string>> = {
         applicationSecret: "Секрет застосунку / захищений ключ",
         telegramBotToken: "Токен бота від BotFather",
         callbackUrl: "Адреса повернення (Callback URL)",
-        callbackUrlHint: "Додайте цю адресу до дозволених OAuth Redirect URL у налаштуваннях застосунку.",
-        secretStorageHint: "Секрети зберігаються зашифрованими й належать лише цьому майстру.",
+        callbackUrlHint:
+            "Додайте цю адресу до дозволених OAuth Redirect URL у налаштуваннях застосунку.",
+        secretStorageHint:
+            "Секрети зберігаються зашифрованими й належать лише цьому майстру.",
         saveAndConnect: "Зберегти й підключити",
-        socialProviderHelp_instagram_1: "Відкрийте Meta for Developers і створіть застосунок типу Business.",
-        socialProviderHelp_instagram_2: "Додайте Instagram Graph API та скопіюйте ID і секрет застосунку.",
-        socialProviderHelp_instagram_3: "Додайте Callback URL нижче до списку дозволених OAuth-адрес.",
-        socialProviderHelp_facebook_1: "Відкрийте Meta for Developers і створіть застосунок типу Business.",
-        socialProviderHelp_facebook_2: "Додайте Facebook Login та скопіюйте ID і секрет застосунку.",
-        socialProviderHelp_facebook_3: "Додайте Callback URL нижче до списку дозволених OAuth-адрес.",
+        socialProviderHelp_instagram_1:
+            "Відкрийте Meta for Developers і створіть застосунок типу Business.",
+        socialProviderHelp_instagram_2:
+            "Додайте Instagram Graph API та скопіюйте ID і секрет застосунку.",
+        socialProviderHelp_instagram_3:
+            "Додайте Callback URL нижче до списку дозволених OAuth-адрес.",
+        socialProviderHelp_facebook_1:
+            "Відкрийте Meta for Developers і створіть застосунок типу Business.",
+        socialProviderHelp_facebook_2:
+            "Додайте Facebook Login та скопіюйте ID і секрет застосунку.",
+        socialProviderHelp_facebook_3:
+            "Додайте Callback URL нижче до списку дозволених OAuth-адрес.",
         socialProviderHelp_vk_1: "Створіть новий застосунок у кабінеті VK ID.",
         socialProviderHelp_vk_2: "Скопіюйте ID застосунку та захищений ключ.",
-        socialProviderHelp_vk_3: "Додайте Callback URL нижче в налаштуваннях застосунку.",
-        socialProviderHelp_telegram_1: "Відкрийте @BotFather у Telegram і надішліть команду /newbot.",
-        socialProviderHelp_telegram_2: "Виконайте його підказки та скопіюйте виданий токен бота.",
-        socialProviderHelp_telegram_3: "Додайте бота адміністратором каналу, потім укажіть @назву_каналу.",
+        socialProviderHelp_vk_3:
+            "Додайте Callback URL нижче в налаштуваннях застосунку.",
+        socialProviderHelp_telegram_1:
+            "Відкрийте @BotFather у Telegram і надішліть команду /newbot.",
+        socialProviderHelp_telegram_2:
+            "Виконайте його підказки та скопіюйте виданий токен бота.",
+        socialProviderHelp_telegram_3:
+            "Додайте бота адміністратором каналу, потім укажіть @назву_каналу.",
     },
 };
 export const masterText = (locale: string, key: string) =>

@@ -10,6 +10,7 @@ use App\Models\TenantReminder;
 use App\Models\TenantService;
 use App\Services\EntitlementService;
 use App\Services\ImageStorageService;
+use App\Services\LocalizedContentTranslationService;
 use App\Services\TenantCalendarService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +21,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class TenantCalendarController extends Controller
 {
@@ -86,7 +88,7 @@ class TenantCalendarController extends Controller
         return response()->json(['working_hours' => $tenant->workingHours()->orderBy('weekday')->get()]);
     }
 
-    public function saveService(Request $request, Tenant $tenant, EntitlementService $entitlements, ?TenantService $service = null): JsonResponse
+    public function saveService(Request $request, Tenant $tenant, EntitlementService $entitlements, LocalizedContentTranslationService $translations, ?TenantService $service = null): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($this->enabled($entitlements, $tenant, 'services_enabled', true), 403, 'SERVICES_NOT_INCLUDED');
@@ -95,8 +97,11 @@ class TenantCalendarController extends Controller
         }
 
         $data = $request->validate([
+            'source_locale' => ['nullable', Rule::in(['de', 'en', 'ru', 'uk'])],
             'name' => 'required|array',
+            'name.*' => 'nullable|string|max:160',
             'description' => 'nullable|array',
+            'description.*' => 'nullable|string|max:10000',
             'duration_minutes' => 'required|integer|between:10,1440',
             'buffer_before_minutes' => 'nullable|integer|between:0,240',
             'buffer_after_minutes' => 'nullable|integer|between:0,240',
@@ -109,9 +114,73 @@ class TenantCalendarController extends Controller
             'sort_order' => 'nullable|integer|min:0',
         ]);
 
+        $sourceLocale = $data['source_locale'] ?? (in_array($tenant->locale, ['de', 'en', 'ru', 'uk'], true) ? $tenant->locale : 'de');
+        unset($data['source_locale']);
+        if (blank(data_get($data, 'name.'.$sourceLocale))) {
+            throw ValidationException::withMessages(['name' => 'Enter the service name in the primary language.']);
+        }
+        $enabledLocales = (array) data_get($tenant->profile?->content, 'enabled_locales', [$sourceLocale]);
+        $translationLocales = array_values(array_unique([...$enabledLocales, $sourceLocale]));
+        $sourceChanged = ! $service
+            || data_get($service->name, $sourceLocale) !== data_get($data, 'name.'.$sourceLocale)
+            || data_get($service->description, $sourceLocale, '') !== data_get($data, 'description.'.$sourceLocale, '');
+        $translationMissing = collect($enabledLocales)
+            ->reject(fn ($locale) => $locale === $sourceLocale)
+            ->contains(fn ($locale) => blank(data_get($data, 'name.'.$locale)));
+
+        if (count($translationLocales) > 1 && ($sourceChanged || $translationMissing)) {
+            try {
+                $localized = $translations->translateService(
+                    (array) $data['name'],
+                    (array) ($data['description'] ?? []),
+                    $sourceLocale,
+                    $translationLocales,
+                    $request->user()?->id,
+                    $tenant->id,
+                );
+                $data['name'] = $localized['name'];
+                $data['description'] = $localized['description'];
+            } catch (Throwable $exception) {
+                report($exception);
+                throw ValidationException::withMessages(['translation' => 'Automatic translation failed: '.$exception->getMessage()]);
+            }
+        }
+
         $service ? $service->update($data) : $service = $tenant->services()->create($data);
 
         return response()->json(['service' => $service], $service->wasRecentlyCreated ? 201 : 200);
+    }
+
+    public function translateService(Request $request, Tenant $tenant, TenantService $service, LocalizedContentTranslationService $translations, EntitlementService $entitlements): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($this->enabled($entitlements, $tenant, 'services_enabled', true), 403, 'SERVICES_NOT_INCLUDED');
+        abort_unless($service->tenant_id === $tenant->id, 404);
+        $data = $request->validate([
+            'source_locale' => ['required', Rule::in(['de', 'en', 'ru', 'uk'])],
+            'name' => 'required|array',
+            'name.*' => 'nullable|string|max:160',
+            'description' => 'nullable|array',
+            'description.*' => 'nullable|string|max:10000',
+        ]);
+        $enabledLocales = (array) data_get($tenant->profile?->content, 'enabled_locales', [$data['source_locale']]);
+
+        try {
+            $localized = $translations->translateService(
+                (array) $data['name'],
+                (array) ($data['description'] ?? []),
+                $data['source_locale'],
+                $enabledLocales,
+                $request->user()?->id,
+                $tenant->id,
+            );
+            $service->update($localized);
+        } catch (Throwable $exception) {
+            report($exception);
+            throw ValidationException::withMessages(['translation' => 'Automatic translation failed: '.$exception->getMessage()]);
+        }
+
+        return response()->json(['service' => $service->fresh()]);
     }
 
     public function uploadServiceImage(Request $request, Tenant $tenant, TenantService $service, ImageStorageService $images): JsonResponse
