@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\SendSmsMessage;
+use App\Models\AiUsageRecord;
 use App\Models\BusinessClassification;
 use App\Models\BusinessPhrase;
 use App\Models\BusinessVariation;
@@ -685,11 +686,71 @@ class SaasFoundationTest extends TestCase
     public function test_control_dashboard_returns_clickable_tasks_metrics_and_activity(): void
     {
         $admin = User::factory()->create(['is_super_admin' => true]);
-        Tenant::create(['name' => 'Recent Client', 'slug' => 'recent-client', 'country' => 'DE', 'locale' => 'de', 'status' => 'active']);
+        $tenant = Tenant::create(['name' => 'Recent Client', 'slug' => 'recent-client', 'country' => 'DE', 'locale' => 'de', 'status' => 'active']);
+        AiUsageRecord::create([
+            'tenant_id' => $tenant->id,
+            'operation' => 'translation',
+            'model' => 'gpt-test',
+            'input_tokens' => 120,
+            'output_tokens' => 30,
+            'cost' => .0123,
+            'usage_date' => today(),
+        ]);
 
         $this->actingAs($admin)->getJson('/api/control/dashboard')->assertOk()
-            ->assertJsonStructure(['tenants', 'mrr', 'metrics' => [['key', 'value', 'to']], 'tasks', 'recent' => [['title', 'to']]])
+            ->assertJsonStructure(['tenants', 'mrr', 'metrics' => [['key', 'value', 'to']], 'ai_usage' => ['local', 'openai'], 'tasks', 'recent' => [['title', 'to']]])
+            ->assertJsonPath('ai_usage.local.requests', 1)
+            ->assertJsonPath('ai_usage.local.input_tokens', 120)
+            ->assertJsonPath('ai_usage.local.by_tenant.0.tenant_name', 'Recent Client')
+            ->assertJsonPath('ai_usage.openai.status', 'not_configured')
+            ->assertJsonFragment(['key' => 'ai_spend_month', 'to' => '/control/settings/openai'])
             ->assertJsonPath('metrics.0.to', '/control/tenants');
+    }
+
+    public function test_openai_admin_key_is_encrypted_and_usage_costs_can_be_synchronized(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $settings = $this->actingAs($admin)->getJson('/api/control/settings')->assertOk()->json('settings');
+        $settings['openai_project_id'] = 'proj_lookdo';
+        $settings['openai_admin_key'] = 'sk-admin-lookdo-secret';
+
+        $this->actingAs($admin)->putJson('/api/control/settings', ['settings' => $settings])
+            ->assertOk()
+            ->assertJsonPath('openai.admin_key_configured', true)
+            ->assertJsonPath('openai.project_id', 'proj_lookdo')
+            ->assertJsonMissing(['openai_admin_key' => 'sk-admin-lookdo-secret']);
+
+        $this->assertSame('sk-admin-lookdo-secret', SystemSetting::readSecret('openai_admin_key'));
+        $this->assertNotSame('sk-admin-lookdo-secret', SystemSetting::where('key', 'openai_admin_key')->firstOrFail()->value);
+
+        Http::fake([
+            'api.openai.com/v1/organization/costs*' => Http::response(['data' => [['results' => [[
+                'amount' => ['value' => .106, 'currency' => 'usd'],
+                'line_item' => 'Model usage',
+            ]]]]]),
+            'api.openai.com/v1/organization/usage/completions*' => Http::response(['data' => [['results' => [[
+                'input_tokens' => 102,
+                'input_cached_tokens' => 0,
+                'output_tokens' => 45,
+                'num_model_requests' => 3,
+            ]]]]]),
+            'api.openai.com/v1/organization/usage/images*' => Http::response(['data' => [['results' => [[
+                'images' => 2,
+                'num_model_requests' => 2,
+            ]]]]]),
+        ]);
+
+        $this->actingAs($admin)->postJson('/api/control/openai/test')->assertOk()
+            ->assertJsonPath('status', 'connected')
+            ->assertJsonPath('project_id', 'proj_lookdo')
+            ->assertJsonPath('month_cost', .106)
+            ->assertJsonPath('requests', 5)
+            ->assertJsonPath('input_tokens', 102)
+            ->assertJsonPath('output_tokens', 45)
+            ->assertJsonPath('images', 2);
+
+        Http::assertSentCount(3);
+        Http::assertSent(fn (HttpRequest $request): bool => $request->hasHeader('Authorization', 'Bearer sk-admin-lookdo-secret'));
     }
 
     public function test_storage_backup_is_finalized_even_when_storage_has_no_user_files(): void

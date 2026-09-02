@@ -167,6 +167,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::post('/stripe/sync-plans', [AdminController::class, 'syncAllPlans']);
             Route::get('/sms', [SmsAdminController::class, 'index']);
             Route::post('/sms/test', [SmsAdminController::class, 'testConnection'])->middleware('throttle:10,1');
+            Route::post('/openai/test', [AdminController::class, 'testOpenAiUsage'])->middleware('throttle:10,1');
             Route::get('/backups', [AdminController::class, 'backups']);
             Route::post('/backups', [AdminController::class, 'createBackup']);
             Route::post('/backups/tenants/{tenant}', [AdminController::class, 'createTenantBackup']);

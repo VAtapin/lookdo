@@ -10,8 +10,9 @@ const busy = ref(false);
 const error = ref('');
 const notice = ref('');
 const persistedSmsEnabled = computed(() => Boolean(props.data?.settings?.integrations?.sms));
+const persistedOpenAiAdminKey = computed(() => Boolean(props.data?.openai?.admin_key_configured));
 const locales = [['de', 'Deutsch'], ['en', 'English'], ['ru', 'Русский'], ['uk', 'Українська']];
-const allowedGroups = ['legal', 'platform', 'media', 'sms', 'operation'];
+const allowedGroups = ['legal', 'platform', 'media', 'sms', 'openai', 'operation'];
 const group = computed(() => {
     const value = String(route.params.settingsGroup || '');
     return allowedGroups.includes(value) ? value : '';
@@ -26,6 +27,7 @@ const form = reactive<any>({
     enabled_locales: ['de', 'en', 'ru', 'uk'], integrations: { stripe: true, openai: true, sms: false },
     sms_provider: 'seven', sms_sender: 'LOOKDO', sms_events: { request_received: true, master_replied: true, work_ready: true, agreement_reminder: true },
     sms_seven_api_key: '', sms_seven_signing_key: '', sms_clear_api_key: false, sms_clear_signing_key: false,
+    openai_project_id: '', openai_admin_key: '', openai_clear_admin_key: false,
     legal_operator_name: '', legal_operator_address: '', legal_representative: '', legal_email: '', legal_phone: '', legal_register: '', legal_vat_id: '',
 });
 
@@ -36,6 +38,7 @@ function hydrate() {
         integrations: { stripe: true, openai: true, sms: false, ...(settings.integrations || {}) },
         sms_events: { request_received: true, master_replied: true, work_ready: true, agreement_reminder: true, ...(settings.sms_events || {}) },
         sms_seven_api_key: '', sms_seven_signing_key: '', sms_clear_api_key: false, sms_clear_signing_key: false,
+        openai_admin_key: '', openai_clear_admin_key: false,
     });
 }
 watch(() => props.data, hydrate, { immediate: true, deep: true });
@@ -45,6 +48,7 @@ const sections = computed(() => [
     { key: 'platform', icon: '⚙', title: 'Allgemeine Plattformparameter', description: 'Name, Standardsprache, Standardvorlage, Testtage und Upload-Limit.', status: form.default_request_template_code ? 'Eingerichtet' : 'Unvollständig', tone: form.default_request_template_code ? 'ready' : 'warning' },
     { key: 'media', icon: '▣', title: 'Freigabe, Vorschaubilder und Demo', description: 'Vier Sprachbilder für WhatsApp und soziale Netzwerke sowie das Demo-Video.', status: `${locales.filter(([code]) => form.social_share_images?.[code]).length}/4 Bilder`, tone: 'ready' },
     { key: 'sms', icon: '✉', title: 'SMS-Gateway', description: 'Provider, Schlüssel, Absender, Zustellberichte und wichtige Ereignisse.', status: form.integrations.sms ? 'Aktiv' : 'Deaktiviert', tone: form.integrations.sms ? 'ready' : 'muted' },
+    { key: 'openai', icon: '✦', title: 'OpenAI-Verbrauch und Kosten', description: 'Offizielle Organisationskosten mit dem lokalen Verbrauch pro Kunde abgleichen.', status: persistedOpenAiAdminKey.value ? 'Verbunden' : 'Nicht verbunden', tone: persistedOpenAiAdminKey.value ? 'ready' : 'warning' },
     { key: 'operation', icon: '◉', title: 'Betrieb, Integrationen und Sprachen', description: 'Registrierung, Wartungsmodus, Stripe, OpenAI, SMS und Plattformsprachen.', status: form.maintenance ? 'Wartungsmodus' : 'Online', tone: form.maintenance ? 'warning' : 'ready' },
 ]);
 
@@ -86,6 +90,19 @@ async function testSms() {
     try {
         const result = await api<any>('/control/sms/test', { method: 'POST' });
         showNotice(`seven.io verbunden · Guthaben ${Number(result.balance.amount).toFixed(2)} ${result.balance.currency}`);
+    } catch (exception: any) { error.value = exception.message; }
+    finally { busy.value = false; }
+}
+
+async function testOpenAi() {
+    if (!persistedOpenAiAdminKey.value) {
+        error.value = 'OpenAI Admin Key zuerst speichern.';
+        return;
+    }
+    busy.value = true; error.value = '';
+    try {
+        const result = await api<any>('/control/openai/test', { method: 'POST' });
+        showNotice(`OpenAI verbunden · ${Number(result.month_cost || 0).toFixed(4)} ${String(result.currency || 'usd').toUpperCase()} in diesem Monat`);
     } catch (exception: any) { error.value = exception.message; }
     finally { busy.value = false; }
 }
@@ -146,6 +163,17 @@ async function testSms() {
             <div class="settings-form-grid"><label>Anbieter<select v-model="form.sms_provider"><option v-for="provider in data.sms.providers" :key="provider.value" :value="provider.value">{{ provider.label }}</option></select></label><label>Absender<input v-model="form.sms_sender" maxlength="16" placeholder="LOOKDO"><small>Maximal 11 alphanumerische oder 16 numerische Zeichen.</small></label><label>seven.io API-Key<input v-model="form.sms_seven_api_key" type="password" autocomplete="new-password" :placeholder="data.sms.api_key_configured ? 'Gespeichert – leer lassen, um beizubehalten' : 'API-Key eintragen'"><small>{{ data.sms.api_key_configured ? 'API-Key ist verschlüsselt gespeichert.' : 'Noch kein API-Key gespeichert.' }}</small></label><label>seven.io Signing Key<input v-model="form.sms_seven_signing_key" type="password" autocomplete="new-password" :placeholder="data.sms.signing_key_configured ? 'Gespeichert – leer lassen, um beizubehalten' : 'Signing Key eintragen'"><small>{{ data.sms.signing_key_configured ? 'Signing Key ist verschlüsselt gespeichert.' : 'Für sichere Delivery-Reports erforderlich.' }}</small></label><label class="wide">Delivery-Webhook<input :value="data.sms.webhook_url" readonly></label><label class="check"><input v-model="form.sms_clear_api_key" type="checkbox"> Gespeicherten API-Key löschen</label><label class="check"><input v-model="form.sms_clear_signing_key" type="checkbox"> Gespeicherten Signing Key löschen</label></div>
             <div class="sms-event-settings"><h3>Wichtige Ereignisse</h3><div class="settings-choice-grid"><label class="settings-toggle"><input v-model="form.sms_events.request_received" type="checkbox"><span><b>Anfrage erhalten</b><small>Bestätigung für den Endkunden.</small></span></label><label class="settings-toggle"><input v-model="form.sms_events.master_replied" type="checkbox"><span><b>Meister hat geantwortet</b><small>Hinweis mit Link zur Antwort.</small></span></label><label class="settings-toggle"><input v-model="form.sms_events.work_ready" type="checkbox"><span><b>Arbeit fertig</b><small>Benachrichtigung über die Fertigstellung.</small></span></label><label class="settings-toggle"><input v-model="form.sms_events.agreement_reminder" type="checkbox"><span><b>Vereinbarung erinnern</b><small>Erinnerung an Termin oder Absprache.</small></span></label></div></div>
             <div class="settings-panel-actions"><span>{{ !form.integrations.sms ? 'SMS-Versand ist global deaktiviert.' : !persistedSmsEnabled ? 'Aktivierung zuerst speichern.' : 'Neue Schlüssel zuerst speichern, danach kann die Verbindung geprüft werden.' }}</span><button type="button" class="button ghost" :disabled="busy || !persistedSmsEnabled || !data.sms.api_key_configured" @click="testSms">seven.io-Verbindung prüfen</button></div>
+        </section>
+
+        <section v-if="group === 'openai'" class="settings-panel openai-settings">
+            <div class="settings-panel-head"><p class="eyebrow">OPENAI USAGE & COSTS</p><h2>Offizielle Kosten abgleichen</h2><p>LOOKDO vergleicht den eigenen Verbrauch pro Kunde mit den abrechnungsrelevanten Organisationskosten von OpenAI.</p></div>
+            <div class="openai-connection-note"><strong>Zwei getrennte Schlüssel</strong><p>Der normale OPENAI_API_KEY führt Anfragen aus. Für organisationsweite Usage- und Costs-Daten verlangt OpenAI zusätzlich einen Admin Key des Organization Owners.</p></div>
+            <div class="settings-form-grid">
+                <label>OpenAI Project ID<input v-model.trim="form.openai_project_id" placeholder="proj_…"><small>Optional. Leer lassen, um alle Projekte der Organisation zu summieren.</small></label>
+                <label>OpenAI Admin Key<input v-model="form.openai_admin_key" type="password" autocomplete="new-password" :placeholder="data.openai.admin_key_configured ? 'Gespeichert – leer lassen, um beizubehalten' : 'sk-admin-…'"><small>{{ data.openai.admin_key_configured ? 'Admin Key ist verschlüsselt gespeichert.' : 'Nur ein Organization Owner kann diesen Schlüssel erstellen.' }}</small></label>
+                <label class="check"><input v-model="form.openai_clear_admin_key" type="checkbox"> Gespeicherten Admin Key löschen</label>
+            </div>
+            <div class="settings-panel-actions"><span><a :href="data.openai.admin_keys_url" target="_blank" rel="noopener">Admin Key bei OpenAI erstellen ↗</a> · <a :href="data.openai.usage_dashboard_url" target="_blank" rel="noopener">OpenAI Usage öffnen ↗</a></span><button type="button" class="button ghost" :disabled="busy || !persistedOpenAiAdminKey" @click="testOpenAi">Verbindung und Kosten prüfen</button></div>
         </section>
 
         <section v-if="group === 'operation'" class="settings-panel">

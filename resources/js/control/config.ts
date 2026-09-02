@@ -62,6 +62,7 @@ export const metricLabels: Record<string, string> = {
     domains_attention: "Domains prüfen",
     classifications_30d: "Klassifizierungen (30 Tage)",
     ai_spend_month: "KI-Kosten im Monat",
+    openai_spend_month: "OpenAI-Abrechnung im Monat",
     mrr: "Monatlicher Umsatz",
 };
 export const smsEventLabels: Record<string, string> = {

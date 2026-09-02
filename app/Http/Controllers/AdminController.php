@@ -21,6 +21,7 @@ use App\Services\BackupService;
 use App\Services\BusinessClassifier;
 use App\Services\ImageStorageService;
 use App\Services\OpenAiBudgetService;
+use App\Services\OpenAiOrganizationUsageService;
 use App\Services\OpenAiService;
 use App\Services\StripeService;
 use App\Services\TenantBackupService;
@@ -35,8 +36,35 @@ use Throwable;
 
 class AdminController extends Controller
 {
-    public function dashboard(): JsonResponse
+    public function dashboard(OpenAiOrganizationUsageService $organizationUsage): JsonResponse
     {
+        $monthStart = now()->startOfMonth();
+        $localAiQuery = AiUsageRecord::query()->where('created_at', '>=', $monthStart);
+        $localAi = [
+            'month_cost' => (float) (clone $localAiQuery)->sum('cost'),
+            'requests' => (clone $localAiQuery)->count(),
+            'input_tokens' => (int) (clone $localAiQuery)->sum('input_tokens'),
+            'output_tokens' => (int) (clone $localAiQuery)->sum('output_tokens'),
+            'images' => (clone $localAiQuery)->where('input_tokens', 0)->where('output_tokens', 0)->count(),
+            'budget' => (float) config('services.openai.monthly_budget'),
+            'by_tenant' => AiUsageRecord::query()
+                ->leftJoin('tenants', 'tenants.id', '=', 'ai_usage_records.tenant_id')
+                ->where('ai_usage_records.created_at', '>=', $monthStart)
+                ->selectRaw("COALESCE(tenants.name, 'Plattform') as tenant_name, ai_usage_records.tenant_id, COUNT(*) as requests, SUM(ai_usage_records.input_tokens + ai_usage_records.output_tokens) as tokens, SUM(ai_usage_records.cost) as cost")
+                ->groupBy('ai_usage_records.tenant_id', 'tenants.name')
+                ->orderByDesc('cost')
+                ->limit(8)
+                ->get()
+                ->map(fn ($row): array => [
+                    'tenant_id' => $row->tenant_id,
+                    'tenant_name' => $row->tenant_name,
+                    'requests' => (int) $row->requests,
+                    'tokens' => (int) $row->tokens,
+                    'cost' => (float) $row->cost,
+                ]),
+        ];
+        $openAiUsage = $organizationUsage->summary();
+
         $metrics = [
             'tenants' => Tenant::count(),
             'active_tenants' => Tenant::where('status', 'active')->count(),
@@ -45,7 +73,8 @@ class AdminController extends Controller
             'complimentary' => Tenant::where('manual_access_until', '>', now())->count(),
             'domains_attention' => TenantDomain::whereIn('status', ['failed', 'verifying', 'ssl_pending'])->count(),
             'classifications_30d' => BusinessClassification::where('created_at', '>=', now()->subDays(30))->count(),
-            'ai_spend_month' => (float) AiUsageRecord::where('created_at', '>=', now()->startOfMonth())->sum('cost'),
+            'ai_spend_month' => $localAi['month_cost'],
+            'openai_spend_month' => $openAiUsage['status'] === 'connected' ? (float) $openAiUsage['month_cost'] : null,
             'mrr' => (float) Subscription::join('plans', 'plans.id', '=', 'subscriptions.plan_id')->where('subscriptions.status', 'active')->where('subscriptions.complimentary', false)->sum(DB::raw('plans.price_monthly * (100 - subscriptions.discount_percent) / 100')),
         ];
 
@@ -92,7 +121,13 @@ class AdminController extends Controller
                 ['key' => 'trialing', 'value' => $metrics['trialing'], 'to' => '/control/subscriptions'],
                 ['key' => 'paid', 'value' => $metrics['paid'], 'to' => '/control/subscriptions'],
                 ['key' => 'domains_attention', 'value' => $metrics['domains_attention'], 'to' => '/control/tenants'],
+                ['key' => 'ai_spend_month', 'value' => $metrics['ai_spend_month'], 'to' => '/control/settings/openai'],
+                ['key' => 'openai_spend_month', 'value' => $metrics['openai_spend_month'], 'to' => '/control/settings/openai'],
                 ['key' => 'mrr', 'value' => $metrics['mrr'], 'to' => '/control/subscriptions'],
+            ],
+            'ai_usage' => [
+                'local' => $localAi,
+                'openai' => $openAiUsage,
             ],
             'tasks' => $tasks,
             'recent' => $recentTenants->concat($recentAudits)->sortByDesc('created_at')->take(8)->values(),
@@ -412,6 +447,12 @@ class AdminController extends Controller
                 'signing_key_configured' => filled(SystemSetting::readSecret('sms_seven_signing_key')),
                 'webhook_url' => rtrim((string) config('app.url'), '/').'/api/webhooks/seven/sms',
             ],
+            'openai' => [
+                'admin_key_configured' => filled(SystemSetting::readSecret('openai_admin_key')),
+                'project_id' => (string) SystemSetting::read('openai_project_id', ''),
+                'usage_dashboard_url' => 'https://platform.openai.com/usage',
+                'admin_keys_url' => 'https://platform.openai.com/settings/organization/admin-keys',
+            ],
         ]);
     }
 
@@ -453,6 +494,9 @@ class AdminController extends Controller
             'settings.sms_seven_signing_key' => 'nullable|string|max:1024',
             'settings.sms_clear_api_key' => 'nullable|boolean',
             'settings.sms_clear_signing_key' => 'nullable|boolean',
+            'settings.openai_project_id' => ['nullable', 'string', 'max:120', 'regex:/^proj_[A-Za-z0-9_-]+$/'],
+            'settings.openai_admin_key' => 'nullable|string|max:1024',
+            'settings.openai_clear_admin_key' => 'nullable|boolean',
             'settings.legal_operator_name' => 'nullable|string|max:255',
             'settings.legal_operator_address' => 'nullable|string|max:2000',
             'settings.legal_representative' => 'nullable|string|max:255',
@@ -466,6 +510,7 @@ class AdminController extends Controller
             'platform_name', 'support_email', 'default_locale', 'default_request_template_code',
             'trial_days_default', 'upload_base_limit_mb', 'social_share_image_url', 'social_share_images', 'demo_video_source', 'demo_video_url', 'registration_enabled', 'maintenance',
             'enabled_locales', 'integrations', 'sms_provider', 'sms_sender', 'sms_events', 'legal_operator_name', 'legal_operator_address',
+            'openai_project_id',
             'legal_representative', 'legal_email', 'legal_phone', 'legal_register', 'legal_vat_id',
         ];
         if (($data['settings']['demo_video_source'] ?? 'none') !== 'none' && blank($data['settings']['demo_video_url'] ?? null)) {
@@ -493,6 +538,7 @@ class AdminController extends Controller
             foreach ([
                 'sms_seven_api_key' => 'sms_clear_api_key',
                 'sms_seven_signing_key' => 'sms_clear_signing_key',
+                'openai_admin_key' => 'openai_clear_admin_key',
             ] as $secretKey => $clearKey) {
                 if ($data['settings'][$clearKey] ?? false) {
                     SystemSetting::writeSecret($secretKey, null);
@@ -503,6 +549,16 @@ class AdminController extends Controller
         });
 
         return $this->settings();
+    }
+
+    public function testOpenAiUsage(OpenAiOrganizationUsageService $usage): JsonResponse
+    {
+        $result = $usage->summary(true);
+        if (($result['status'] ?? null) !== 'connected') {
+            throw ValidationException::withMessages(['openai_admin_key' => $result['error'] ?? 'OpenAI Admin Key ist nicht konfiguriert.']);
+        }
+
+        return response()->json($result);
     }
 
     public function savePage(Request $request, PlatformPage $page, AuditService $audit): JsonResponse
