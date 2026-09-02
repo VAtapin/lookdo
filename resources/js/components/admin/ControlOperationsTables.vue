@@ -3,7 +3,7 @@ const props = defineProps<{ ctx: any }>();
 const {
     section,
     rows,
-    backupAction,
+    tenantBackupAction,
     formatDate,
     smsEventLabels,
     smsStatusLabels,
@@ -16,7 +16,7 @@ const {
         <tr>
             <th>Backup</th>
             <th>Erstellt</th>
-            <th>Dateien</th>
+            <th>Inhalt</th>
             <th>Aktionen</th>
         </tr>
     </thead>
@@ -24,17 +24,21 @@ const {
         <tr v-for="item in rows" :key="item.name">
             <td>
                 <b>{{ item.name }}</b>
+                <small>{{ item.reason === 'pre-restore' ? 'Sicherheitskopie vor Wiederherstellung' : item.reason === 'scheduled' ? 'Automatisch' : 'Manuell' }}</small>
             </td>
             <td>{{ formatDate(item.created_at) }}</td>
             <td>
-                {{ Object.keys(item.files || {}).length }}
+                {{ Object.values(item.rows || {}).reduce((sum: number, count: any) => sum + Number(count || 0), 0) }} Datensätze ·
+                {{ item.file_count || 0 }} Dateien
             </td>
             <td class="table-actions">
-                <button @click="backupAction('verify', item.name)">
+                <button @click="tenantBackupAction('verify', item.name)">
                     Prüfen</button
+                ><button @click="tenantBackupAction('restore', item.name)">
+                    Wiederherstellen</button
                 ><button
                     class="danger"
-                    @click="backupAction('delete', item.name)"
+                    @click="tenantBackupAction('delete', item.name)"
                 >
                     Löschen
                 </button>

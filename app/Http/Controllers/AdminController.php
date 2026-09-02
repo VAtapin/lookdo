@@ -23,6 +23,7 @@ use App\Services\ImageStorageService;
 use App\Services\OpenAiBudgetService;
 use App\Services\OpenAiService;
 use App\Services\StripeService;
+use App\Services\TenantBackupService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -604,9 +605,25 @@ class AdminController extends Controller
         return response()->json(['ok' => true, 'count' => $count]);
     }
 
-    public function backups(BackupService $backups): JsonResponse
+    public function backups(Request $request, BackupService $backups, TenantBackupService $tenantBackups): JsonResponse
     {
-        return response()->json(['path' => config('backup.path'), 'keep' => config('backup.keep'), 'backups' => $backups->list()]);
+        $tenants = Tenant::query()->orderBy('name')->get(['id', 'name', 'slug', 'status']);
+        $selectedId = $request->integer('tenant_id') ?: (int) ($tenants->first()?->id ?? 0);
+        $selected = $selectedId ? $tenants->firstWhere('id', $selectedId) : null;
+        if ($selectedId && ! $selected) {
+            throw ValidationException::withMessages(['tenant_id' => 'Der ausgewählte Kunde wurde nicht gefunden.']);
+        }
+
+        return response()->json([
+            'path' => $tenantBackups->path(),
+            'keep' => config('backup.tenant_keep'),
+            'selected_tenant_id' => $selected?->id,
+            'tenants' => $tenants,
+            'backups' => $selected ? $tenantBackups->list($selected) : [],
+            'platform_backups' => $backups->list(),
+            'platform_path' => config('backup.path'),
+            'platform_keep' => config('backup.keep'),
+        ]);
     }
 
     public function createBackup(BackupService $backups, AuditService $audit): JsonResponse
@@ -626,6 +643,40 @@ class AdminController extends Controller
     {
         $backups->delete($name);
         $audit->log('backup.deleted', null, ['name' => $name], null);
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function createTenantBackup(Tenant $tenant, TenantBackupService $backups, AuditService $audit): JsonResponse
+    {
+        $manifest = $backups->create($tenant);
+        $audit->log('tenant_backup.created', $tenant, null, ['name' => $manifest['name']], $tenant->id);
+
+        return response()->json($manifest, 201);
+    }
+
+    public function verifyTenantBackup(Tenant $tenant, string $name, TenantBackupService $backups): JsonResponse
+    {
+        return response()->json($backups->verify($tenant, $name));
+    }
+
+    public function restoreTenantBackup(Request $request, Tenant $tenant, string $name, TenantBackupService $backups, AuditService $audit): JsonResponse
+    {
+        $data = $request->validate(['confirmation' => ['required', 'string']]);
+        if (! hash_equals($tenant->slug, trim($data['confirmation']))) {
+            throw ValidationException::withMessages(['confirmation' => 'Zur Bestätigung muss der Kundencode exakt eingegeben werden.']);
+        }
+
+        $result = $backups->restore($tenant, $name);
+        $audit->log('tenant_backup.restored', $tenant, ['name' => $name], ['safety_backup' => $result['safety_backup']], $tenant->id);
+
+        return response()->json($result);
+    }
+
+    public function deleteTenantBackup(Tenant $tenant, string $name, TenantBackupService $backups, AuditService $audit): JsonResponse
+    {
+        $backups->delete($tenant, $name);
+        $audit->log('tenant_backup.deleted', $tenant, ['name' => $name], null, $tenant->id);
 
         return response()->json(['ok' => true]);
     }

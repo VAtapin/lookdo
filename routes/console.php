@@ -9,4 +9,5 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('backup:create')->dailyAt('02:30')->withoutOverlapping();
+Schedule::command('backup:tenant --all')->dailyAt('03:15')->withoutOverlapping();
 Schedule::command('backup:verify')->dailyAt('04:00')->withoutOverlapping();

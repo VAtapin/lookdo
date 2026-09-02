@@ -19,6 +19,9 @@ const {
     statusOptions,
     sortOptions,
     backupAction,
+    backupTenantId,
+    selectBackupTenant,
+    tenantBackupAction,
     changePage,
 } = ctx;
 </script>
@@ -115,6 +118,20 @@ const {
                 <option :value="100">100</option>
             </select></RegistryToolbar
         >
+        <div v-if="section === 'backups'" class="registry-context backup-tenant-context">
+            <label>
+                <span>Kunde</span>
+                <select v-model="backupTenantId" @change="selectBackupTenant">
+                    <option v-for="tenant in data.tenants || []" :key="tenant.id" :value="tenant.id">
+                        {{ tenant.name }} · {{ tenant.slug }}
+                    </option>
+                </select>
+            </label>
+            <span>Getrennte Aufbewahrung: {{ data.keep }} Stände je Kunde</span>
+            <button class="button" :disabled="busy || !backupTenantId" @click="tenantBackupAction('create')">
+                ＋ Kundenbackup erstellen
+            </button>
+        </div>
         <div class="admin-table-wrap">
             <table>
                 <ControlCustomerTables :ctx="ctx" />
@@ -132,14 +149,14 @@ const {
             >
         </div>
         <div v-if="section === 'backups'" class="registry-context">
-            <span>Speicherort: {{ data.path }}</span
-            ><span>Aufbewahrung: {{ data.keep }}</span
+            <span>Systembackup (alle Kunden): {{ (data.platform_backups || []).length }} vorhanden</span
+            ><span>Speicherort: {{ data.platform_path }}</span
             ><button
                 class="button"
                 :disabled="busy"
                 @click="backupAction('create')"
             >
-                ＋ Backup erstellen
+                ＋ Vollständiges Systembackup
             </button>
         </div>
         <AdminPagination

@@ -164,6 +164,10 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::post('/sms/test', [SmsAdminController::class, 'testConnection'])->middleware('throttle:10,1');
             Route::get('/backups', [AdminController::class, 'backups']);
             Route::post('/backups', [AdminController::class, 'createBackup']);
+            Route::post('/backups/tenants/{tenant}', [AdminController::class, 'createTenantBackup']);
+            Route::post('/backups/tenants/{tenant}/{name}/verify', [AdminController::class, 'verifyTenantBackup']);
+            Route::post('/backups/tenants/{tenant}/{name}/restore', [AdminController::class, 'restoreTenantBackup']);
+            Route::delete('/backups/tenants/{tenant}/{name}', [AdminController::class, 'deleteTenantBackup']);
             Route::post('/backups/{name}/verify', [AdminController::class, 'verifyBackup']);
             Route::delete('/backups/{name}', [AdminController::class, 'deleteBackup']);
             Route::get('/taxonomy', [AdminController::class, 'taxonomy']);

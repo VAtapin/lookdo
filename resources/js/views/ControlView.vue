@@ -49,6 +49,7 @@ const selectedTenant = ref<any>(null);
 const selectedPage = ref<any>(null);
 const selectedTemplate = ref<any>(null);
 const selectedAudit = ref<any>(null);
+const backupTenantId = ref<number | string>("");
 const confirmAction = ref<any>(null);
 const pageTranslation = reactive<{
     phase: "idle" | "running" | "ready" | "error";
@@ -109,6 +110,11 @@ async function load() {
             ]);
             data.value = plans;
             entitlementCatalog.value = catalog;
+        } else if (section.value === "backups") {
+            data.value = await api(
+                `${url}${backupTenantId.value ? `?tenant_id=${backupTenantId.value}` : ""}`,
+            );
+            backupTenantId.value = data.value?.selected_tenant_id || "";
         } else
             data.value = await api(
                 serverSections.has(section.value)
@@ -816,6 +822,52 @@ async function backupAction(action: string, name?: string) {
               : "Backup wurde gelöscht.",
     );
 }
+async function selectBackupTenant() {
+    filters.page = 1;
+    await load();
+}
+async function tenantBackupAction(action: string, name?: string) {
+    const tenant = (data.value?.tenants || []).find(
+        (item: any) => Number(item.id) === Number(backupTenantId.value),
+    );
+    if (!tenant) return;
+    let confirmation: string | null = null;
+    if (action === "restore") {
+        confirmation = window.prompt(
+            `Der Inhalt von „${tenant.name}“ wird auf diesen Stand zurückgesetzt. Abrechnung, Domains und Zugänge bleiben unverändert.\n\nZur Bestätigung Kundencode eingeben: ${tenant.slug}`,
+        );
+        if (confirmation === null) return;
+    }
+    if (
+        action === "delete" &&
+        !confirm(`Backup ${name} von ${tenant.name} wirklich löschen?`)
+    )
+        return;
+    const suffix = name ? `/${encodeURIComponent(name)}` : "";
+    const actionSuffix = ["verify", "restore"].includes(action)
+        ? `/${action}`
+        : "";
+    await submit(
+        () =>
+            api(
+                `/control/backups/tenants/${tenant.id}${suffix}${actionSuffix}`,
+                {
+                    method: action === "delete" ? "DELETE" : "POST",
+                    body:
+                        action === "restore"
+                            ? JSON.stringify({ confirmation })
+                            : undefined,
+                },
+            ),
+        action === "create"
+            ? `Backup für ${tenant.name} wurde erstellt.`
+            : action === "verify"
+              ? "Backup ist vollständig."
+              : action === "restore"
+                ? `${tenant.name} wurde wiederhergestellt. Ein Sicherheitsbackup des vorherigen Stands wurde angelegt.`
+                : "Backup wurde gelöscht.",
+    );
+}
 const {
     editPage,
     closePageEditor,
@@ -875,6 +927,9 @@ const controlContext = {
     togglePhrase,
     editPage,
     backupAction,
+    backupTenantId,
+    selectBackupTenant,
+    tenantBackupAction,
     smsEventLabels,
     smsStatusLabels,
     modal,
