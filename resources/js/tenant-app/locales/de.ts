@@ -75,30 +75,40 @@ export default {
     notificationBenefit3Text: "Wir geben Ihre Daten nicht an Dritte weiter.",
     notificationEnabled: "Benachrichtigungen sind aktiviert.",
     notificationDenied: "Benachrichtigungen wurden nicht erlaubt.",
-    notificationConfigurationError: "Benachrichtigungen werden gerade eingerichtet. Bitte versuchen Sie es in einer Minute erneut.",
+    notificationConfigurationError:
+        "Benachrichtigungen werden gerade eingerichtet. Bitte versuchen Sie es in einer Minute erneut.",
     notificationsMenu: "Benachrichtigungen",
     notificationUnsupported: "Auf diesem Gerät nicht unterstützt",
-    notificationUnsupportedText: "Benachrichtigungen sind auf diesem Gerät oder für diesen Kunden derzeit nicht verfügbar.",
+    notificationUnsupportedText:
+        "Benachrichtigungen sind auf diesem Gerät oder für diesen Kunden derzeit nicht verfügbar.",
     notificationInstallRequired: "Installieren Sie zuerst die App",
-    notificationInstallNudgeText: "Auf dem iPhone funktionieren Mitteilungen in der Home-Bildschirm-App.",
+    notificationInstallNudgeText:
+        "Auf dem iPhone funktionieren Mitteilungen in der Home-Bildschirm-App.",
     notificationNotConfigured: "Nicht eingerichtet",
     notificationNeedsRepair: "Muss wiederhergestellt werden",
     notificationBlocked: "Blockiert",
     notificationBlockedTitle: "Benachrichtigungen sind blockiert",
-    notificationBlockedText: "Öffnen Sie Einstellungen → Mitteilungen → diese App und erlauben Sie Mitteilungen. Kehren Sie danach hierher zurück.",
-    notificationEnabledText: "Alles ist eingerichtet. Sie werden benachrichtigt, sobald der Spezialist antwortet.",
+    notificationBlockedText:
+        "Öffnen Sie Einstellungen → Mitteilungen → diese App und erlauben Sie Mitteilungen. Kehren Sie danach hierher zurück.",
+    notificationEnabledText:
+        "Alles ist eingerichtet. Sie werden benachrichtigt, sobald der Spezialist antwortet.",
     notificationRepair: "Benachrichtigungen wiederherstellen",
-    notificationRepairText: "Die Erlaubnis ist vorhanden, aber das Abonnement fehlt. Tippen Sie unten, um es wiederherzustellen.",
+    notificationRepairText:
+        "Die Erlaubnis ist vorhanden, aber das Abonnement fehlt. Tippen Sie unten, um es wiederherzustellen.",
     notificationNudgeTitle: "Verpassen Sie keine Antwort",
-    notificationNudgeText: "Aktivieren Sie Benachrichtigungen in wenigen Sekunden.",
+    notificationNudgeText:
+        "Aktivieren Sie Benachrichtigungen in wenigen Sekunden.",
     enable: "Aktivieren",
     aiAssistTitle: "Mit KI ausfüllen",
     aiAssistShort: "KI",
-    aiAssistText: "Beschreiben Sie alles in einem Satz – wir füllen das Formular für Sie aus.",
-    aiAssistPlaceholder: "Zum Beispiel: Toyota Camry 2018, schwarzes Leder mit roter Naht",
+    aiAssistText:
+        "Beschreiben Sie alles in einem Satz – wir füllen das Formular für Sie aus.",
+    aiAssistPlaceholder:
+        "Zum Beispiel: Toyota Camry 2018, schwarzes Leder mit roter Naht",
     aiAssistButton: "Formular ausfüllen",
     aiAssisting: "Wird ausgefüllt…",
-    aiAssistError: "Das automatische Ausfüllen ist fehlgeschlagen. Sie können manuell fortfahren.",
+    aiAssistError:
+        "Das automatische Ausfüllen ist fehlgeschlagen. Sie können manuell fortfahren.",
     later: "Nicht jetzt",
     noActivity: "Noch keine Anfragen oder Termine",
     noActivityText:
@@ -134,12 +144,16 @@ export default {
     shareRequest: "Anfrage teilen",
     install: "Zum Startbildschirm",
     installTitle: "App installieren",
-    installText: "Die App öffnet sich unabhängig vom Browser und ist direkt über den Startbildschirm erreichbar.",
+    installText:
+        "Die App öffnet sich unabhängig vom Browser und ist direkt über den Startbildschirm erreichbar.",
     installNow: "Jetzt installieren",
     installInstalled: "Die App ist auf diesem Gerät bereits installiert.",
-    installSteps_ios: "Öffnen Sie die App in Safari.|Tippen Sie unten auf „Teilen“.|Wählen Sie „Zum Home-Bildschirm“.|Tippen Sie auf „Hinzufügen“.",
-    installSteps_android: "Öffnen Sie das Browsermenü ⋮.|Wählen Sie „App installieren“ oder „Zum Startbildschirm hinzufügen“.|Bestätigen Sie die Installation.",
-    installSteps_desktop: "Klicken Sie rechts in der Adressleiste auf das Installationssymbol.|Falls es fehlt, öffnen Sie das Browsermenü und wählen Sie „App installieren“.|Bestätigen Sie die Installation.",
+    installSteps_ios:
+        "Öffnen Sie die App in Safari.|Tippen Sie unten auf „Teilen“.|Wählen Sie „Zum Home-Bildschirm“.|Tippen Sie auf „Hinzufügen“.",
+    installSteps_android:
+        "Öffnen Sie das Browsermenü ⋮.|Wählen Sie „App installieren“ oder „Zum Startbildschirm hinzufügen“.|Bestätigen Sie die Installation.",
+    installSteps_desktop:
+        "Klicken Sie rechts in der Adressleiste auf das Installationssymbol.|Falls es fehlt, öffnen Sie das Browsermenü und wählen Sie „App installieren“.|Bestätigen Sie die Installation.",
     close: "Schließen",
     reviews: "Kundenbewertungen",
     reviewsSubtitle: "Bewertungen echter Kunden",
@@ -197,8 +211,10 @@ export default {
     preferredChannel: "Wohin dürfen wir bestätigen?",
     pushConfirmation: "Push-Benachrichtigungen",
     enablePushConfirmation: "Push-Benachrichtigungen aktivieren",
-    pushConfirmationHint: "Bestätigung und Erinnerungen kommen auf dieses Gerät.",
-    pushUnavailableHint: "Der Termin wird in der App gespeichert. Aktivieren Sie Push für Bestätigung und Erinnerungen.",
+    pushConfirmationHint:
+        "Bestätigung und Erinnerungen kommen auf dieses Gerät.",
+    pushUnavailableHint:
+        "Der Termin wird in der App gespeichert. Aktivieren Sie Push für Bestätigung und Erinnerungen.",
     serviceLocation: "Wo soll die Leistung stattfinden?",
     serviceLocationWorkshop: "Im Studio",
     serviceLocationOnSite: "Bei Ihnen vor Ort",
@@ -220,5 +236,6 @@ export default {
     cancelAppointment: "Termin absagen",
     cancelConfirm: "Diesen Termin wirklich absagen?",
     cancelled: "Abgesagt",
+    noShow: "Nicht erschienen",
     bookAgain: "Erneut buchen",
 } as const;

@@ -74,27 +74,35 @@ export default {
     notificationBenefit3Text: "We never share your data with third parties.",
     notificationEnabled: "Notifications are enabled.",
     notificationDenied: "Notifications were not allowed.",
-    notificationConfigurationError: "Notifications are being configured. Please try again in a minute.",
+    notificationConfigurationError:
+        "Notifications are being configured. Please try again in a minute.",
     notificationsMenu: "Notifications",
     notificationUnsupported: "Not supported on this device",
-    notificationUnsupportedText: "Notifications are not currently available on this device or for this customer.",
+    notificationUnsupportedText:
+        "Notifications are not currently available on this device or for this customer.",
     notificationInstallRequired: "Install the app first",
-    notificationInstallNudgeText: "On iPhone, notifications work in the Home Screen app.",
+    notificationInstallNudgeText:
+        "On iPhone, notifications work in the Home Screen app.",
     notificationNotConfigured: "Not configured",
     notificationNeedsRepair: "Needs restoring",
     notificationBlocked: "Blocked",
     notificationBlockedTitle: "Notifications are blocked",
-    notificationBlockedText: "Open device Settings → Notifications → this app and allow notifications, then return here.",
-    notificationEnabledText: "Everything is configured. You will be notified when the specialist replies.",
+    notificationBlockedText:
+        "Open device Settings → Notifications → this app and allow notifications, then return here.",
+    notificationEnabledText:
+        "Everything is configured. You will be notified when the specialist replies.",
     notificationRepair: "Restore notifications",
-    notificationRepairText: "Permission is granted but the subscription is missing. Tap below to restore it.",
+    notificationRepairText:
+        "Permission is granted but the subscription is missing. Tap below to restore it.",
     notificationNudgeTitle: "Do not miss the reply",
     notificationNudgeText: "Enable notifications in just a few seconds.",
     enable: "Enable",
     aiAssistTitle: "Fill with AI",
     aiAssistShort: "AI",
-    aiAssistText: "Describe everything in one sentence and we will fill the form for you.",
-    aiAssistPlaceholder: "For example: 2018 Toyota Camry, black leather with red stitching",
+    aiAssistText:
+        "Describe everything in one sentence and we will fill the form for you.",
+    aiAssistPlaceholder:
+        "For example: 2018 Toyota Camry, black leather with red stitching",
     aiAssistButton: "Fill the form",
     aiAssisting: "Filling…",
     aiAssistError: "Automatic form filling failed. You can continue manually.",
@@ -133,12 +141,16 @@ export default {
     shareRequest: "Share request",
     install: "Add to home screen",
     installTitle: "Install app",
-    installText: "The app will open separately from the browser and remain available from your home screen.",
+    installText:
+        "The app will open separately from the browser and remain available from your home screen.",
     installNow: "Install now",
     installInstalled: "The app is already installed on this device.",
-    installSteps_ios: "Open the app in Safari.|Tap the Share button at the bottom of the screen.|Choose “Add to Home Screen”.|Tap “Add”.",
-    installSteps_android: "Open the browser menu ⋮.|Choose “Install app” or “Add to Home screen”.|Confirm the installation.",
-    installSteps_desktop: "Click the install icon on the right side of the address bar.|If it is not shown, open the browser menu and choose “Install app”.|Confirm the installation.",
+    installSteps_ios:
+        "Open the app in Safari.|Tap the Share button at the bottom of the screen.|Choose “Add to Home Screen”.|Tap “Add”.",
+    installSteps_android:
+        "Open the browser menu ⋮.|Choose “Install app” or “Add to Home screen”.|Confirm the installation.",
+    installSteps_desktop:
+        "Click the install icon on the right side of the address bar.|If it is not shown, open the browser menu and choose “Install app”.|Confirm the installation.",
     close: "Close",
     reviews: "Customer reviews",
     reviewsSubtitle: "Reviews from real customers",
@@ -196,8 +208,10 @@ export default {
     preferredChannel: "Where should we send confirmation?",
     pushConfirmation: "Push notifications",
     enablePushConfirmation: "Enable push notifications",
-    pushConfirmationHint: "Confirmation and reminders will arrive on this device.",
-    pushUnavailableHint: "The booking will be saved in the app. Enable push for confirmation and reminders.",
+    pushConfirmationHint:
+        "Confirmation and reminders will arrive on this device.",
+    pushUnavailableHint:
+        "The booking will be saved in the app. Enable push for confirmation and reminders.",
     serviceLocation: "Where should the service take place?",
     serviceLocationWorkshop: "At the studio",
     serviceLocationOnSite: "At your location",
@@ -219,5 +233,6 @@ export default {
     cancelAppointment: "Cancel booking",
     cancelConfirm: "Cancel this booking?",
     cancelled: "Cancelled",
+    noShow: "No show",
     bookAgain: "Book again",
 } as const;

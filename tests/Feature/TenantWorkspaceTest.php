@@ -67,6 +67,16 @@ class TenantWorkspaceTest extends TestCase
             'sender_type' => 'customer',
             'body' => 'Когда можно привезти?',
         ]);
+        $service = $tenant->services()->firstOrFail();
+        $appointment = $tenant->appointments()->create([
+            'customer_id' => $customer->id,
+            'service_id' => $service->id,
+            'number' => 'A-TEST-001',
+            'status' => 'pending',
+            'starts_at' => now()->addDay(),
+            'ends_at' => now()->addDay()->addMinutes($service->duration_minutes),
+            'locale' => 'ru',
+        ]);
 
         $this->actingAs($owner)->getJson('/api/tenant/'.$tenant->id.'/workspace/requests')
             ->assertOk()
@@ -76,7 +86,14 @@ class TenantWorkspaceTest extends TestCase
             ->assertJsonPath('items.data.0.details.5.label', 'Марка автомобиля')
             ->assertJsonPath('items.data.0.details.5.value', 'BMW')
             ->assertJsonPath('items.data.0.details.6.label', 'Модель')
-            ->assertJsonPath('items.data.0.details.6.value', null);
+            ->assertJsonPath('items.data.0.details.6.value', null)
+            ->assertJsonPath('appointments.0.id', $appointment->id)
+            ->assertJsonPath('appointments.0.kind', 'appointment')
+            ->assertJsonPath('appointments.0.status', 'pending');
+
+        $this->actingAs($owner)->putJson('/api/tenant/'.$tenant->id.'/workspace/appointments/'.$appointment->id, [
+            'status' => 'confirmed',
+        ])->assertOk()->assertJsonPath('appointment.status', 'confirmed');
 
         $this->actingAs($owner)->getJson('/api/tenant/'.$tenant->id.'/workspace')
             ->assertOk()

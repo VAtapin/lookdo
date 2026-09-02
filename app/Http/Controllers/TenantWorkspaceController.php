@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\AuthorizesTenantWorkspace;
 use App\Models\Tenant;
+use App\Models\TenantAppointment;
 use App\Models\TenantCustomer;
 use App\Models\TenantPushSubscription;
 use App\Models\TenantRequest;
@@ -56,7 +57,7 @@ class TenantWorkspaceController extends Controller
         return response()->json([
             'tenant' => ['id' => $tenant->id, 'name' => $tenant->name, 'slug' => $tenant->slug, 'locale' => $tenant->locale, 'platform_url' => 'https://'.$tenant->slug.'.'.config('tenancy.platform_domain')],
             'today' => ['date' => $today->toDateString(), 'appointments' => $appointments->map(fn ($a) => $this->appointment($a)), 'requests' => $requests->map(fn ($r) => $this->requestItem($r)), 'unread' => $unread, 'free_slots' => $this->freeSlots($tenant, $calendar, $today->toDateString()), 'repeat_candidates' => $repeat, 'unpublished_works' => $tenant->portfolioItems()->where('published', false)->count()],
-            'counts' => ['requests' => $tenant->appRequests()->count(), 'new_requests' => $tenant->appRequests()->where('status', 'new')->count(), 'customers' => $tenant->customers()->count(), 'messages' => $unread, 'appointments' => $tenant->appointments()->where('starts_at', '>=', now())->whereNotIn('status', ['cancelled'])->count()],
+            'counts' => ['requests' => $tenant->appRequests()->count(), 'new_requests' => $tenant->appRequests()->where('status', 'new')->count() + $tenant->appointments()->where('status', 'pending')->count(), 'customers' => $tenant->customers()->count(), 'messages' => $unread, 'appointments' => $tenant->appointments()->where('starts_at', '>=', now())->whereNotIn('status', ['cancelled'])->count()],
             'services' => $tenant->services()->orderBy('sort_order')->get(), 'working_hours' => $tenant->workingHours()->orderBy('weekday')->get(),
             'access' => ['trial' => (bool) $tenant->currentSubscription?->isTrialActive(), 'entitlements' => $entitlements->all($tenant)],
             'push' => ['enabled' => $webPush->configured() && (string) $entitlements->get($tenant, 'push_enabled', '1') === '1', 'public_key' => $webPush->configured() ? (string) config('services.webpush.vapid_public_key', '') : ''],
@@ -75,7 +76,29 @@ class TenantWorkspaceController extends Controller
             $q->where(fn ($x) => $x->where('number', 'like', $term)->orWhere('summary', 'like', $term)->orWhereHas('customer', fn ($c) => $c->where('name', 'like', $term)->orWhere('phone', 'like', $term)));
         }
 
-        return response()->json(['items' => $q->latest()->paginate(30)->through(fn ($r) => $this->requestItem($r, true))]);
+        $appointments = $tenant->appointments()->with(['customer', 'service'])->latest()->limit(100);
+        if ($request->filled('status')) {
+            $appointments->where('status', $request->string('status'));
+        }
+        if ($request->filled('search')) {
+            $term = '%'.$request->string('search').'%';
+            $appointments->where(fn ($x) => $x->where('number', 'like', $term)->orWhere('comment', 'like', $term)->orWhereHas('customer', fn ($c) => $c->where('name', 'like', $term)->orWhere('phone', 'like', $term)));
+        }
+
+        return response()->json([
+            'items' => $q->latest()->paginate(30)->through(fn ($r) => $this->requestItem($r, true)),
+            'appointments' => $appointments->get()->map(fn ($appointment) => $this->appointment($appointment) + ['kind' => 'appointment']),
+        ]);
+    }
+
+    public function updateAppointment(Request $request, Tenant $tenant, TenantAppointment $tenantAppointment): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless($tenantAppointment->tenant_id === $tenant->id, 404);
+        $data = $request->validate(['status' => ['required', Rule::in(['pending', 'confirmed', 'completed', 'cancelled', 'no_show'])]]);
+        $tenantAppointment->update($data);
+
+        return response()->json(['appointment' => $this->appointment($tenantAppointment->fresh(['customer', 'service'])) + ['kind' => 'appointment']]);
     }
 
     public function updateRequest(Request $request, Tenant $tenant, TenantRequest $tenantRequest): JsonResponse
@@ -399,6 +422,8 @@ class TenantWorkspaceController extends Controller
             'status' => $a->status,
             'starts_at' => $a->starts_at?->toIso8601String(),
             'ends_at' => $a->ends_at?->toIso8601String(),
+            'created_at' => $a->created_at?->toIso8601String(),
+            'comment' => $a->comment,
             'service_mode' => data_get($a, 'contact_snapshot.service_mode', 'workshop'),
             'service_address' => data_get($a, 'contact_snapshot.service_address'),
             'customer' => $a->customer,

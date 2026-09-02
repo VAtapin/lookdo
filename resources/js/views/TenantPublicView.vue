@@ -42,10 +42,18 @@ const languageOpen = ref(false);
 const pushPrompt = ref(false);
 const pushBusy = ref(false);
 const pushStatus = ref("");
-type PushState = "unsupported" | "install_required" | "default" | "subscribed" | "repair" | "denied";
+type PushState =
+    | "unsupported"
+    | "install_required"
+    | "default"
+    | "subscribed"
+    | "repair"
+    | "denied";
 const pushState = ref<PushState>("unsupported");
 const pushNudge = ref(false);
-const workFilter = ref<"all" | "before_after" | "finished" | "favorites">("all");
+const workFilter = ref<"all" | "before_after" | "finished" | "favorites">(
+    "all",
+);
 const workFilterOpen = ref(false);
 const lightbox = ref<{ src: string; alt: string } | null>(null);
 const reviewOpen = ref(false);
@@ -76,19 +84,23 @@ const installPlatform = computed<"ios" | "android" | "desktop">(() => {
     if (/android/.test(agent)) return "android";
     return "desktop";
 });
-const appInstalled = computed(() =>
-    window.matchMedia("(display-mode: standalone)").matches ||
-    Boolean((navigator as any).standalone),
+const appInstalled = computed(
+    () =>
+        window.matchMedia("(display-mode: standalone)").matches ||
+        Boolean((navigator as any).standalone),
 );
 const isIos = computed(() => /iphone|ipad|ipod/i.test(navigator.userAgent));
-const pushStateLabel = computed(() => ({
-    unsupported: copy.value.notificationUnsupported,
-    install_required: copy.value.notificationInstallRequired,
-    default: copy.value.notificationNotConfigured,
-    subscribed: copy.value.notificationEnabled,
-    repair: copy.value.notificationNeedsRepair,
-    denied: copy.value.notificationBlocked,
-}[pushState.value]));
+const pushStateLabel = computed(
+    () =>
+        ({
+            unsupported: copy.value.notificationUnsupported,
+            install_required: copy.value.notificationInstallRequired,
+            default: copy.value.notificationNotConfigured,
+            subscribed: copy.value.notificationEnabled,
+            repair: copy.value.notificationNeedsRepair,
+            denied: copy.value.notificationBlocked,
+        })[pushState.value],
+);
 const screen = computed(() => {
     const parts = route.path
         .split("/")
@@ -142,19 +154,44 @@ const averageRating = computed(() => {
 const filteredPortfolio = computed(() => {
     const rows = app.value?.portfolio || [];
     if (workFilter.value === "before_after")
-        return rows.filter((item: any) => item.before_image && item.after_image);
+        return rows.filter(
+            (item: any) => item.before_image && item.after_image,
+        );
     if (workFilter.value === "finished")
-        return rows.filter((item: any) => !(item.before_image && item.after_image));
+        return rows.filter(
+            (item: any) => !(item.before_image && item.after_image),
+        );
     if (workFilter.value === "favorites")
-        return rows.filter((item: any) => favoriteIds.value.includes(String(item.id)));
+        return rows.filter((item: any) =>
+            favoriteIds.value.includes(String(item.id)),
+        );
     return rows;
 });
 const portfolioLabels = computed(() => ({
-    finished: { de: "Fertige Arbeiten", en: "Finished work", ru: "Готовые работы", uk: "Готові роботи" }[locale.value],
-    favorites: { de: "Favoriten", en: "Favorites", ru: "Избранное", uk: "Обране" }[locale.value],
-    filters: { de: "Filter", en: "Filters", ru: "Фильтры", uk: "Фільтри" }[locale.value],
-    close: { de: "Schließen", en: "Close", ru: "Закрыть", uk: "Закрити" }[locale.value],
-    lightboxHint: { de: "Außerhalb des Bildes oder auf × tippen, um zu schließen", en: "Tap outside the image or × to close", ru: "Нажмите вне фотографии или на ×, чтобы закрыть", uk: "Натисніть поза фотографією або на ×, щоб закрити" }[locale.value],
+    finished: {
+        de: "Fertige Arbeiten",
+        en: "Finished work",
+        ru: "Готовые работы",
+        uk: "Готові роботи",
+    }[locale.value],
+    favorites: {
+        de: "Favoriten",
+        en: "Favorites",
+        ru: "Избранное",
+        uk: "Обране",
+    }[locale.value],
+    filters: { de: "Filter", en: "Filters", ru: "Фильтры", uk: "Фільтри" }[
+        locale.value
+    ],
+    close: { de: "Schließen", en: "Close", ru: "Закрыть", uk: "Закрити" }[
+        locale.value
+    ],
+    lightboxHint: {
+        de: "Außerhalb des Bildes oder auf × tippen, um zu schließen",
+        en: "Tap outside the image or × to close",
+        ru: "Нажмите вне фотографии или на ×, чтобы закрыть",
+        uk: "Натисніть поза фотографією або на ×, щоб закрити",
+    }[locale.value],
 }));
 const navItems = computed(() => [
     { key: "home", icon: "home", label: copy.value.home },
@@ -162,8 +199,18 @@ const navItems = computed(() => [
         ? { key: "services", icon: "works", label: copy.value.servicesNav }
         : { key: "works", icon: "works", label: copy.value.works },
     isBrows.value
-        ? { key: "book", icon: "measure", label: copy.value.book, central: true }
-        : { key: actionScreen.value, icon: "camera", label: copy.value.action, central: true },
+        ? {
+              key: "book",
+              icon: "measure",
+              label: copy.value.book,
+              central: true,
+          }
+        : {
+              key: actionScreen.value,
+              icon: "camera",
+              label: copy.value.action,
+              central: true,
+          },
     { key: "activity", icon: "message", label: copy.value.activity },
     { key: "reviews", icon: "star", label: copy.value.reviews },
 ]);
@@ -171,8 +218,18 @@ const contactName = computed(
     () => app.value?.tenant?.contact?.name || app.value?.tenant?.name,
 );
 const hasContactMethods = computed(() =>
-    ["phone", "whatsapp_url", "max_url", "telegram_url", "viber_url", "vk_url", "instagram_url", "facebook_url", "email", "website_url"]
-        .some((key) => Boolean(app.value?.tenant?.contact?.[key])),
+    [
+        "phone",
+        "whatsapp_url",
+        "max_url",
+        "telegram_url",
+        "viber_url",
+        "vk_url",
+        "instagram_url",
+        "facebook_url",
+        "email",
+        "website_url",
+    ].some((key) => Boolean(app.value?.tenant?.contact?.[key])),
 );
 const rescheduleAppointment = ref<any>(null);
 
@@ -248,14 +305,21 @@ async function load() {
             headers["X-Lookdo-Client-Token"] = clientToken.value;
         app.value = await api("/tenant-app/bootstrap", { headers });
         applyTenantLocale(app.value.tenant.locale || "de");
-        if (!hasSelectedLocale.value && (app.value.template.locales || []).length > 1)
+        if (
+            !hasSelectedLocale.value &&
+            (app.value.template.locales || []).length > 1
+        )
             languageOpen.value = true;
         if (screen.value === "activity") await loadActivity();
         await refreshPushState();
-        if (pushState.value === "subscribed") await syncExistingPushSubscription();
+        if (pushState.value === "subscribed")
+            await syncExistingPushSubscription();
         if (shouldNudgePush()) {
             pushNudge.value = true;
-            localStorage.setItem("lookdo-push-nudge:" + location.hostname, localDayKey());
+            localStorage.setItem(
+                "lookdo-push-nudge:" + location.hostname,
+                localDayKey(),
+            );
         }
     } catch (e: any) {
         if (e instanceof ApiError) applyTenantLocale(e.payload.locale);
@@ -267,28 +331,56 @@ async function load() {
 function shouldNudgePush() {
     const today = localDayKey();
     return Boolean(
-        hasSelectedLocale.value && ["default", "install_required"].includes(pushState.value) &&
-        localStorage.getItem("lookdo-push-nudge:" + location.hostname) !== today,
+        hasSelectedLocale.value &&
+        ["default", "install_required"].includes(pushState.value) &&
+        localStorage.getItem("lookdo-push-nudge:" + location.hostname) !==
+            today,
     );
 }
 function localDayKey() {
     const now = new Date();
-    return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
+    return [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0"),
+    ].join("-");
 }
 async function refreshPushState() {
-    if (!app.value?.push?.enabled) { pushState.value = "unsupported"; return; }
-    if (isIos.value && !appInstalled.value) { pushState.value = "install_required"; return; }
-    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) { pushState.value = "unsupported"; return; }
-    if (Notification.permission === "denied") { pushState.value = "denied"; return; }
-    if (Notification.permission === "default") { pushState.value = "default"; return; }
+    if (!app.value?.push?.enabled) {
+        pushState.value = "unsupported";
+        return;
+    }
+    if (isIos.value && !appInstalled.value) {
+        pushState.value = "install_required";
+        return;
+    }
+    if (
+        !("Notification" in window) ||
+        !("serviceWorker" in navigator) ||
+        !("PushManager" in window)
+    ) {
+        pushState.value = "unsupported";
+        return;
+    }
+    if (Notification.permission === "denied") {
+        pushState.value = "denied";
+        return;
+    }
+    if (Notification.permission === "default") {
+        pushState.value = "default";
+        return;
+    }
     try {
         const registration = await navigator.serviceWorker.ready;
-        pushState.value = await registration.pushManager.getSubscription() ? "subscribed" : "repair";
-    } catch { pushState.value = "repair"; }
+        pushState.value = (await registration.pushManager.getSubscription())
+            ? "subscribed"
+            : "repair";
+    } catch {
+        pushState.value = "repair";
+    }
 }
 async function syncExistingPushSubscription() {
-    if (!app.value?.push?.enabled || !("serviceWorker" in navigator))
-        return;
+    if (!app.value?.push?.enabled || !("serviceWorker" in navigator)) return;
     try {
         const registration = await navigator.serviceWorker.ready;
         const subscription = await registration.pushManager.getSubscription();
@@ -296,8 +388,13 @@ async function syncExistingPushSubscription() {
         const value = subscription.toJSON();
         await api("/tenant-app/push-subscriptions", {
             method: "POST",
-            headers: clientToken.value ? { "X-Lookdo-Client-Token": clientToken.value } : {},
-            body: JSON.stringify({ endpoint: value.endpoint, keys: value.keys }),
+            headers: clientToken.value
+                ? { "X-Lookdo-Client-Token": clientToken.value }
+                : {},
+            body: JSON.stringify({
+                endpoint: value.endpoint,
+                keys: value.keys,
+            }),
         });
     } catch {
         // A stale browser subscription must never block the application itself.
@@ -398,6 +495,8 @@ async function submitReview() {
     }
 }
 function statusLabel(status: string) {
+    if (status === "cancelled") return copy.value.cancelled;
+    if (status === "no_show") return copy.value.noShow;
     if (["completed", "done", "closed"].includes(status))
         return copy.value.statusDone;
     if (["pending", "in_progress"].includes(status))
@@ -439,7 +538,9 @@ async function enablePush() {
         const value = subscription.toJSON();
         await api("/tenant-app/push-subscriptions", {
             method: "POST",
-            headers: clientToken.value ? { "X-Lookdo-Client-Token": clientToken.value } : {},
+            headers: clientToken.value
+                ? { "X-Lookdo-Client-Token": clientToken.value }
+                : {},
             body: JSON.stringify({
                 endpoint: value.endpoint,
                 keys: value.keys,
@@ -449,7 +550,11 @@ async function enablePush() {
         pushState.value = "subscribed";
         window.setTimeout(() => (pushPrompt.value = false), 700);
     } catch (e: any) {
-        pushStatus.value = /applicationServerKey|P-256|public key/i.test(String(e?.message || "")) ? copy.value.notificationConfigurationError : copy.value.notificationDenied;
+        pushStatus.value = /applicationServerKey|P-256|public key/i.test(
+            String(e?.message || ""),
+        )
+            ? copy.value.notificationConfigurationError
+            : copy.value.notificationDenied;
         await refreshPushState();
     } finally {
         pushBusy.value = false;
@@ -459,14 +564,20 @@ function dismissPush() {
     pushPrompt.value = false;
 }
 function dismissPushNudge() {
-    localStorage.setItem("lookdo-push-nudge:" + location.hostname, localDayKey());
+    localStorage.setItem(
+        "lookdo-push-nudge:" + location.hostname,
+        localDayKey(),
+    );
     pushNudge.value = false;
 }
 async function openPushSettings() {
     menuOpen.value = false;
     pushNudge.value = false;
     await refreshPushState();
-    if (pushState.value === "install_required") { showInstall(); return; }
+    if (pushState.value === "install_required") {
+        showInstall();
+        return;
+    }
     pushStatus.value = "";
     pushPrompt.value = true;
 }
@@ -475,7 +586,10 @@ async function handleVisibilityChange() {
     await refreshPushState();
     if (shouldNudgePush()) {
         pushNudge.value = true;
-        localStorage.setItem("lookdo-push-nudge:" + location.hostname, localDayKey());
+        localStorage.setItem(
+            "lookdo-push-nudge:" + location.hostname,
+            localDayKey(),
+        );
     }
 }
 async function login() {
@@ -620,12 +734,34 @@ const loginContext = {
                                     >
                                 </button>
                                 <div>
-                                    <button class="ta-language-trigger" @click="languageOpen = true">{{ locale.toUpperCase() }}</button>
-                                    <button v-if="hasContactMethods" class="ta-contact-trigger" :aria-label="copy.contacts" @click="contactOpen = !contactOpen"><AppIcon name="phone" /></button>
-                                    <button @click="contactOpen = false; menuOpen = true">
+                                    <button
+                                        class="ta-language-trigger"
+                                        @click="languageOpen = true"
+                                    >
+                                        {{ locale.toUpperCase() }}
+                                    </button>
+                                    <button
+                                        v-if="hasContactMethods"
+                                        class="ta-contact-trigger"
+                                        :aria-label="copy.contacts"
+                                        @click="contactOpen = !contactOpen"
+                                    >
+                                        <AppIcon name="phone" />
+                                    </button>
+                                    <button
+                                        @click="
+                                            contactOpen = false;
+                                            menuOpen = true;
+                                        "
+                                    >
                                         <AppIcon name="menu" />
                                     </button>
-                                    <TenantContactPopover v-if="contactOpen" :contact="app.tenant.contact" :copy="copy" @close="contactOpen = false" />
+                                    <TenantContactPopover
+                                        v-if="contactOpen"
+                                        :contact="app.tenant.contact"
+                                        :copy="copy"
+                                        @close="contactOpen = false"
+                                    />
                                 </div>
                             </header>
                             <article class="ta-brows-hero">
@@ -764,33 +900,61 @@ const loginContext = {
                                 <header class="ta-hero-header">
                                     <button
                                         class="ta-brand"
-                                        :class="{'has-horizontal-logo':app.tenant.branding?.horizontal_logo}"
+                                        :class="{
+                                            'has-horizontal-logo':
+                                                app.tenant.branding
+                                                    ?.horizontal_logo,
+                                        }"
                                         @click="go('home')"
                                     >
                                         <img
                                             :src="
-                                                app.tenant.branding?.horizontal_logo ||
+                                                app.tenant.branding
+                                                    ?.horizontal_logo ||
                                                 app.tenant.logo ||
                                                 '/brand/lookdo-mark.webp'
                                             "
                                             :alt="app.tenant.name"
-                                        /><span v-if="!app.tenant.branding?.horizontal_logo">{{ app.tenant.name }}</span>
+                                        /><span
+                                            v-if="
+                                                !app.tenant.branding
+                                                    ?.horizontal_logo
+                                            "
+                                            >{{ app.tenant.name }}</span
+                                        >
                                     </button>
                                     <span class="ta-service-name">{{
                                         app.template.hero.eyebrow
                                     }}</span>
                                     <div>
-                                        <button class="ta-language-trigger" @click="languageOpen = true">{{ locale.toUpperCase() }}</button>
+                                        <button
+                                            class="ta-language-trigger"
+                                            @click="languageOpen = true"
+                                        >
+                                            {{ locale.toUpperCase() }}
+                                        </button>
                                         <button
                                             v-if="hasContactMethods"
                                             class="ta-contact-trigger"
                                             :aria-label="copy.contacts"
                                             @click="contactOpen = !contactOpen"
-                                        ><AppIcon name="phone" /></button>
-                                        <button @click="contactOpen = false; menuOpen = true">
+                                        >
+                                            <AppIcon name="phone" />
+                                        </button>
+                                        <button
+                                            @click="
+                                                contactOpen = false;
+                                                menuOpen = true;
+                                            "
+                                        >
                                             <AppIcon name="menu" />
                                         </button>
-                                        <TenantContactPopover v-if="contactOpen" :contact="app.tenant.contact" :copy="copy" @close="contactOpen = false" />
+                                        <TenantContactPopover
+                                            v-if="contactOpen"
+                                            :contact="app.tenant.contact"
+                                            :copy="copy"
+                                            @close="contactOpen = false"
+                                        />
                                     </div>
                                 </header>
                                 <div class="ta-hero-content">
@@ -966,8 +1130,20 @@ const loginContext = {
                                     /><span>{{ app.tenant.name }}</span>
                                 </button>
                                 <div>
-                                    <button v-if="hasContactMethods" class="ta-contact-trigger" :aria-label="copy.contacts" @click="contactOpen = !contactOpen"><AppIcon name="phone" /></button>
-                                    <TenantContactPopover v-if="contactOpen" :contact="app.tenant.contact" :copy="copy" @close="contactOpen = false" />
+                                    <button
+                                        v-if="hasContactMethods"
+                                        class="ta-contact-trigger"
+                                        :aria-label="copy.contacts"
+                                        @click="contactOpen = !contactOpen"
+                                    >
+                                        <AppIcon name="phone" />
+                                    </button>
+                                    <TenantContactPopover
+                                        v-if="contactOpen"
+                                        :contact="app.tenant.contact"
+                                        :copy="copy"
+                                        @close="contactOpen = false"
+                                    />
                                 </div>
                             </header>
                             <div class="ta-page-title">
@@ -986,17 +1162,52 @@ const loginContext = {
                                     }"
                                     @click="selectWorkFilter('before_after')"
                                 >
-                                    {{ copy.featured }}</button
-                                ><div class="ta-work-filter-menu">
+                                    {{ copy.featured }}
+                                </button>
+                                <div class="ta-work-filter-menu">
                                     <button
-                                        :class="{ active: workFilter === 'finished' || workFilter === 'favorites' }"
+                                        :class="{
+                                            active:
+                                                workFilter === 'finished' ||
+                                                workFilter === 'favorites',
+                                        }"
                                         :aria-label="portfolioLabels.filters"
                                         :aria-expanded="workFilterOpen"
-                                        @click="workFilterOpen = !workFilterOpen"
-                                    ><AppIcon name="menu" /></button>
-                                    <div v-if="workFilterOpen" class="ta-work-filter-popover">
-                                        <button :class="{active:workFilter==='finished'}" @click="selectWorkFilter('finished')">{{ portfolioLabels.finished }}</button>
-                                        <button :class="{active:workFilter==='favorites'}" @click="selectWorkFilter('favorites')"><AppIcon name="heart" :size="18" />{{ portfolioLabels.favorites }}</button>
+                                        @click="
+                                            workFilterOpen = !workFilterOpen
+                                        "
+                                    >
+                                        <AppIcon name="menu" />
+                                    </button>
+                                    <div
+                                        v-if="workFilterOpen"
+                                        class="ta-work-filter-popover"
+                                    >
+                                        <button
+                                            :class="{
+                                                active:
+                                                    workFilter === 'finished',
+                                            }"
+                                            @click="
+                                                selectWorkFilter('finished')
+                                            "
+                                        >
+                                            {{ portfolioLabels.finished }}
+                                        </button>
+                                        <button
+                                            :class="{
+                                                active:
+                                                    workFilter === 'favorites',
+                                            }"
+                                            @click="
+                                                selectWorkFilter('favorites')
+                                            "
+                                        >
+                                            <AppIcon
+                                                name="heart"
+                                                :size="18"
+                                            />{{ portfolioLabels.favorites }}
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -1018,18 +1229,42 @@ const loginContext = {
                                         :before-label="copy.before"
                                         :after-label="copy.after"
                                         :alt="item.title"
-                                        @open="openLightbox($event.src, $event.alt)"
+                                        @open="
+                                            openLightbox($event.src, $event.alt)
+                                        "
                                     /><button
                                         v-else
                                         class="ta-portfolio-image-button"
-                                        @click="openLightbox(item.image || item.after_image || item.before_image, item.title)"
-                                    ><img :src="item.image || item.after_image || item.before_image" :alt="item.title" /></button>
+                                        @click="
+                                            openLightbox(
+                                                item.image ||
+                                                    item.after_image ||
+                                                    item.before_image,
+                                                item.title,
+                                            )
+                                        "
+                                    >
+                                        <img
+                                            :src="
+                                                item.image ||
+                                                item.after_image ||
+                                                item.before_image
+                                            "
+                                            :alt="item.title"
+                                        />
+                                    </button>
                                     <div>
                                         <header>
                                             <h2>{{ item.title }}</h2>
                                             <button
-                                                :class="{ favorite: isFavorite(item.id) }"
-                                                :aria-pressed="isFavorite(item.id)"
+                                                :class="{
+                                                    favorite: isFavorite(
+                                                        item.id,
+                                                    ),
+                                                }"
+                                                :aria-pressed="
+                                                    isFavorite(item.id)
+                                                "
                                                 @click="toggleFavorite(item.id)"
                                             >
                                                 <AppIcon name="heart" />
@@ -1100,12 +1335,19 @@ const loginContext = {
                             :aria-label="lightbox.alt"
                             @click.self="lightbox = null"
                         >
-                            <button :aria-label="portfolioLabels.close" @click="lightbox = null"><AppIcon name="close" /></button>
+                            <button
+                                :aria-label="portfolioLabels.close"
+                                @click="lightbox = null"
+                            >
+                                <AppIcon name="close" />
+                            </button>
                             <figure>
                                 <img :src="lightbox.src" :alt="lightbox.alt" />
                                 <figcaption>
                                     <strong>{{ lightbox.alt }}</strong>
-                                    <span>{{ portfolioLabels.lightboxHint }}</span>
+                                    <span>{{
+                                        portfolioLabels.lightboxHint
+                                    }}</span>
                                 </figcaption>
                             </figure>
                         </div>

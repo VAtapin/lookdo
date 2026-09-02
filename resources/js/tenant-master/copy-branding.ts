@@ -9,7 +9,7 @@ const brandingExtra: Record<MasterLocale, Record<string, string>> = {
             "Beantworten Sie kurz die Fragen und wählen Sie anschließend eigene oder mit KI vorbereitete Bilder.",
         questionnaire: "Über Ihren Betrieb",
         businessDescription: "Was macht Ihr Betrieb?",
-        customers: "Für welche Kunden arbeiten Sie?",
+        targetCustomers: "Für welche Kunden arbeiten Sie?",
         visualStyle: "Gewünschte Wirkung und Stil",
         avoid: "Was darf nicht im Bild erscheinen?",
         tagline: "Kurze Überschrift",
@@ -28,10 +28,14 @@ const brandingExtra: Record<MasterLocale, Record<string, string>> = {
         saved: "Gespeichert.",
         saveDraft: "Zwischenspeichern",
         saveBranding: "Auftritt speichern",
-        whatsappHelp: "Geben Sie die WhatsApp-Nummer international ein. LOOKDO erstellt den wa.me-Link automatisch.",
-        maxHelp: "Öffnen Sie Ihr MAX-Profil, wählen Sie Einladen/Teilen und fügen Sie den kopierten max.ru/u-Link ein.",
-        telegramHelp: "Geben Sie Ihren öffentlichen @Benutzernamen oder den vollständigen t.me-Link ein.",
-        viberHelp: "Geben Sie die Viber-Nummer international ein. LOOKDO erstellt den Link automatisch.",
+        whatsappHelp:
+            "Geben Sie die WhatsApp-Nummer international ein. LOOKDO erstellt den wa.me-Link automatisch.",
+        maxHelp:
+            "Öffnen Sie Ihr MAX-Profil, wählen Sie Einladen/Teilen und fügen Sie den kopierten max.ru/u-Link ein.",
+        telegramHelp:
+            "Geben Sie Ihren öffentlichen @Benutzernamen oder den vollständigen t.me-Link ein.",
+        viberHelp:
+            "Geben Sie die Viber-Nummer international ein. LOOKDO erstellt den Link automatisch.",
         preview: "Vorschau Ihrer App",
         brandingRequired:
             "Bitte ergänzen Sie die Beschreibung, das Logo und das Startbild.",
@@ -42,11 +46,14 @@ const brandingExtra: Record<MasterLocale, Record<string, string>> = {
         generate: "Bild erstellen",
         generating: "Bild wird erstellt…",
         designServiceTitle: "Sie wünschen ein individuelles App-Design?",
-        designServicePaid: "Die LOOKDO Designer können Layout, Stil und Darstellung individuell anpassen. Die Umsetzung wird separat kalkuliert.",
-        designServiceBusiness: "Im Business-Tarif ist die persönliche Designberatung enthalten. Die gewünschte Umsetzung wird danach transparent kalkuliert.",
+        designServicePaid:
+            "Die LOOKDO Designer können Layout, Stil und Darstellung individuell anpassen. Die Umsetzung wird separat kalkuliert.",
+        designServiceBusiness:
+            "Im Business-Tarif ist die persönliche Designberatung enthalten. Die gewünschte Umsetzung wird danach transparent kalkuliert.",
         contactLookdoDesigners: "LOOKDO Designer kontaktieren",
         designRequestSubject: "Anfrage für individuelles LOOKDO Design",
-        designRequestGreeting: "Hallo LOOKDO Design-Team, ich wünsche Änderungen am Design meiner App.",
+        designRequestGreeting:
+            "Hallo LOOKDO Design-Team, ich wünsche Änderungen am Design meiner App.",
         designRequestQuestions: "Meine Wünsche und Beispiele:",
     },
     en: {
@@ -57,7 +64,7 @@ const brandingExtra: Record<MasterLocale, Record<string, string>> = {
             "Answer a few questions, then upload your own images or prepare them with AI.",
         questionnaire: "About your business",
         businessDescription: "What does your business do?",
-        customers: "Who are your customers?",
+        targetCustomers: "Who are your customers?",
         visualStyle: "Desired look and style",
         avoid: "What must not appear in the image?",
         tagline: "Short headline",
@@ -76,10 +83,13 @@ const brandingExtra: Record<MasterLocale, Record<string, string>> = {
         saved: "Saved.",
         saveDraft: "Save draft",
         saveBranding: "Save appearance",
-        whatsappHelp: "Enter the WhatsApp number in international format. LOOKDO creates the wa.me link automatically.",
-        maxHelp: "Open your MAX profile, choose Invite/Share, and paste the copied max.ru/u link.",
+        whatsappHelp:
+            "Enter the WhatsApp number in international format. LOOKDO creates the wa.me link automatically.",
+        maxHelp:
+            "Open your MAX profile, choose Invite/Share, and paste the copied max.ru/u link.",
         telegramHelp: "Enter your public @username or the complete t.me link.",
-        viberHelp: "Enter the Viber number in international format. LOOKDO creates the link automatically.",
+        viberHelp:
+            "Enter the Viber number in international format. LOOKDO creates the link automatically.",
         preview: "App preview",
         brandingRequired: "Please add a description, logo and hero image.",
         looksGood: "Yes, this fits",
@@ -89,11 +99,14 @@ const brandingExtra: Record<MasterLocale, Record<string, string>> = {
         generate: "Create image",
         generating: "Creating image…",
         designServiceTitle: "Need a custom app design?",
-        designServicePaid: "LOOKDO designers can tailor the layout, style and presentation. Implementation is quoted separately.",
-        designServiceBusiness: "A personal design consultation is included with Business. The requested implementation is then quoted transparently.",
+        designServicePaid:
+            "LOOKDO designers can tailor the layout, style and presentation. Implementation is quoted separately.",
+        designServiceBusiness:
+            "A personal design consultation is included with Business. The requested implementation is then quoted transparently.",
         contactLookdoDesigners: "Contact LOOKDO designers",
         designRequestSubject: "Custom LOOKDO design request",
-        designRequestGreeting: "Hello LOOKDO design team, I would like changes to my app design.",
+        designRequestGreeting:
+            "Hello LOOKDO design team, I would like changes to my app design.",
         designRequestQuestions: "My wishes and examples:",
     },
     ru: {
@@ -103,7 +116,7 @@ const brandingExtra: Record<MasterLocale, Record<string, string>> = {
             "Коротко расскажите о фирме, затем загрузите свои изображения или подготовьте их с помощью ИИ.",
         questionnaire: "О вашей фирме",
         businessDescription: "Чем занимается ваша фирма?",
-        customers: "Для каких клиентов вы работаете?",
+        targetCustomers: "Для каких клиентов вы работаете?",
         visualStyle: "Желаемый стиль и впечатление",
         avoid: "Чего не должно быть на изображениях?",
         tagline: "Короткий заголовок",
@@ -122,10 +135,13 @@ const brandingExtra: Record<MasterLocale, Record<string, string>> = {
         saved: "Сохранено.",
         saveDraft: "Сохранить черновик",
         saveBranding: "Сохранить оформление",
-        whatsappHelp: "Введите номер WhatsApp в международном формате. LOOKDO сам создаст ссылку wa.me.",
-        maxHelp: "Откройте свой профиль MAX, выберите «Пригласить/Поделиться» и вставьте скопированную ссылку max.ru/u.",
+        whatsappHelp:
+            "Введите номер WhatsApp в международном формате. LOOKDO сам создаст ссылку wa.me.",
+        maxHelp:
+            "Откройте свой профиль MAX, выберите «Пригласить/Поделиться» и вставьте скопированную ссылку max.ru/u.",
         telegramHelp: "Введите публичное имя @username или полную ссылку t.me.",
-        viberHelp: "Введите номер Viber в международном формате. LOOKDO сам создаст ссылку.",
+        viberHelp:
+            "Введите номер Viber в международном формате. LOOKDO сам создаст ссылку.",
         preview: "Так будет выглядеть приложение",
         brandingRequired: "Добавьте описание, логотип и главное изображение.",
         looksGood: "Да, так подходит",
@@ -135,11 +151,14 @@ const brandingExtra: Record<MasterLocale, Record<string, string>> = {
         generate: "Создать изображение",
         generating: "Изображение создаётся…",
         designServiceTitle: "Нужен индивидуальный дизайн приложения?",
-        designServicePaid: "Дизайнеры LOOKDO могут серьёзно изменить компоновку, стиль и оформление. Работа рассчитывается и оплачивается отдельно.",
-        designServiceBusiness: "В тариф Business входит персональная консультация дизайнера. Сама выбранная доработка рассчитывается отдельно и заранее согласовывается.",
+        designServicePaid:
+            "Дизайнеры LOOKDO могут серьёзно изменить компоновку, стиль и оформление. Работа рассчитывается и оплачивается отдельно.",
+        designServiceBusiness:
+            "В тариф Business входит персональная консультация дизайнера. Сама выбранная доработка рассчитывается отдельно и заранее согласовывается.",
         contactLookdoDesigners: "Обратиться к дизайнерам LOOKDO",
         designRequestSubject: "Заявка на индивидуальный дизайн LOOKDO",
-        designRequestGreeting: "Здравствуйте! Я хочу изменить дизайн своего приложения LOOKDO.",
+        designRequestGreeting:
+            "Здравствуйте! Я хочу изменить дизайн своего приложения LOOKDO.",
         designRequestQuestions: "Мои пожелания и примеры:",
     },
     uk: {
@@ -149,7 +168,7 @@ const brandingExtra: Record<MasterLocale, Record<string, string>> = {
             "Коротко розкажіть про фірму, потім завантажте власні зображення або підготуйте їх за допомогою ШІ.",
         questionnaire: "Про вашу фірму",
         businessDescription: "Чим займається ваша фірма?",
-        customers: "Для яких клієнтів ви працюєте?",
+        targetCustomers: "Для яких клієнтів ви працюєте?",
         visualStyle: "Бажаний стиль і враження",
         avoid: "Чого не повинно бути на зображеннях?",
         tagline: "Короткий заголовок",
@@ -168,10 +187,14 @@ const brandingExtra: Record<MasterLocale, Record<string, string>> = {
         saved: "Збережено.",
         saveDraft: "Зберегти чернетку",
         saveBranding: "Зберегти оформлення",
-        whatsappHelp: "Введіть номер WhatsApp у міжнародному форматі. LOOKDO сам створить посилання wa.me.",
-        maxHelp: "Відкрийте свій профіль MAX, виберіть «Запросити/Поділитися» та вставте скопійоване посилання max.ru/u.",
-        telegramHelp: "Введіть публічне ім’я @username або повне посилання t.me.",
-        viberHelp: "Введіть номер Viber у міжнародному форматі. LOOKDO сам створить посилання.",
+        whatsappHelp:
+            "Введіть номер WhatsApp у міжнародному форматі. LOOKDO сам створить посилання wa.me.",
+        maxHelp:
+            "Відкрийте свій профіль MAX, виберіть «Запросити/Поділитися» та вставте скопійоване посилання max.ru/u.",
+        telegramHelp:
+            "Введіть публічне ім’я @username або повне посилання t.me.",
+        viberHelp:
+            "Введіть номер Viber у міжнародному форматі. LOOKDO сам створить посилання.",
         preview: "Так виглядатиме застосунок",
         brandingRequired: "Додайте опис, логотип і головне зображення.",
         looksGood: "Так, усе підходить",
@@ -181,11 +204,14 @@ const brandingExtra: Record<MasterLocale, Record<string, string>> = {
         generate: "Створити зображення",
         generating: "Зображення створюється…",
         designServiceTitle: "Потрібен індивідуальний дизайн застосунку?",
-        designServicePaid: "Дизайнери LOOKDO можуть суттєво змінити компонування, стиль і оформлення. Робота розраховується й оплачується окремо.",
-        designServiceBusiness: "До тарифу Business входить персональна консультація дизайнера. Обрана доробка розраховується окремо та погоджується заздалегідь.",
+        designServicePaid:
+            "Дизайнери LOOKDO можуть суттєво змінити компонування, стиль і оформлення. Робота розраховується й оплачується окремо.",
+        designServiceBusiness:
+            "До тарифу Business входить персональна консультація дизайнера. Обрана доробка розраховується окремо та погоджується заздалегідь.",
         contactLookdoDesigners: "Звернутися до дизайнерів LOOKDO",
         designRequestSubject: "Заявка на індивідуальний дизайн LOOKDO",
-        designRequestGreeting: "Вітаю! Я хочу змінити дизайн свого застосунку LOOKDO.",
+        designRequestGreeting:
+            "Вітаю! Я хочу змінити дизайн свого застосунку LOOKDO.",
         designRequestQuestions: "Мої побажання та приклади:",
     },
 };
