@@ -116,6 +116,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
         Route::get('/tenant/{tenant}/content-workspace', [TenantContentController::class, 'index']);
         Route::post('/tenant/{tenant}/portfolio', [TenantContentController::class, 'savePortfolio']);
         Route::post('/tenant/{tenant}/portfolio/{item}', [TenantContentController::class, 'savePortfolio']);
+        Route::put('/tenant/{tenant}/portfolio/{item}', [TenantContentController::class, 'savePortfolio']);
         Route::delete('/tenant/{tenant}/portfolio/{item}', [TenantContentController::class, 'deletePortfolio']);
         Route::post('/tenant/{tenant}/reviews', [TenantContentController::class, 'saveReview']);
         Route::put('/tenant/{tenant}/reviews/{review}', [TenantContentController::class, 'saveReview']);
