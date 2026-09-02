@@ -46,7 +46,39 @@ const designRequestUrl=computed(()=>{
 });
 
 function brandingPayload(){
-  return {...form,business_description:form.description_translations[mainLocale.value]||form.business_description,tagline:form.tagline_translations[mainLocale.value]||form.tagline};
+  const contacts={
+    whatsapp_url:normalizeWhatsApp(form.whatsapp_url),
+    telegram_url:normalizeTelegram(form.telegram_url),
+    viber_url:normalizeViber(form.viber_url),
+  };
+  Object.assign(form,contacts);
+  return {...form,...contacts,business_description:form.description_translations[mainLocale.value]||form.business_description,tagline:form.tagline_translations[mainLocale.value]||form.tagline};
+}
+
+function internationalDigits(value:string){
+  const trimmed=String(value||'').trim();
+  const digits=trimmed.replace(/\D/g,'');
+  return digits.startsWith('00')?digits.slice(2):digits;
+}
+function normalizeWhatsApp(value:string){
+  const trimmed=String(value||'').trim();
+  if(!trimmed)return '';
+  if(/^https?:\/\//i.test(trimmed))return trimmed;
+  const digits=internationalDigits(trimmed);
+  return digits?`https://wa.me/${digits}`:trimmed;
+}
+function normalizeTelegram(value:string){
+  const trimmed=String(value||'').trim();
+  if(!trimmed)return '';
+  if(/^https?:\/\//i.test(trimmed))return trimmed;
+  const username=trimmed.replace(/^@/,'');
+  return username?`https://t.me/${username}`:trimmed;
+}
+function normalizeViber(value:string){
+  const trimmed=String(value||'').trim();
+  if(!trimmed||/^(?:https?:\/\/|viber:\/\/)/i.test(trimmed))return trimmed;
+  const digits=internationalDigits(trimmed);
+  return digits?`viber://chat?number=${encodeURIComponent(`+${digits}`)}`:trimmed;
 }
 
 async function save(confirmed?:boolean){
@@ -111,13 +143,13 @@ function closePrompt(){
       <label>{{t('phone')}}<input v-model="form.phone" type="tel" autocomplete="tel" placeholder="+7 999 123-45-67"></label>
       <fieldset class="mw-contact-fields"><legend>{{t('contacts')}}</legend>
         <p>{{t('contactsHint')}}</p>
-        <div class="mw-field-pair"><label>WhatsApp<input v-model="form.whatsapp_url" type="url" placeholder="https://wa.me/..."></label><label>MAX<input v-model="form.max_url" type="url" placeholder="https://max.ru/u/..."></label></div>
-        <div class="mw-field-pair"><label>Telegram<input v-model="form.telegram_url" type="url" placeholder="https://t.me/..."></label><label>Viber<input v-model="form.viber_url" type="url" placeholder="viber://chat?number=..."></label></div>
+        <div class="mw-field-pair"><label>WhatsApp<input v-model="form.whatsapp_url" type="text" inputmode="tel" placeholder="+49 174 4812109"><small>{{t('whatsappHelp')}}</small></label><label>MAX<input v-model="form.max_url" type="url" placeholder="https://max.ru/u/..."><small>{{t('maxHelp')}}</small></label></div>
+        <div class="mw-field-pair"><label>Telegram<input v-model="form.telegram_url" type="text" placeholder="@username"><small>{{t('telegramHelp')}}</small></label><label>Viber<input v-model="form.viber_url" type="text" inputmode="tel" placeholder="+49 174 4812109"><small>{{t('viberHelp')}}</small></label></div>
         <div class="mw-field-pair"><label>VK<input v-model="form.vk_url" type="url" placeholder="https://vk.com/..."></label><label>Instagram<input v-model="form.instagram_url" type="url" placeholder="https://instagram.com/..."></label></div>
         <div class="mw-field-pair"><label>Facebook<input v-model="form.facebook_url" type="url" placeholder="https://facebook.com/..."></label><label>{{t('website')}}<input v-model="form.website_url" type="url" placeholder="https://..."></label></div>
       </fieldset>
       <label>{{t('workingHours')}}<input v-model="form.working_hours"></label>
-      <button class="mw-secondary" :disabled="busy">{{t('saveDraft')}}</button>
+      <button class="mw-secondary" :disabled="busy">{{t('saveBranding')}}</button>
     </form>
     <div class="mw-stack">
       <article class="mw-panel mw-brand-assets">
