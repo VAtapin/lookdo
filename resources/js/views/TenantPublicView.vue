@@ -55,9 +55,9 @@ const workFilter = ref<"all" | "before_after" | "finished" | "favorites">(
     "all",
 );
 const workFilterOpen = ref(false);
-const mediaFilter = ref<"all" | "photos" | "videos">("all");
+const mediaFilter = ref<"mixed" | "photos" | "videos">("mixed");
 const portfolioPage = ref(1);
-const portfolioPageSize = 12;
+const portfolioPageSize = ref(6);
 const lightbox = ref<{ src: string; alt: string } | null>(null);
 const videoLightbox = ref<{ src: string; title: string } | null>(null);
 const reviewOpen = ref(false);
@@ -160,33 +160,38 @@ const averageRating = computed(() => {
 });
 const filteredPortfolio = computed(() => {
     let rows = app.value?.portfolio || [];
-    if (mediaFilter.value === "photos")
-        rows = rows.filter((item: any) => !item.video);
-    if (mediaFilter.value === "videos")
-        rows = rows.filter((item: any) => !!item.video);
     if (workFilter.value === "before_after")
-        return rows.filter(
+        rows = rows.filter(
             (item: any) => item.before_image && item.after_image,
         );
     if (workFilter.value === "finished")
-        return rows.filter(
+        rows = rows.filter(
             (item: any) => !(item.before_image && item.after_image),
         );
     if (workFilter.value === "favorites")
-        return rows.filter((item: any) =>
+        rows = rows.filter((item: any) =>
             favoriteIds.value.includes(String(item.id)),
         );
-    return rows;
+    if (mediaFilter.value === "photos")
+        return rows.filter((item: any) => !item.video);
+    if (mediaFilter.value === "videos")
+        return rows.filter((item: any) => !!item.video);
+    return mixPortfolio(rows, portfolioPageSize.value);
 });
 const portfolioPageCount = computed(() =>
-    Math.max(1, Math.ceil(filteredPortfolio.value.length / portfolioPageSize)),
+    Math.max(
+        1,
+        Math.ceil(filteredPortfolio.value.length / portfolioPageSize.value),
+    ),
 );
 const paginatedPortfolio = computed(() => {
-    const start = (portfolioPage.value - 1) * portfolioPageSize;
-    return filteredPortfolio.value.slice(start, start + portfolioPageSize);
+    const start = (portfolioPage.value - 1) * portfolioPageSize.value;
+    return filteredPortfolio.value.slice(
+        start,
+        start + portfolioPageSize.value,
+    );
 });
 const mediaLabels = computed(() => ({
-    all: { de: "Alle", en: "All", ru: "Все", uk: "Усі" }[locale.value],
     photos: { de: "Fotos", en: "Photos", ru: "Фото", uk: "Фото" }[locale.value],
     videos: { de: "Videos", en: "Videos", ru: "Видео", uk: "Відео" }[
         locale.value
@@ -203,6 +208,12 @@ const portfolioImages = computed(() =>
     ),
 );
 const portfolioLabels = computed(() => ({
+    all: {
+        de: "Alle Arbeiten",
+        en: "All work",
+        ru: "Все работы",
+        uk: "Усі роботи",
+    }[locale.value],
     finished: {
         de: "Fertige Arbeiten",
         en: "Finished work",
@@ -215,9 +226,15 @@ const portfolioLabels = computed(() => ({
         ru: "Избранное",
         uk: "Обране",
     }[locale.value],
-    filters: { de: "Filter", en: "Filters", ru: "Фильтры", uk: "Фільтри" }[
+    filters: { de: "Filter", en: "Filter", ru: "Фильтр", uk: "Фільтр" }[
         locale.value
     ],
+    perPage: {
+        de: "Pro Seite",
+        en: "Per page",
+        ru: "На странице",
+        uk: "На сторінці",
+    }[locale.value],
     close: { de: "Schließen", en: "Close", ru: "Закрыть", uk: "Закрити" }[
         locale.value
     ],
@@ -228,6 +245,33 @@ const portfolioLabels = computed(() => ({
         uk: "Натисніть поза фотографією або на ×, щоб закрити",
     }[locale.value],
 }));
+const hasBeforeAfterPortfolio = computed(() =>
+    (app.value?.portfolio || []).some(
+        (item: any) => item.before_image && item.after_image,
+    ),
+);
+
+function mixPortfolio(rows: any[], pageSize: number) {
+    const photos = rows.filter((item: any) => !item.video);
+    const videos = rows.filter((item: any) => !!item.video);
+    if (!photos.length || !videos.length) return rows;
+
+    const result: any[] = [];
+    const photoCount = Math.max(1, Math.round((pageSize * 2) / 3));
+    const videoCount = Math.max(1, pageSize - photoCount);
+
+    while (photos.length || videos.length) {
+        const page = photos
+            .splice(0, photoCount)
+            .concat(videos.splice(0, videoCount));
+        while (page.length < pageSize && (photos.length || videos.length)) {
+            page.push((photos.length ? photos : videos).shift());
+        }
+        result.push(...page);
+    }
+
+    return result;
+}
 const serviceDetailLabels = computed(() => ({
     inclusions: {
         de: "Was ist enthalten?",
@@ -327,7 +371,20 @@ function selectWorkFilter(value: typeof workFilter.value) {
     workFilter.value = value;
     workFilterOpen.value = false;
 }
-watch([workFilter, mediaFilter], () => (portfolioPage.value = 1));
+function selectMediaFilter(value: typeof mediaFilter.value) {
+    mediaFilter.value = value;
+    workFilter.value = "all";
+    workFilterOpen.value = false;
+}
+function selectPortfolioPageSize(value: number) {
+    portfolioPageSize.value = value;
+    portfolioPage.value = 1;
+    workFilterOpen.value = false;
+}
+watch(
+    [workFilter, mediaFilter, portfolioPageSize],
+    () => (portfolioPage.value = 1),
+);
 function openLightbox(src: string, alt: string) {
     lightbox.value = { src, alt };
 }
@@ -1248,51 +1305,23 @@ const loginContext = {
                                 <h1>{{ copy.works }}</h1>
                                 <p>{{ app.tenant.description }}</p>
                             </div>
-                            <div class="ta-filter-row">
-                                <button
-                                    v-for="kind in ['all', 'photos', 'videos']"
-                                    :key="`media-${kind}`"
-                                    :class="{ active: mediaFilter === kind }"
-                                    @click="mediaFilter = kind as any"
+                            <div class="ta-filter-row ta-media-filter-row">
+                                <div
+                                    class="ta-work-filter-menu ta-media-filter-menu"
                                 >
-                                    {{
-                                        mediaLabels[
-                                            kind as keyof typeof mediaLabels
-                                        ]
-                                    }}
-                                </button>
-                            </div>
-                            <div
-                                v-if="!isBrows"
-                                class="ta-filter-row ta-filter-row-secondary"
-                            >
-                                <button
-                                    :class="{ active: workFilter === 'all' }"
-                                    @click="selectWorkFilter('all')"
-                                >
-                                    {{ copy.all }}</button
-                                ><button
-                                    :class="{
-                                        active: workFilter === 'before_after',
-                                    }"
-                                    @click="selectWorkFilter('before_after')"
-                                >
-                                    {{ copy.featured }}
-                                </button>
-                                <div class="ta-work-filter-menu">
                                     <button
                                         :class="{
                                             active:
-                                                workFilter === 'finished' ||
-                                                workFilter === 'favorites',
+                                                mediaFilter === 'mixed' ||
+                                                workFilter !== 'all',
                                         }"
-                                        :aria-label="portfolioLabels.filters"
                                         :aria-expanded="workFilterOpen"
                                         @click="
                                             workFilterOpen = !workFilterOpen
                                         "
                                     >
-                                        <AppIcon name="menu" />
+                                        <AppIcon name="menu" :size="18" />
+                                        {{ portfolioLabels.filters }}
                                     </button>
                                     <div
                                         v-if="workFilterOpen"
@@ -1301,13 +1330,12 @@ const loginContext = {
                                         <button
                                             :class="{
                                                 active:
-                                                    workFilter === 'finished',
+                                                    workFilter === 'all' &&
+                                                    mediaFilter === 'mixed',
                                             }"
-                                            @click="
-                                                selectWorkFilter('finished')
-                                            "
+                                            @click="selectMediaFilter('mixed')"
                                         >
-                                            {{ portfolioLabels.finished }}
+                                            {{ portfolioLabels.all }}
                                         </button>
                                         <button
                                             :class="{
@@ -1318,13 +1346,61 @@ const loginContext = {
                                                 selectWorkFilter('favorites')
                                             "
                                         >
-                                            <AppIcon
-                                                name="heart"
-                                                :size="18"
-                                            />{{ portfolioLabels.favorites }}
+                                            <AppIcon name="heart" :size="18" />
+                                            {{ portfolioLabels.favorites }}
                                         </button>
+                                        <button
+                                            v-if="hasBeforeAfterPortfolio"
+                                            :class="{
+                                                active:
+                                                    workFilter ===
+                                                    'before_after',
+                                            }"
+                                            @click="
+                                                selectWorkFilter('before_after')
+                                            "
+                                        >
+                                            {{ copy.featured }}
+                                        </button>
+                                        <small>{{
+                                            portfolioLabels.perPage
+                                        }}</small>
+                                        <div class="ta-page-size-options">
+                                            <button
+                                                v-for="size in [6, 12, 24, 48]"
+                                                :key="size"
+                                                :class="{
+                                                    active:
+                                                        portfolioPageSize ===
+                                                        size,
+                                                }"
+                                                @click="
+                                                    selectPortfolioPageSize(
+                                                        size,
+                                                    )
+                                                "
+                                            >
+                                                {{ size }}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
+                                <button
+                                    :class="{
+                                        active: mediaFilter === 'photos',
+                                    }"
+                                    @click="selectMediaFilter('photos')"
+                                >
+                                    {{ mediaLabels.photos }}
+                                </button>
+                                <button
+                                    :class="{
+                                        active: mediaFilter === 'videos',
+                                    }"
+                                    @click="selectMediaFilter('videos')"
+                                >
+                                    {{ mediaLabels.videos }}
+                                </button>
                             </div>
                             <div
                                 v-if="paginatedPortfolio.length"
