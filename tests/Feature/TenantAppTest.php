@@ -283,12 +283,31 @@ class TenantAppTest extends TestCase
         $startsAt = $availability->json('slots.0.starts_at');
         $this->assertNotNull($startsAt);
 
+        $push = \Mockery::mock(TenantWebPushService::class);
+        $push->shouldReceive('configured')->once()->andReturnTrue();
+        $push->shouldReceive('sendToCustomer')->once()->withArgs(function ($customer, array $payload): bool {
+            return $customer->phone === '+380671234567'
+                && str_contains($payload['body'], 'підтверджено')
+                && $payload['url'] === '/activity';
+        })->andReturn(['sent' => 1, 'failed' => 0, 'expired' => 0, 'skipped' => false]);
+        $this->app->instance(TenantWebPushService::class, $push);
+
         $booking = $this->withHeader('X-Locale', 'uk')->postJson($this->url($tenant, '/api/tenant-app/appointments'), [
             'service_id' => $serviceId, 'starts_at' => $startsAt, 'name' => 'Олена', 'phone' => '+380671234567', 'comment' => 'Перша процедура',
+            'preferred_channel' => 'push',
+            'push_subscription' => [
+                'endpoint' => 'https://push.example.test/subscription-1',
+                'keys' => ['p256dh' => 'public-key', 'auth' => 'auth-token'],
+            ],
         ])->assertCreated()->assertJsonPath('appointment.status', 'pending');
         $token = $booking->json('token');
         $appointmentId = $booking->json('appointment.id');
         $this->assertNotEmpty($token);
+        $this->assertDatabaseHas('tenant_push_subscriptions', [
+            'tenant_id' => $tenant->id,
+            'endpoint' => 'https://push.example.test/subscription-1',
+            'customer_id' => TenantAppointment::findOrFail($appointmentId)->customer_id,
+        ]);
 
         $this->postJson($this->url($tenant, '/api/tenant-app/appointments'), [
             'service_id' => $serviceId, 'starts_at' => $startsAt, 'name' => 'Марія', 'phone' => '+380671111111',

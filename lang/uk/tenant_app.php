@@ -22,6 +22,7 @@ return [
     'customer_push' => [
         'open' => 'Відкрити',
         'new_message' => ['body' => 'Ви отримали нове повідомлення від майстра.'],
+        'appointment_confirmed' => ['body' => 'Запис на послугу «:service» підтверджено: :date.'],
     ],
     'sms' => [
         'request_received' => ':business отримав вашу заявку. Статус: :url',

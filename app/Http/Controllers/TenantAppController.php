@@ -232,7 +232,7 @@ class TenantAppController extends Controller
         return response()->json(['slots' => $slots]);
     }
 
-    public function createAppointment(Request $request, TenantCalendarService $calendar): JsonResponse
+    public function createAppointment(Request $request, TenantCalendarService $calendar, TenantWebPushService $webPush): JsonResponse
     {
         $tenant = $this->tenant($request);
         $this->ensureAvailable($request, $tenant);
@@ -246,6 +246,10 @@ class TenantAppController extends Controller
             'resource_id' => 'nullable|integer',
             'service_mode' => 'nullable|in:workshop,on_site',
             'service_address' => 'nullable|required_if:service_mode,on_site|string|max:500',
+            'push_subscription' => 'nullable|array',
+            'push_subscription.endpoint' => 'required_with:push_subscription|url|max:2000',
+            'push_subscription.keys.p256dh' => 'required_with:push_subscription|string|max:1000',
+            'push_subscription.keys.auth' => 'required_with:push_subscription|string|max:500',
         ]);
         $service = $tenant->services()->where('active', true)->where('booking_enabled', true)->findOrFail($data['service_id']);
         $locale = $this->locale($request, $tenant);
@@ -277,6 +281,37 @@ class TenantAppController extends Controller
         });
 
         $this->notifyMaster($tenant, 'new_appointment', '/app/calendar', 'appointment-'.$appointment->id);
+
+        if (($data['preferred_channel'] ?? null) === 'push'
+            && isset($data['push_subscription'])
+            && $this->enabled($tenant, 'push_enabled', true)
+            && $webPush->configured()) {
+            $subscription = $data['push_subscription'];
+            TenantPushSubscription::updateOrCreate(
+                ['tenant_id' => $tenant->id, 'endpoint_hash' => hash('sha256', $subscription['endpoint'])],
+                [
+                    'customer_id' => $customer->id,
+                    'endpoint' => $subscription['endpoint'],
+                    'public_key' => $subscription['keys']['p256dh'],
+                    'auth_token' => $subscription['keys']['auth'],
+                    'locale' => $locale,
+                ],
+            );
+            try {
+                $webPush->sendToCustomer($customer, [
+                    'title' => $tenant->name,
+                    'body' => trans('tenant_app.customer_push.appointment_confirmed.body', [
+                        'service' => $service->localized('name', $locale),
+                        'date' => $start->locale($locale)->translatedFormat('j F, H:i'),
+                    ], $locale),
+                    'url' => '/activity',
+                    'tag' => 'lookdo-appointment-'.$appointment->id,
+                    'action' => trans('tenant_app.customer_push.open', locale: $locale),
+                ]);
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        }
 
         return response()->json(['token' => $rawToken, 'appointment' => $this->appointmentPayload($appointment->load('service'), $locale)], 201);
     }

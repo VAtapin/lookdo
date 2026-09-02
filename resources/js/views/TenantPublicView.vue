@@ -556,9 +556,11 @@ const loginContext = {
                     :copy="copy"
                     :locale="locale"
                     :token="clientToken"
+                    :push-state="pushState"
                     :appointment="rescheduleAppointment"
                     @close="rescheduleAppointment = null"
                     @success="flowSuccess"
+                    @enable-push="openPushExperience"
                 />
                 <RequestFlow
                     v-else-if="screen === 'request'"
@@ -575,8 +577,10 @@ const loginContext = {
                     :copy="copy"
                     :locale="locale"
                     :token="clientToken"
+                    :push-state="pushState"
                     @close="go('home')"
                     @success="flowSuccess"
+                    @enable-push="openPushExperience"
                 />
                 <TenantLogin
                     v-else-if="screen === 'login'"

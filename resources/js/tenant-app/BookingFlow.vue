@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { api } from "../api";
 import AppIcon from "./AppIcon.vue";
 
@@ -8,9 +8,14 @@ const props = defineProps<{
     copy: any;
     locale: string;
     token: string;
+    pushState: string;
     appointment?: any;
 }>();
-const emit = defineEmits<{ close: []; success: [payload: any] }>();
+const emit = defineEmits<{
+    close: [];
+    success: [payload: any];
+    enablePush: [];
+}>();
 const stage = ref<"service" | "date" | "contact" | "success">("service");
 const selectedService = ref<any>(null);
 const selectedDate = ref("");
@@ -26,7 +31,7 @@ const form = reactive({
     phone: "",
     email: "",
     comment: "",
-    preferred_channel: "whatsapp",
+    preferred_channel: null as "push" | null,
     service_mode: "workshop",
     service_address: "",
 });
@@ -82,6 +87,15 @@ const weekDays = computed(() => {
 });
 const appointmentResult = computed(
     () => result.value?.appointment || result.value || props.appointment,
+);
+const pushSubscribed = computed(() => props.pushState === "subscribed");
+
+watch(
+    pushSubscribed,
+    (subscribed) => {
+        form.preferred_channel = subscribed ? "push" : null;
+    },
+    { immediate: true },
 );
 
 function localIso(date: Date) {
@@ -176,6 +190,11 @@ async function book() {
     busy.value = true;
     error.value = "";
     try {
+        let pushSubscription = null;
+        if (pushSubscribed.value && "serviceWorker" in navigator) {
+            const registration = await navigator.serviceWorker.ready;
+            pushSubscription = (await registration.pushManager.getSubscription())?.toJSON() || null;
+        }
         result.value = await api("/tenant-app/appointments", {
             method: "POST",
             headers: props.token
@@ -186,6 +205,7 @@ async function book() {
                 service_id: selectedService.value.id,
                 starts_at: selectedSlot.value.starts_at,
                 resource_id: selectedSlot.value.resource_id,
+                push_subscription: pushSubscription,
             }),
         });
         stage.value = "success";
@@ -493,22 +513,20 @@ onMounted(() => {
             <h2>{{ copy.preferredChannel }}</h2>
             <div class="ta-channel-grid">
                 <button
-                    v-for="channel in [
-                        { key: 'whatsapp', label: 'WhatsApp' },
-                        { key: 'viber', label: 'Viber' },
-                        { key: 'telegram', label: 'Telegram' },
-                    ]"
-                    :key="channel.key"
-                    :class="{ active: form.preferred_channel === channel.key }"
-                    @click="form.preferred_channel = channel.key"
+                    v-if="pushSubscribed"
+                    class="active"
+                    @click="form.preferred_channel = 'push'"
                 >
-                    {{ channel.label
-                    }}<AppIcon
-                        v-if="form.preferred_channel === channel.key"
-                        name="check"
-                    />
+                    <AppIcon name="bell" />{{ copy.pushConfirmation }}
+                    <AppIcon name="check" />
+                </button>
+                <button v-else @click="emit('enablePush')">
+                    <AppIcon name="bell" />{{ copy.enablePushConfirmation }}
                 </button>
             </div>
+            <p class="ta-channel-hint">
+                {{ pushSubscribed ? copy.pushConfirmationHint : copy.pushUnavailableHint }}
+            </p>
             <div class="ta-final-summary">
                 <b>{{ copy.yourBooking }}</b>
                 <p>

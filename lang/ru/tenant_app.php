@@ -22,6 +22,7 @@ return [
     'customer_push' => [
         'open' => 'Открыть',
         'new_message' => ['body' => 'Вы получили новое сообщение от мастера.'],
+        'appointment_confirmed' => ['body' => 'Запись на услугу «:service» подтверждена: :date.'],
     ],
     'sms' => [
         'request_received' => ':business получил вашу заявку. Статус: :url',

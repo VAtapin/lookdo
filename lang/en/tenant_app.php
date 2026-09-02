@@ -22,6 +22,7 @@ return [
     'customer_push' => [
         'open' => 'Open',
         'new_message' => ['body' => 'You have received a new message from the business.'],
+        'appointment_confirmed' => ['body' => 'Your booking for “:service” is confirmed: :date.'],
     ],
     'sms' => [
         'request_received' => ':business has received your request. Status: :url',
