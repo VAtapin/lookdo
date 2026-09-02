@@ -259,7 +259,7 @@ async function load() {
         if (screen.value === "activity") await loadActivity();
         await refreshPushState();
         if (pushState.value === "subscribed") await syncExistingPushSubscription();
-        if (app.value.session?.known && shouldNudgePush()) {
+        if (shouldNudgePush()) {
             pushNudge.value = true;
             localStorage.setItem("lookdo-push-nudge:" + location.hostname, localDayKey());
         }
@@ -273,7 +273,7 @@ async function load() {
 function shouldNudgePush() {
     const today = localDayKey();
     return Boolean(
-        ["default", "install_required"].includes(pushState.value) && clientToken.value &&
+        ["default", "install_required"].includes(pushState.value) &&
         localStorage.getItem("lookdo-push-nudge:" + location.hostname) !== today,
     );
 }
@@ -282,7 +282,7 @@ function localDayKey() {
     return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
 }
 async function refreshPushState() {
-    if (!app.value?.push?.enabled || !clientToken.value) { pushState.value = "unsupported"; return; }
+    if (!app.value?.push?.enabled) { pushState.value = "unsupported"; return; }
     if (isIos.value && !appInstalled.value) { pushState.value = "install_required"; return; }
     if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) { pushState.value = "unsupported"; return; }
     if (Notification.permission === "denied") { pushState.value = "denied"; return; }
@@ -293,7 +293,7 @@ async function refreshPushState() {
     } catch { pushState.value = "repair"; }
 }
 async function syncExistingPushSubscription() {
-    if (!app.value?.push?.enabled || !clientToken.value || !("serviceWorker" in navigator))
+    if (!app.value?.push?.enabled || !("serviceWorker" in navigator))
         return;
     try {
         const registration = await navigator.serviceWorker.ready;
@@ -302,7 +302,7 @@ async function syncExistingPushSubscription() {
         const value = subscription.toJSON();
         await api("/tenant-app/push-subscriptions", {
             method: "POST",
-            headers: { "X-Lookdo-Client-Token": clientToken.value },
+            headers: clientToken.value ? { "X-Lookdo-Client-Token": clientToken.value } : {},
             body: JSON.stringify({ endpoint: value.endpoint, keys: value.keys }),
         });
     } catch {
@@ -336,6 +336,7 @@ function flowSuccess(payload: any) {
         localStorage.setItem(tokenKey, payload.token);
     }
     void refreshPushState();
+    void syncExistingPushSubscription();
     loadActivity();
 }
 async function cancelAppointment(item: any) {
@@ -443,7 +444,7 @@ async function enablePush() {
         const value = subscription.toJSON();
         await api("/tenant-app/push-subscriptions", {
             method: "POST",
-            headers: { "X-Lookdo-Client-Token": clientToken.value },
+            headers: clientToken.value ? { "X-Lookdo-Client-Token": clientToken.value } : {},
             body: JSON.stringify({
                 endpoint: value.endpoint,
                 keys: value.keys,
@@ -477,7 +478,7 @@ async function openPushSettings() {
 async function handleVisibilityChange() {
     if (document.visibilityState !== "visible") return;
     await refreshPushState();
-    if (app.value?.session?.known && shouldNudgePush()) {
+    if (shouldNudgePush()) {
         pushNudge.value = true;
         localStorage.setItem("lookdo-push-nudge:" + location.hostname, localDayKey());
     }

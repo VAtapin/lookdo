@@ -172,6 +172,43 @@ class TenantAppTest extends TestCase
         $this->assertDatabaseHas('tenant_push_subscriptions', ['tenant_id' => $tenant->id, 'endpoint_hash' => hash('sha256', $endpoint)]);
     }
 
+    public function test_device_can_subscribe_before_creating_a_request_and_is_linked_afterwards(): void
+    {
+        Storage::fake('public');
+        $tenant = $this->tenant('push-before-request', 'automotive.steering-wheel-upholstery');
+        $endpoint = 'https://push.example.test/subscription/before-request';
+        $payload = ['endpoint' => $endpoint, 'keys' => ['p256dh' => 'public-key', 'auth' => 'auth-key']];
+
+        $this->withHeader('X-Locale', 'ru')->postJson($this->url($tenant, '/api/tenant-app/push-subscriptions'), $payload)
+            ->assertOk()->assertJsonPath('subscribed', true);
+        $this->assertDatabaseHas('tenant_push_subscriptions', [
+            'tenant_id' => $tenant->id,
+            'endpoint_hash' => hash('sha256', $endpoint),
+            'customer_id' => null,
+            'locale' => 'ru',
+        ]);
+
+        $response = $this->post($this->url($tenant, '/api/tenant-app/requests'), [
+            'name' => 'Иван',
+            'phone' => '8 999 123-45-67',
+            'summary' => 'Нужна оценка руля',
+            'fields' => json_encode([]),
+            'media_slots' => json_encode(['overall']),
+            'media' => [UploadedFile::fake()->image('wheel.jpg', 1200, 900)],
+        ])->assertCreated();
+
+        $customer = $tenant->customers()->where('phone', '8 999 123-45-67')->firstOrFail();
+
+        $this->withHeader('X-Lookdo-Client-Token', $response->json('token'))
+            ->postJson($this->url($tenant, '/api/tenant-app/push-subscriptions'), $payload)
+            ->assertOk();
+        $this->assertDatabaseHas('tenant_push_subscriptions', [
+            'tenant_id' => $tenant->id,
+            'endpoint_hash' => hash('sha256', $endpoint),
+            'customer_id' => $customer->id,
+        ]);
+    }
+
     public function test_only_customer_with_unreviewed_completed_request_can_submit_review(): void
     {
         $tenant = $this->tenant('review-eligibility', 'automotive.steering-wheel-upholstery');

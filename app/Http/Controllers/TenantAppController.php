@@ -320,13 +320,19 @@ class TenantAppController extends Controller
     {
         $tenant = $this->tenant($request);
         $this->ensureAvailable($request, $tenant);
-        $customer = $this->requireCustomer($request, $tenant);
+        $customer = $this->customerFromToken($request, $tenant);
         abort_unless($this->enabled($tenant, 'push_enabled', true), 403);
         $data = $request->validate(['endpoint' => 'required|url|max:2000', 'keys.p256dh' => 'required|string|max:1000', 'keys.auth' => 'required|string|max:500']);
         $endpointHash = hash('sha256', $data['endpoint']);
         TenantPushSubscription::updateOrCreate(
             ['tenant_id' => $tenant->id, 'endpoint_hash' => $endpointHash],
-            ['customer_id' => $customer->id, 'endpoint' => $data['endpoint'], 'public_key' => $data['keys']['p256dh'], 'auth_token' => $data['keys']['auth'], 'locale' => $customer->locale],
+            [
+                'customer_id' => $customer?->id,
+                'endpoint' => $data['endpoint'],
+                'public_key' => $data['keys']['p256dh'],
+                'auth_token' => $data['keys']['auth'],
+                'locale' => $customer?->locale ?: $this->locale($request, $tenant),
+            ],
         );
 
         return response()->json(['subscribed' => true]);
