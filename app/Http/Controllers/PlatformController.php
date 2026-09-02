@@ -65,7 +65,7 @@ class PlatformController extends Controller
         $source = @imagecreatefromstring($contents);
         abort_unless($source, 404);
         $canvas = imagecreatetruecolor($size, $size);
-        $hex = ltrim((string) ($tenant->profile?->secondary_color ?: '#111318'), '#');
+        $hex = ltrim((string) ($tenant?->profile?->secondary_color ?: '#111318'), '#');
         $background = imagecolorallocate($canvas, hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2)));
         imagefill($canvas, 0, 0, $background);
         $sourceWidth = imagesx($source);
