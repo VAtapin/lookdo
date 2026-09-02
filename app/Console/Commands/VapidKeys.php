@@ -12,7 +12,10 @@ use Throwable;
 
 class VapidKeys extends Command
 {
-    protected $signature = 'lookdo:webpush:keys {--check : Check the configured keys without generating new ones}';
+    protected $signature = 'lookdo:webpush:keys
+        {--check : Check the configured keys without generating new ones}
+        {--write : Write the generated pair directly to the application .env file}
+        {--force : Allow --write to replace an existing pair}';
 
     protected $description = 'Generate VAPID keys for manual .env setup or verify the current Web Push configuration';
 
@@ -33,6 +36,19 @@ class VapidKeys extends Command
 
         try {
             $keys = $this->generateKeys();
+            if ($this->option('write')) {
+                if (! $this->option('force') && (filled(env('VAPID_PUBLIC_KEY')) || filled(env('VAPID_PRIVATE_KEY')))) {
+                    $this->error('VAPID keys already exist. Use --force only when the configured pair is broken.');
+
+                    return self::FAILURE;
+                }
+                $this->writeEnvironment($keys);
+                $this->info('A new valid VAPID key pair was written to .env. Existing browser subscriptions must subscribe again.');
+                $this->line('VAPID_PUBLIC_KEY='.$keys['publicKey']);
+
+                return self::SUCCESS;
+            }
+
             $this->warn('Paste these values into .env in the Plesk editor. Do not regenerate them after clients subscribe.');
             $this->newLine();
             $this->line('VAPID_PUBLIC_KEY='.$keys['publicKey']);
@@ -78,6 +94,31 @@ JS;
             }
 
             return ['publicKey' => $keys['publicKey'], 'privateKey' => $keys['privateKey']];
+        }
+    }
+
+    /** @param array{publicKey:string,privateKey:string} $keys */
+    private function writeEnvironment(array $keys): void
+    {
+        $path = base_path('.env');
+        $contents = file_get_contents($path);
+        if (! is_string($contents)) {
+            throw new RuntimeException('The application .env file could not be read.');
+        }
+        $environment = ['VAPID_PUBLIC_KEY' => $keys['publicKey'], 'VAPID_PRIVATE_KEY' => $keys['privateKey']];
+        if (! filled(env('VAPID_SUBJECT'))) {
+            $environment['VAPID_SUBJECT'] = (string) config('services.webpush.subject', 'mailto:support@lookdo.app');
+        }
+        foreach ($environment as $name => $value) {
+            $line = $name.'='.$value;
+            if (preg_match('/^'.preg_quote($name, '/').'=.*$/m', $contents)) {
+                $contents = (string) preg_replace('/^'.preg_quote($name, '/').'=.*$/m', $line, $contents, 1);
+            } else {
+                $contents = rtrim($contents).PHP_EOL.$line.PHP_EOL;
+            }
+        }
+        if (file_put_contents($path, $contents, LOCK_EX) === false) {
+            throw new RuntimeException('The application .env file could not be updated.');
         }
     }
 }

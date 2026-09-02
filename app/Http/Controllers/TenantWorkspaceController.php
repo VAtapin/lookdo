@@ -12,6 +12,7 @@ use App\Services\CustomerMergeService;
 use App\Services\EntitlementService;
 use App\Services\SmsService;
 use App\Services\TenantCalendarService;
+use App\Services\TenantWebPushService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,7 +25,7 @@ class TenantWorkspaceController extends Controller
 {
     use AuthorizesTenantWorkspace;
 
-    public function bootstrap(Request $request, Tenant $tenant, TenantCalendarService $calendar, EntitlementService $entitlements): JsonResponse
+    public function bootstrap(Request $request, Tenant $tenant, TenantCalendarService $calendar, EntitlementService $entitlements, TenantWebPushService $webPush): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         $calendar->ensureWorkingHours($tenant);
@@ -58,7 +59,7 @@ class TenantWorkspaceController extends Controller
             'counts' => ['requests' => $tenant->appRequests()->count(), 'new_requests' => $tenant->appRequests()->where('status', 'new')->count(), 'customers' => $tenant->customers()->count(), 'messages' => $unread, 'appointments' => $tenant->appointments()->where('starts_at', '>=', now())->whereNotIn('status', ['cancelled'])->count()],
             'services' => $tenant->services()->orderBy('sort_order')->get(), 'working_hours' => $tenant->workingHours()->orderBy('weekday')->get(),
             'access' => ['trial' => (bool) $tenant->currentSubscription?->isTrialActive(), 'entitlements' => $entitlements->all($tenant)],
-            'push' => ['enabled' => filled(config('services.webpush.vapid_public_key')) && (string) $entitlements->get($tenant, 'push_enabled', '1') === '1', 'public_key' => (string) config('services.webpush.vapid_public_key', '')],
+            'push' => ['enabled' => $webPush->configured() && (string) $entitlements->get($tenant, 'push_enabled', '1') === '1', 'public_key' => $webPush->configured() ? (string) config('services.webpush.vapid_public_key', '') : ''],
         ]);
     }
 

@@ -14,8 +14,11 @@ use App\Models\TenantRequestValue;
 use App\Models\TenantService;
 use App\Services\EntitlementService;
 use App\Services\ImageStorageService;
+use App\Services\OpenAiBudgetService;
+use App\Services\OpenAiService;
 use App\Services\SmsService;
 use App\Services\TenantCalendarService;
+use App\Services\TenantWebPushService;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -27,13 +30,14 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 use Throwable;
 
 class TenantAppController extends Controller
 {
     public function __construct(private readonly EntitlementService $entitlements) {}
 
-    public function bootstrap(Request $request): JsonResponse
+    public function bootstrap(Request $request, TenantWebPushService $webPush): JsonResponse
     {
         $tenant = $this->tenant($request);
         $this->ensureAvailable($request, $tenant);
@@ -64,13 +68,45 @@ class TenantAppController extends Controller
                 'requests' => $this->enabled($tenant, 'request_enabled', true), 'booking' => $this->enabled($tenant, 'booking_enabled', false),
                 'video' => $this->enabled($tenant, 'video_enabled', false), 'push' => $this->enabled($tenant, 'push_enabled', true),
             ],
-            'push' => ['enabled' => $this->enabled($tenant, 'push_enabled', true) && filled(config('services.webpush.vapid_public_key')), 'public_key' => (string) config('services.webpush.vapid_public_key', '')],
+            'push' => ['enabled' => $this->enabled($tenant, 'push_enabled', true) && $webPush->configured(), 'public_key' => $webPush->configured() ? (string) config('services.webpush.vapid_public_key', '') : ''],
             'session' => [
                 'known' => (bool) $customer,
                 'customer' => $customer ? ['name' => $customer->name, 'phone' => $customer->phone, 'locale' => $customer->locale] : null,
                 'review' => $this->reviewState($tenant, $customer),
             ],
         ]);
+    }
+
+    public function assistRequest(Request $request, OpenAiService $openAi, OpenAiBudgetService $budget): JsonResponse
+    {
+        $tenant = $this->tenant($request);
+        $this->ensureAvailable($request, $tenant);
+        $data = $request->validate(['text' => 'required|string|min:3|max:2000']);
+        $locale = $this->locale($request, $tenant);
+        $budget->ensureAvailable();
+        $result = $openAi->structured(
+            'Help a customer fill a service request. Preserve facts, fix obvious spelling, never invent details. Return concise values in '.$locale.'. Use empty strings for facts not stated.',
+            (string) $data['text'],
+            'tenant_request_assistance',
+            [
+                'type' => 'object',
+                'additionalProperties' => false,
+                'properties' => [
+                    'summary' => ['type' => 'string'],
+                    'vehicle_brand' => ['type' => 'string'],
+                    'vehicle_model' => ['type' => 'string'],
+                    'vehicle_year' => ['type' => 'string'],
+                ],
+                'required' => ['summary', 'vehicle_brand', 'vehicle_model', 'vehicle_year'],
+            ],
+        );
+        $values = json_decode($result['text'], true);
+        if (! is_array($values)) {
+            throw new RuntimeException('AI returned an invalid form result.');
+        }
+        $budget->record('tenant_request_assistance', $result['model'], $result['input_tokens'], $result['output_tokens'], tenantId: $tenant->id);
+
+        return response()->json(['values' => $values]);
     }
 
     public function createRequest(Request $request, ImageStorageService $images): JsonResponse

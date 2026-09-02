@@ -191,6 +191,11 @@
 .theme-steering .ta-empty-action{width:min(100%,350px);min-height:44px;border-radius:7px;text-transform:uppercase;font-size:13px}
 
 /* In standalone mode the fixed inset, not browser viewport units, owns the screen edges. */
+.ta-ai-assistant{border-color:color-mix(in srgb,var(--ta-gold) 65%,transparent);box-shadow:0 0 28px color-mix(in srgb,var(--ta-gold) 10%,transparent)}
+.ta-ai-assistant h2{display:flex;align-items:center;gap:8px;color:var(--ta-gold-soft)}
+.ta-ai-assistant .ta-outline-button{margin-top:10px;min-height:46px}
+.ta-ai-assistant .ta-outline-button:disabled{opacity:.45}
+
 @media (max-width:1499px) {
     .theme-steering.tenant-app-viewport{height:auto;min-height:0}
     .theme-steering .tenant-app-desktop,.theme-steering .tenant-app-shell{position:absolute;inset:0;height:auto;min-height:0}

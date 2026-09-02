@@ -83,8 +83,8 @@ class TenantAppTest extends TestCase
     public function test_vapid_command_checks_configuration_without_external_mutation(): void
     {
         config([
-            'services.webpush.vapid_public_key' => 'public-key',
-            'services.webpush.vapid_private_key' => 'private-key',
+            'services.webpush.vapid_public_key' => 'BATakXB_Ej3dE4FS5yVhlrPr092QHa632IiQ2jQqDzwJbzpEs6F5shpVZvuZi63sziv0LikH8uGrD_r-JdKsObE',
+            'services.webpush.vapid_private_key' => '0RgeAjVK7JQaTkviAqMQHWGTlqf3frBpC0op_Zr8vqQ',
             'services.webpush.subject' => 'mailto:support@lookdo.app',
         ]);
 

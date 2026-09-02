@@ -17,6 +17,8 @@ const error=ref('');
 const result=ref<any>(null);
 const notifying=ref(false);
 const notificationStatus=ref('');
+const assisting=ref(false);
+const assistantText=ref('');
 const form=reactive<any>({name:'',phone:'',email:'',summary:'',preferred_channel:'push',fields:{}});
 
 const configuredSlots=computed<any[]>(()=>props.app.template.media_slots||[]);
@@ -66,7 +68,19 @@ async function enableNotifications(){
     await api('/tenant-app/push-subscriptions',{method:'POST',headers:{'X-Lookdo-Client-Token':result.value.token},body:JSON.stringify({endpoint:value.endpoint,keys:value.keys})});
     notificationStatus.value=props.copy.notificationEnabled;
     window.setTimeout(()=>emit('close'),700);
-  }catch(e:any){notificationStatus.value=e.message;}finally{notifying.value=false;}
+  }catch(e:any){
+    notificationStatus.value=/applicationServerKey|P-256|public key/i.test(String(e?.message||''))?props.copy.notificationConfigurationError:props.copy.notificationDenied;
+  }finally{notifying.value=false;}
+}
+async function assistForm(){
+  if(!assistantText.value.trim())return;
+  assisting.value=true;error.value='';
+  try{
+    const response=await api('/tenant-app/request-assistance',{method:'POST',body:JSON.stringify({text:assistantText.value})});
+    const values=response.values||{};
+    if(values.summary)form.summary=values.summary;
+    for(const key of ['vehicle_brand','vehicle_model','vehicle_year'])if(values[key])form.fields[key]=values[key];
+  }catch(e:any){error.value=props.copy.aiAssistError;}finally{assisting.value=false;}
 }
 async function submit(){
   if(!form.phone.trim()){error.value=props.copy.phone;return;}
@@ -143,6 +157,12 @@ onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));})
         <button class="ta-help"><AppIcon name="info"/><span>{{copy.how}}</span></button>
       </header>
       <div class="ta-flow-scroll ta-detail-form">
+        <section class="ta-dark-card ta-ai-assistant">
+          <h2><AppIcon name="star"/> {{copy.aiAssistTitle}}</h2>
+          <p>{{copy.aiAssistText}}</p>
+          <textarea v-model="assistantText" rows="3" maxlength="2000" :placeholder="copy.aiAssistPlaceholder"></textarea>
+          <button class="ta-outline-button" :disabled="assisting||!assistantText.trim()" @click="assistForm">{{assisting?copy.aiAssisting:copy.aiAssistButton}}</button>
+        </section>
         <section class="ta-dark-card">
           <h2>1. {{copy.photos}} <em>*</em></h2><p>{{copy.requestHint}}</p>
           <div class="ta-detail-photos"><button v-for="(_,index) in slots" :key="index" @click="choose(index)"><img v-if="slotItem(index)" :src="slotItem(index)?.url" alt=""><template v-else><AppIcon name="camera"/><span>{{copy.addPhoto}}</span></template></button></div>

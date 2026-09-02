@@ -17,9 +17,25 @@ class TenantWebPushService
 {
     public function configured(): bool
     {
-        return filled(config('services.webpush.vapid_public_key'))
+        return $this->validPublicKey((string) config('services.webpush.vapid_public_key'))
             && filled(config('services.webpush.vapid_private_key'))
             && filled(config('services.webpush.subject'));
+    }
+
+    public function validPublicKey(string $key): bool
+    {
+        $encoded = strtr($key, '-_', '+/');
+        $encoded .= str_repeat('=', (4 - strlen($encoded) % 4) % 4);
+        $point = base64_decode($encoded, true);
+        if (! is_string($point) || strlen($point) !== 65 || ord($point[0]) !== 4) {
+            return false;
+        }
+
+        // SubjectPublicKeyInfo prefix for an uncompressed prime256v1 public point.
+        $der = hex2bin('3059301306072A8648CE3D020106082A8648CE3D030107034200').$point;
+        $pem = "-----BEGIN PUBLIC KEY-----\n".chunk_split(base64_encode($der), 64, "\n")."-----END PUBLIC KEY-----\n";
+
+        return openssl_pkey_get_public($pem) !== false;
     }
 
     /**

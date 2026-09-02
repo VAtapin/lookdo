@@ -75,6 +75,13 @@ export default {
     notificationBenefit3Text: "Wir geben Ihre Daten nicht an Dritte weiter.",
     notificationEnabled: "Benachrichtigungen sind aktiviert.",
     notificationDenied: "Benachrichtigungen wurden nicht erlaubt.",
+    notificationConfigurationError: "Benachrichtigungen werden gerade eingerichtet. Bitte versuchen Sie es in einer Minute erneut.",
+    aiAssistTitle: "Mit KI ausfüllen",
+    aiAssistText: "Beschreiben Sie alles in einem Satz – wir füllen das Formular für Sie aus.",
+    aiAssistPlaceholder: "Zum Beispiel: Toyota Camry 2018, schwarzes Leder mit roter Naht",
+    aiAssistButton: "Formular ausfüllen",
+    aiAssisting: "Wird ausgefüllt…",
+    aiAssistError: "Das automatische Ausfüllen ist fehlgeschlagen. Sie können manuell fortfahren.",
     later: "Nicht jetzt",
     noActivity: "Noch keine Anfragen oder Termine",
     noActivityText:

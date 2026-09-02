@@ -72,6 +72,13 @@ export default {
     notificationBenefit3Text: "Ми не передаємо ваші дані третім особам.",
     notificationEnabled: "Сповіщення увімкнено.",
     notificationDenied: "Сповіщення не дозволено.",
+    notificationConfigurationError: "Сповіщення зараз налаштовуються. Спробуйте ще раз за хвилину.",
+    aiAssistTitle: "Заповнити за допомогою ШІ",
+    aiAssistText: "Опишіть усе одним реченням — решту форми ми заповнимо самі.",
+    aiAssistPlaceholder: "Наприклад: Toyota Camry 2018, чорна шкіра з червоною строчкою",
+    aiAssistButton: "Заповнити форму",
+    aiAssisting: "Заповнюємо…",
+    aiAssistError: "Не вдалося заповнити форму автоматично. Можна продовжити вручну.",
     later: "Не зараз",
     noActivity: "Поки немає заявок або записів",
     noActivityText:

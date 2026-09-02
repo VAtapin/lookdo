@@ -74,6 +74,13 @@ export default {
     notificationBenefit3Text: "We never share your data with third parties.",
     notificationEnabled: "Notifications are enabled.",
     notificationDenied: "Notifications were not allowed.",
+    notificationConfigurationError: "Notifications are being configured. Please try again in a minute.",
+    aiAssistTitle: "Fill with AI",
+    aiAssistText: "Describe everything in one sentence and we will fill the form for you.",
+    aiAssistPlaceholder: "For example: 2018 Toyota Camry, black leather with red stitching",
+    aiAssistButton: "Fill the form",
+    aiAssisting: "Filling…",
+    aiAssistError: "Automatic form filling failed. You can continue manually.",
     later: "Not now",
     noActivity: "No requests or bookings yet",
     noActivityText:
