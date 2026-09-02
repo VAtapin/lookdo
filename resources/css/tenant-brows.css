@@ -20,12 +20,12 @@
 .theme-brows .ta-device-icons .battery{border-color:var(--ta-brow-ink)}
 .theme-brows .ta-device-icons .battery:before,.theme-brows .ta-device-icons .battery:after{background:var(--ta-brow-ink)}
 .theme-brows .ta-scroll-area{height:calc(100dvh - 42px - 78px - env(safe-area-inset-bottom));background:var(--ta-brow-surface)}
-.ta-brows-header{height:74px;padding:10px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px;background:rgba(255,250,246,.92);border-bottom:1px solid var(--ta-brow-line);backdrop-filter:blur(18px)}
+.ta-brows-header{position:relative;z-index:40;overflow:visible;height:74px;padding:10px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px;background:rgba(255,250,246,.92);border-bottom:1px solid var(--ta-brow-line);backdrop-filter:blur(18px)}
 .ta-brows-header .ta-brand img{width:54px;height:54px;border-radius:17px;object-fit:contain;background:#fff;padding:4px;box-shadow:0 5px 18px rgba(67,37,27,.08)}
 .ta-brows-header .ta-brand.has-horizontal-logo img{width:min(47vw,190px);height:52px;border-radius:10px;object-fit:contain;object-position:left center;background:transparent;padding:0;box-shadow:none}
 .ta-brows-header .ta-brand span{max-width:48vw;color:var(--ta-brow-ink);font-size:16px;letter-spacing:.01em;text-transform:none}
 .ta-brows-header>div{display:flex;gap:8px}
-.ta-brows-header>div a,.ta-brows-header>div button{width:44px;height:44px;border:1px solid var(--ta-brow-line);border-radius:14px;background:#fff;color:var(--ta-brow-primary);display:grid;place-items:center;text-decoration:none}
+.ta-brows-header>div>a,.ta-brows-header>div>button{width:44px;height:44px;border:1px solid var(--ta-brow-line);border-radius:14px;background:#fff;color:var(--ta-brow-primary);display:grid;place-items:center;text-decoration:none}
 .ta-brows-hero{position:relative;min-height:500px;overflow:hidden;background:var(--ta-brow-soft);display:flex;align-items:flex-end}
 .ta-brows-hero>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 38%}
 .ta-brows-hero>div{position:absolute;inset:0;background:linear-gradient(180deg,rgba(42,20,14,.02) 18%,rgba(44,22,16,.22) 50%,rgba(41,20,15,.88) 100%)}
