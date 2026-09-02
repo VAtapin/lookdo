@@ -339,3 +339,7 @@ body{background:#fff}
     background: #fff;
     font-size: 11px;
 }
+
+/* Compact, scalable portfolio workspace. */
+.mw-work-grid video{width:100%;height:190px;display:block;object-fit:cover;background:#111}.mw-portfolio-browser{min-width:0}.mw-media-filters,.mw-pagination{display:flex;align-items:center;gap:8px;margin-bottom:12px}.mw-media-filters button,.mw-pagination button{min-height:38px;padding:0 14px;border:1px solid #ddd9d0;border-radius:99px;background:#fff;font-weight:800;cursor:pointer}.mw-media-filters button.active{border-color:#17181c;background:#17181c;color:#fff}.mw-pagination{justify-content:center;margin:16px 0 0}.mw-pagination button:disabled{opacity:.35;cursor:default}.mw-pagination span{min-width:70px;text-align:center;font-weight:800}.mw-work-editor{align-self:start;align-content:start;grid-auto-rows:max-content}.mw-work-editor label{align-self:start}.mw-work-editor input:not([type=checkbox]){min-height:44px;height:44px}.mw-work-editor input[type=file]{padding:8px}.mw-work-editor textarea{height:105px;min-height:105px}.mw-work-editor .mw-form-hint{min-height:0;margin:0;padding:11px 13px;align-self:start}.mw-form>.mw-work-save{align-self:start;min-height:48px;height:48px}
+@media(min-width:1100px){.mw-work-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.mw-work-grid img,.mw-work-grid video,.mw-work-grid .ta-before-after{height:145px;aspect-ratio:auto}.mw-work-grid span{padding:9px}.mw-card-actions{padding:0 9px 9px}.mw-card-actions button{min-height:38px;padding-inline:10px}}

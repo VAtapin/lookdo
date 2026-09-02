@@ -36,9 +36,15 @@ class TenantWorkspaceController extends Controller
         $requests = $tenant->appRequests()
             ->with(['customer', 'media'])
             ->where('status', 'new')
-            ->whereBetween('created_at', [$today, $tomorrow])
             ->latest()
             ->get();
+        $pendingAppointments = $tenant->appointments()
+            ->with(['customer', 'service'])
+            ->where('status', 'pending')
+            ->latest()
+            ->get();
+        $newItems = $requests->map(fn ($item) => $this->requestItem($item))
+            ->concat($pendingAppointments->map(fn ($item) => $this->appointment($item)));
         $unread = $tenant->messages()->where('sender_type', 'customer')->whereNull('read_at')->count();
         $repeat = $tenant->appointments()
             ->with('service:id,repeat_interval_days')
@@ -56,7 +62,7 @@ class TenantWorkspaceController extends Controller
 
         return response()->json([
             'tenant' => ['id' => $tenant->id, 'name' => $tenant->name, 'slug' => $tenant->slug, 'locale' => $tenant->locale, 'platform_url' => 'https://'.$tenant->slug.'.'.config('tenancy.platform_domain')],
-            'today' => ['date' => $today->toDateString(), 'appointments' => $appointments->map(fn ($a) => $this->appointment($a)), 'requests' => $requests->map(fn ($r) => $this->requestItem($r)), 'unread' => $unread, 'free_slots' => $this->freeSlots($tenant, $calendar, $today->toDateString()), 'repeat_candidates' => $repeat, 'unpublished_works' => $tenant->portfolioItems()->where('published', false)->count()],
+            'today' => ['date' => $today->toDateString(), 'appointments' => $appointments->map(fn ($a) => $this->appointment($a)), 'requests' => $newItems->values(), 'unread' => $unread, 'free_slots' => $this->freeSlots($tenant, $calendar, $today->toDateString()), 'repeat_candidates' => $repeat, 'unpublished_works' => $tenant->portfolioItems()->where('published', false)->count()],
             'counts' => ['requests' => $tenant->appRequests()->count(), 'new_requests' => $tenant->appRequests()->where('status', 'new')->count() + $tenant->appointments()->where('status', 'pending')->count(), 'customers' => $tenant->customers()->count(), 'messages' => $unread, 'appointments' => $tenant->appointments()->where('starts_at', '>=', now())->whereNotIn('status', ['cancelled'])->count()],
             'services' => $tenant->services()->whereNull('archived_at')->orderBy('sort_order')->get(), 'working_hours' => $tenant->workingHours()->orderBy('weekday')->get(),
             'access' => ['trial' => (bool) $tenant->currentSubscription?->isTrialActive(), 'entitlements' => $entitlements->all($tenant)],

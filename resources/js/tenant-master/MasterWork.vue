@@ -42,6 +42,9 @@ const work = reactive<any>({
     before: null,
     after: null,
 });
+const portfolioFilter = ref<"all" | "photos" | "videos">("all");
+const portfolioPage = ref(1);
+const portfolioPageSize = 12;
 const review = reactive<any>({
     id: null,
     rating: 5,
@@ -78,7 +81,11 @@ const channels = [
 const directChannels = ["instagram", "facebook", "telegram", "vk"];
 const telegramTarget = ref("");
 const providerModal = ref("");
-const providerForm = reactive({ client_id: "", client_secret: "", bot_token: "" });
+const providerForm = reactive({
+    client_id: "",
+    client_secret: "",
+    bot_token: "",
+});
 const providerHelpUrl = computed(() =>
     providerModal.value === "telegram"
         ? "https://core.telegram.org/bots/tutorial#obtain-your-bot-token"
@@ -97,6 +104,12 @@ const hasBeforeAfter = computed(() => enabled("before_after_enabled")),
     hasVideo = computed(() => enabled("video_enabled")),
     hasSocial = computed(() => enabled("social_content_enabled")),
     hasAi = computed(() => enabled("ai_communication_enabled"));
+function portfolioMediaUrl(path: string | null | undefined) {
+    if (!path) return "";
+    return path.startsWith("/") || path.startsWith("http")
+        ? path
+        : `/storage/${path}`;
+}
 const tabs = computed(() => [
     "portfolio",
     "reviews",
@@ -105,6 +118,37 @@ const tabs = computed(() => [
 ]);
 const localized = (x: any) =>
     x?.[props.locale] || x?.de || Object.values(x || {})[0] || "";
+const portfolioFilterLabels = computed(() => ({
+    all: props.locale === "uk" ? "Усі" : props.locale === "ru" ? "Все" : "Alle",
+    photos:
+        props.locale === "uk"
+            ? "Фото"
+            : props.locale === "ru"
+              ? "Фото"
+              : "Fotos",
+    videos:
+        props.locale === "uk"
+            ? "Відео"
+            : props.locale === "ru"
+              ? "Видео"
+              : "Videos",
+}));
+const filteredPortfolio = computed(() =>
+    (data.value.portfolio || []).filter((item: any) => {
+        const video = !!(item.video_url || item.video_path);
+        return (
+            portfolioFilter.value === "all" ||
+            (portfolioFilter.value === "videos" ? video : !video)
+        );
+    }),
+);
+const portfolioPageCount = computed(() =>
+    Math.max(1, Math.ceil(filteredPortfolio.value.length / portfolioPageSize)),
+);
+const paginatedPortfolio = computed(() => {
+    const start = (portfolioPage.value - 1) * portfolioPageSize;
+    return filteredPortfolio.value.slice(start, start + portfolioPageSize);
+});
 const socialWork = computed(() =>
     data.value.portfolio.find(
         (item: any) => String(item.id) === String(social.portfolio_item_id),
@@ -120,7 +164,8 @@ const socialPreview = computed(
 );
 const socialConnection = computed(() =>
     data.value.social_connections?.find(
-        (item: any) => item.provider === social.channel && item.status === "active",
+        (item: any) =>
+            item.provider === social.channel && item.status === "active",
     ),
 );
 const providerConfigured = computed(
@@ -168,7 +213,7 @@ function editWork(item: any) {
         publication_confirmed: !!item.published,
         image: null,
         video: null,
-        video_url: item.video_url || "",
+        video_url: item.video_url || portfolioMediaUrl(item.video_path),
         remove_video: false,
         before: null,
         after: null,
@@ -357,10 +402,11 @@ async function previewFile() {
         );
         URL.revokeObjectURL(objectUrl);
         if (!jpeg) return null;
-        const tenantName = String(data.value.tenant?.name || "lookdo")
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-|-$/g, "") || "lookdo";
+        const tenantName =
+            String(data.value.tenant?.name || "lookdo")
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-|-$/g, "") || "lookdo";
         return new File([jpeg], `${tenantName}.jpg`, { type: "image/jpeg" });
     } catch {
         return null;
@@ -394,7 +440,11 @@ async function shareSocial() {
             );
             notice.value = props.t("socialPublished");
             if (published.publication?.url)
-                window.open(published.publication.url, "_blank", "noopener,noreferrer");
+                window.open(
+                    published.publication.url,
+                    "_blank",
+                    "noopener,noreferrer",
+                );
             await load();
             return;
         }
@@ -468,25 +518,37 @@ async function connectSocial(provider: string) {
 }
 function openProviderConfig(provider: string) {
     providerModal.value = provider;
-    Object.assign(providerForm, { client_id: "", client_secret: "", bot_token: "" });
+    Object.assign(providerForm, {
+        client_id: "",
+        client_secret: "",
+        bot_token: "",
+    });
     socialConnectionError.value = "";
 }
 async function saveProviderConfig() {
     busy.value = true;
     socialConnectionError.value = "";
     try {
-        const body = providerModal.value === "telegram"
-            ? { bot_token: providerForm.bot_token }
-            : { client_id: providerForm.client_id, client_secret: providerForm.client_secret };
-        await api(`/tenant/${props.tenantId}/social-providers/${providerModal.value}`, {
-            method: "PUT",
-            body: JSON.stringify(body),
-        });
+        const body =
+            providerModal.value === "telegram"
+                ? { bot_token: providerForm.bot_token }
+                : {
+                      client_id: providerForm.client_id,
+                      client_secret: providerForm.client_secret,
+                  };
+        await api(
+            `/tenant/${props.tenantId}/social-providers/${providerModal.value}`,
+            {
+                method: "PUT",
+                body: JSON.stringify(body),
+            },
+        );
         const configuredProvider = providerModal.value;
         providerModal.value = "";
         await load();
         notice.value = props.t("socialProviderSaved");
-        if (configuredProvider !== "telegram") await connectSocial(configuredProvider);
+        if (configuredProvider !== "telegram")
+            await connectSocial(configuredProvider);
     } catch (e: any) {
         socialConnectionError.value = e.message;
     } finally {
@@ -559,6 +621,7 @@ async function makeQr() {
 }
 watch(() => social.portfolio_item_id, selectSocialWork);
 watch(() => social.booking_url, makeQr);
+watch(portfolioFilter, () => (portfolioPage.value = 1));
 onMounted(async () => {
     await load();
     await makeQr();
@@ -587,55 +650,102 @@ onMounted(async () => {
         <p v-if="notice" class="mw-success">{{ notice }}</p>
 
         <div v-if="tab === 'portfolio'" class="mw-two">
-            <div class="mw-work-grid">
-                <article v-for="item in data.portfolio" :key="item.id">
-                    <BeforeAfterSlider
-                        v-if="item.before_image_url && item.after_image_url"
-                        :before="item.before_image_url"
-                        :after="item.after_image_url"
-                        :before-label="t('before')"
-                        :after-label="t('after')"
-                        :alt="localized(item.title)"
-                    /><video
-                        v-else-if="item.video_url"
-                        :src="item.video_url"
-                        controls
-                        playsinline
-                        preload="metadata"
-                    ></video
-                    ><img
-                        v-else-if="
-                            item.image_url ||
-                            item.after_image_url ||
-                            item.before_image_url
-                        "
-                        :src="
-                            item.image_url ||
-                            item.after_image_url ||
-                            item.before_image_url
-                        "
-                    /><span
-                        ><b>{{ localized(item.title) || t("works") }}</b
-                        ><small>{{
-                            item.published ? t("published") : t("scheduled")
-                        }}</small></span
+            <div class="mw-portfolio-browser">
+                <nav
+                    class="mw-media-filters"
+                    aria-label="Portfolio media filter"
+                >
+                    <button
+                        v-for="kind in ['all', 'photos', 'videos']"
+                        :key="kind"
+                        :class="{ active: portfolioFilter === kind }"
+                        @click="portfolioFilter = kind as any"
                     >
-                    <div class="mw-card-actions">
-                        <button class="mw-secondary" @click="editWork(item)">
-                            {{ t("edit") }}</button
-                        ><button
-                            class="mw-danger-link"
-                            @click="remove('portfolio', item.id)"
+                        {{
+                            portfolioFilterLabels[
+                                kind as keyof typeof portfolioFilterLabels
+                            ]
+                        }}
+                    </button>
+                </nav>
+                <div class="mw-work-grid">
+                    <article v-for="item in paginatedPortfolio" :key="item.id">
+                        <BeforeAfterSlider
+                            v-if="item.before_image_url && item.after_image_url"
+                            :before="item.before_image_url"
+                            :after="item.after_image_url"
+                            :before-label="t('before')"
+                            :after-label="t('after')"
+                            :alt="localized(item.title)"
+                        /><video
+                            v-else-if="item.video_url || item.video_path"
+                            :src="
+                                item.video_url ||
+                                portfolioMediaUrl(item.video_path)
+                            "
+                            controls
+                            playsinline
+                            preload="metadata"
+                        ></video
+                        ><img
+                            v-else-if="
+                                item.image_url ||
+                                item.after_image_url ||
+                                item.before_image_url
+                            "
+                            :src="
+                                item.image_url ||
+                                item.after_image_url ||
+                                item.before_image_url
+                            "
+                        /><span
+                            ><b>{{ localized(item.title) || t("works") }}</b
+                            ><small>{{
+                                item.published ? t("published") : t("scheduled")
+                            }}</small></span
                         >
-                            {{ t("delete") }}
-                        </button>
-                    </div>
-                </article>
-                <p v-if="!data.portfolio.length" class="mw-empty">
-                    {{ t("noItems") }}
-                </p>
+                        <div class="mw-card-actions">
+                            <button
+                                class="mw-secondary"
+                                @click="editWork(item)"
+                            >
+                                {{ t("edit") }}</button
+                            ><button
+                                class="mw-danger-link"
+                                @click="remove('portfolio', item.id)"
+                            >
+                                {{ t("delete") }}
+                            </button>
+                        </div>
+                    </article>
+                    <p v-if="!filteredPortfolio.length" class="mw-empty">
+                        {{ t("noItems") }}
+                    </p>
+                </div>
+                <nav
+                    v-if="portfolioPageCount > 1"
+                    class="mw-pagination"
+                    aria-label="Portfolio pages"
+                >
+                    <button
+                        :disabled="portfolioPage === 1"
+                        @click="portfolioPage--"
+                    >
+                        ←
+                    </button>
+                    <span>{{ portfolioPage }} / {{ portfolioPageCount }}</span>
+                    <button
+                        :disabled="portfolioPage === portfolioPageCount"
+                        @click="portfolioPage++"
+                    >
+                        →
+                    </button>
+                </nav>
             </div>
-            <form class="mw-panel mw-form" @submit.prevent="saveWork">
+            <form
+                class="mw-panel mw-form mw-work-editor"
+                @submit.prevent="saveWork"
+            >
                 <h2>{{ t(work.id ? "editWork" : "addWork") }}</h2>
                 <label
                     >{{ t("title")
@@ -662,7 +772,8 @@ onMounted(async () => {
                             work.video = (
                                 $event.target as HTMLInputElement
                             ).files?.[0]
-                        " /><small>{{ t("portfolioVideoHint") }}</small></label
+                        "
+                    /><small>{{ t("portfolioVideoHint") }}</small></label
                 ><label v-if="work.video_url" class="mw-check"
                     ><input v-model="work.remove_video" type="checkbox" />{{
                         t("removeVideo")
@@ -702,7 +813,7 @@ onMounted(async () => {
                         v-model="work.publication_confirmed"
                         type="checkbox"
                     />{{ t("consentRequired") }}</label
-                ><button class="mw-primary" :disabled="busy">
+                ><button class="mw-primary mw-work-save" :disabled="busy">
                     {{ t("save") }}</button
                 ><button
                     v-if="work.id"
@@ -818,37 +929,87 @@ onMounted(async () => {
                 <h2>{{ t("socialComposer") }}</h2>
                 <section class="mw-social-connections full">
                     <b>{{ t("socialAccounts") }}</b>
-                    <p v-if="socialConnectionError" class="mw-warning">{{ socialConnectionError }}</p>
+                    <p v-if="socialConnectionError" class="mw-warning">
+                        {{ socialConnectionError }}
+                    </p>
                     <div v-for="provider in directChannels" :key="provider">
                         <span>
                             <strong>{{ t(provider) }}</strong>
-                            <small v-if="data.social_connections?.find((item:any) => item.provider === provider && item.status === 'active')">
-                                {{ data.social_connections.find((item:any) => item.provider === provider && item.status === 'active')?.account_name || t("socialConnected") }}
+                            <small
+                                v-if="
+                                    data.social_connections?.find(
+                                        (item: any) =>
+                                            item.provider === provider &&
+                                            item.status === 'active',
+                                    )
+                                "
+                            >
+                                {{
+                                    data.social_connections.find(
+                                        (item: any) =>
+                                            item.provider === provider &&
+                                            item.status === "active",
+                                    )?.account_name || t("socialConnected")
+                                }}
                             </small>
-                            <small v-else-if="!data.social_providers?.[provider]?.configured">{{ t("socialProviderNeedsSetup") }}</small>
+                            <small
+                                v-else-if="
+                                    !data.social_providers?.[provider]
+                                        ?.configured
+                                "
+                                >{{ t("socialProviderNeedsSetup") }}</small
+                            >
                             <small v-else>{{ t("socialNotConnected") }}</small>
                         </span>
                         <input
-                            v-if="provider === 'telegram' && !data.social_connections?.find((item:any) => item.provider === provider && item.status === 'active') && data.social_providers?.[provider]?.configured"
+                            v-if="
+                                provider === 'telegram' &&
+                                !data.social_connections?.find(
+                                    (item: any) =>
+                                        item.provider === provider &&
+                                        item.status === 'active',
+                                ) &&
+                                data.social_providers?.[provider]?.configured
+                            "
                             v-model="telegramTarget"
                             type="text"
                             :placeholder="t('telegramTargetPlaceholder')"
                             :aria-label="t('telegramTarget')"
                         />
                         <button
-                            v-if="data.social_connections?.find((item:any) => item.provider === provider && item.status === 'active')"
+                            v-if="
+                                data.social_connections?.find(
+                                    (item: any) =>
+                                        item.provider === provider &&
+                                        item.status === 'active',
+                                )
+                            "
                             type="button"
                             class="mw-secondary"
                             :disabled="busy"
                             @click="disconnectSocial(provider)"
-                        >{{ t("disconnect") }}</button>
+                        >
+                            {{ t("disconnect") }}
+                        </button>
                         <button
                             v-else
                             type="button"
                             class="mw-secondary"
-                            :disabled="busy || (provider === 'telegram' && data.social_providers?.[provider]?.configured && !telegramTarget.trim())"
+                            :disabled="
+                                busy ||
+                                (provider === 'telegram' &&
+                                    data.social_providers?.[provider]
+                                        ?.configured &&
+                                    !telegramTarget.trim())
+                            "
                             @click="connectSocial(provider)"
-                        >{{ data.social_providers?.[provider]?.configured ? t("connect") : t("configure") }}</button>
+                        >
+                            {{
+                                data.social_providers?.[provider]?.configured
+                                    ? t("connect")
+                                    : t("configure")
+                            }}
+                        </button>
                     </div>
                 </section>
                 <label
@@ -957,16 +1118,28 @@ onMounted(async () => {
             <textarea v-if="aiResult" v-model="aiResult" rows="8"></textarea>
         </div>
     </section>
-    <div v-if="providerModal" class="mw-brand-modal" @click.self="providerModal = ''">
+    <div
+        v-if="providerModal"
+        class="mw-brand-modal"
+        @click.self="providerModal = ''"
+    >
         <form class="mw-panel mw-form" @submit.prevent="saveProviderConfig">
             <header>
                 <div>
                     <small>{{ t("socialProviderSetup") }}</small>
                     <h2>{{ t(providerModal) }}</h2>
                 </div>
-                <button type="button" :disabled="busy" @click="providerModal = ''">×</button>
+                <button
+                    type="button"
+                    :disabled="busy"
+                    @click="providerModal = ''"
+                >
+                    ×
+                </button>
             </header>
-            <p class="mw-warning" v-if="socialConnectionError">{{ socialConnectionError }}</p>
+            <p class="mw-warning" v-if="socialConnectionError">
+                {{ socialConnectionError }}
+            </p>
             <div class="mw-provider-help">
                 <b>{{ t("socialProviderHelpTitle") }}</b>
                 <ol>
@@ -974,21 +1147,61 @@ onMounted(async () => {
                     <li>{{ t(`socialProviderHelp_${providerModal}_2`) }}</li>
                     <li>{{ t(`socialProviderHelp_${providerModal}_3`) }}</li>
                 </ol>
-                <a :href="providerHelpUrl" target="_blank" rel="noopener noreferrer">{{ t("openOfficialInstructions") }} ↗</a>
+                <a
+                    :href="providerHelpUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >{{ t("openOfficialInstructions") }} ↗</a
+                >
             </div>
             <template v-if="providerModal === 'telegram'">
-                <label>{{ t("telegramBotToken") }}<input v-model="providerForm.bot_token" type="password" required autocomplete="new-password" /></label>
+                <label
+                    >{{ t("telegramBotToken")
+                    }}<input
+                        v-model="providerForm.bot_token"
+                        type="password"
+                        required
+                        autocomplete="new-password"
+                /></label>
             </template>
             <template v-else>
-                <label>{{ t("applicationId") }}<input v-model="providerForm.client_id" required autocomplete="off" /></label>
-                <label>{{ t("applicationSecret") }}<input v-model="providerForm.client_secret" type="password" required autocomplete="new-password" /></label>
-                <label>{{ t("callbackUrl") }}<input :value="providerCallbackUrl" readonly @focus="($event.target as HTMLInputElement).select()" /></label>
+                <label
+                    >{{ t("applicationId")
+                    }}<input
+                        v-model="providerForm.client_id"
+                        required
+                        autocomplete="off"
+                /></label>
+                <label
+                    >{{ t("applicationSecret")
+                    }}<input
+                        v-model="providerForm.client_secret"
+                        type="password"
+                        required
+                        autocomplete="new-password"
+                /></label>
+                <label
+                    >{{ t("callbackUrl")
+                    }}<input
+                        :value="providerCallbackUrl"
+                        readonly
+                        @focus="($event.target as HTMLInputElement).select()"
+                /></label>
                 <p>{{ t("callbackUrlHint") }}</p>
             </template>
             <p>{{ t("secretStorageHint") }}</p>
             <div>
-                <button type="button" class="mw-secondary" :disabled="busy" @click="providerModal = ''">{{ t("cancel") }}</button>
-                <button class="mw-primary" :disabled="busy">{{ t("saveAndConnect") }}</button>
+                <button
+                    type="button"
+                    class="mw-secondary"
+                    :disabled="busy"
+                    @click="providerModal = ''"
+                >
+                    {{ t("cancel") }}
+                </button>
+                <button class="mw-primary" :disabled="busy">
+                    {{ t("saveAndConnect") }}
+                </button>
             </div>
         </form>
     </div>

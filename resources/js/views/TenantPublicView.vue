@@ -55,7 +55,11 @@ const workFilter = ref<"all" | "before_after" | "finished" | "favorites">(
     "all",
 );
 const workFilterOpen = ref(false);
+const mediaFilter = ref<"all" | "photos" | "videos">("all");
+const portfolioPage = ref(1);
+const portfolioPageSize = 12;
 const lightbox = ref<{ src: string; alt: string } | null>(null);
+const videoLightbox = ref<{ src: string; title: string } | null>(null);
 const reviewOpen = ref(false);
 const reviewBusy = ref(false);
 const reviewNotice = ref("");
@@ -155,7 +159,11 @@ const averageRating = computed(() => {
         : "—";
 });
 const filteredPortfolio = computed(() => {
-    const rows = app.value?.portfolio || [];
+    let rows = app.value?.portfolio || [];
+    if (mediaFilter.value === "photos")
+        rows = rows.filter((item: any) => !item.video);
+    if (mediaFilter.value === "videos")
+        rows = rows.filter((item: any) => !!item.video);
     if (workFilter.value === "before_after")
         return rows.filter(
             (item: any) => item.before_image && item.after_image,
@@ -170,6 +178,20 @@ const filteredPortfolio = computed(() => {
         );
     return rows;
 });
+const portfolioPageCount = computed(() =>
+    Math.max(1, Math.ceil(filteredPortfolio.value.length / portfolioPageSize)),
+);
+const paginatedPortfolio = computed(() => {
+    const start = (portfolioPage.value - 1) * portfolioPageSize;
+    return filteredPortfolio.value.slice(start, start + portfolioPageSize);
+});
+const mediaLabels = computed(() => ({
+    all: copy.value.all,
+    photos: { de: "Fotos", en: "Photos", ru: "Фото", uk: "Фото" }[locale.value],
+    videos: { de: "Videos", en: "Videos", ru: "Видео", uk: "Відео" }[
+        locale.value
+    ],
+}));
 const portfolioVideos = computed(() =>
     (app.value?.portfolio || []).filter((item: any) => item.video),
 );
@@ -219,6 +241,14 @@ const serviceDetailLabels = computed(() => ({
         ru: "Результат",
         uk: "Результат",
     }[locale.value],
+}));
+const videoLabels = computed(() => ({
+    heading: { de: "Videos", en: "Videos", ru: "Видео", uk: "Відео" }[
+        locale.value
+    ],
+    close: { de: "Schließen", en: "Close", ru: "Закрыть", uk: "Закрити" }[
+        locale.value
+    ],
 }));
 const navItems = computed(() => [
     { key: "home", icon: "home", label: copy.value.home },
@@ -297,6 +327,7 @@ function selectWorkFilter(value: typeof workFilter.value) {
     workFilter.value = value;
     workFilterOpen.value = false;
 }
+watch([workFilter, mediaFilter], () => (portfolioPage.value = 1));
 function openLightbox(src: string, alt: string) {
     lightbox.value = { src, alt };
 }
@@ -824,7 +855,7 @@ const loginContext = {
                             </article>
                             <section class="ta-section ta-featured">
                                 <div class="ta-section-head">
-                                    <h2>{{ copy.featured }}</h2>
+                                    <h2>{{ copy.works }}</h2>
                                     <button @click="go('works')">
                                         {{ copy.all }}
                                         <AppIcon name="arrow" :size="17" />
@@ -840,7 +871,14 @@ const loginContext = {
                                             4,
                                         )"
                                         :key="item.id"
-                                        @click="go('works')"
+                                        @click="
+                                            openLightbox(
+                                                item.image ||
+                                                    item.after_image ||
+                                                    item.before_image,
+                                                item.title,
+                                            )
+                                        "
                                     >
                                         <BeforeAfterSlider
                                             v-if="
@@ -885,25 +923,34 @@ const loginContext = {
                                 class="ta-section ta-video-works"
                             >
                                 <div class="ta-section-head">
-                                    <h2>{{ copy.works }}</h2>
+                                    <h2>{{ videoLabels.heading }}</h2>
                                     <button @click="go('works')">
                                         {{ copy.all }}
                                         <AppIcon name="arrow" :size="17" />
                                     </button>
                                 </div>
                                 <div class="ta-video-work-grid">
-                                    <article
-                                        v-for="item in portfolioVideos.slice(0, 4)"
+                                    <button
+                                        v-for="item in portfolioVideos.slice(
+                                            0,
+                                            4,
+                                        )"
                                         :key="item.id"
+                                        type="button"
+                                        @click="
+                                            videoLightbox = {
+                                                src: item.video,
+                                                title: item.title,
+                                            }
+                                        "
                                     >
                                         <video
                                             :src="item.video"
-                                            controls
                                             playsinline
                                             preload="metadata"
                                         ></video>
                                         <h3>{{ item.title }}</h3>
-                                    </article>
+                                    </button>
                                 </div>
                             </section>
                         </section>
@@ -1025,7 +1072,14 @@ const loginContext = {
                                             4,
                                         )"
                                         :key="item.id"
-                                        @click="go('works')"
+                                        @click="
+                                            openLightbox(
+                                                item.image ||
+                                                    item.after_image ||
+                                                    item.before_image,
+                                                item.title,
+                                            )
+                                        "
                                     >
                                         <BeforeAfterSlider
                                             v-if="
@@ -1070,25 +1124,34 @@ const loginContext = {
                                 class="ta-section ta-video-works"
                             >
                                 <div class="ta-section-head">
-                                    <h2>{{ copy.works }}</h2>
+                                    <h2>{{ videoLabels.heading }}</h2>
                                     <button @click="go('works')">
                                         {{ copy.all }}
                                         <AppIcon name="arrow" :size="17" />
                                     </button>
                                 </div>
                                 <div class="ta-video-work-grid">
-                                    <article
-                                        v-for="item in portfolioVideos.slice(0, 4)"
+                                    <button
+                                        v-for="item in portfolioVideos.slice(
+                                            0,
+                                            4,
+                                        )"
                                         :key="item.id"
+                                        type="button"
+                                        @click="
+                                            videoLightbox = {
+                                                src: item.video,
+                                                title: item.title,
+                                            }
+                                        "
                                     >
                                         <video
                                             :src="item.video"
-                                            controls
                                             playsinline
                                             preload="metadata"
                                         ></video>
                                         <h3>{{ item.title }}</h3>
-                                    </article>
+                                    </button>
                                 </div>
                             </section>
                         </section>
@@ -1129,7 +1192,9 @@ const loginContext = {
                                         </p>
                                         <details v-if="service.inclusions">
                                             <summary>
-                                                {{ serviceDetailLabels.inclusions }}
+                                                {{
+                                                    serviceDetailLabels.inclusions
+                                                }}
                                             </summary>
                                             <p>{{ service.inclusions }}</p>
                                         </details>
@@ -1184,6 +1249,20 @@ const loginContext = {
                                 <p>{{ app.tenant.description }}</p>
                             </div>
                             <div class="ta-filter-row">
+                                <button
+                                    v-for="kind in ['all', 'photos', 'videos']"
+                                    :key="`media-${kind}`"
+                                    :class="{ active: mediaFilter === kind }"
+                                    @click="mediaFilter = kind as any"
+                                >
+                                    {{
+                                        mediaLabels[
+                                            kind as keyof typeof mediaLabels
+                                        ]
+                                    }}
+                                </button>
+                            </div>
+                            <div class="ta-filter-row ta-filter-row-secondary">
                                 <button
                                     :class="{ active: workFilter === 'all' }"
                                     @click="selectWorkFilter('all')"
@@ -1245,11 +1324,11 @@ const loginContext = {
                                 </div>
                             </div>
                             <div
-                                v-if="filteredPortfolio.length"
+                                v-if="paginatedPortfolio.length"
                                 class="ta-portfolio-list"
                             >
                                 <article
-                                    v-for="item in filteredPortfolio"
+                                    v-for="item in paginatedPortfolio"
                                     :key="item.id"
                                 >
                                     <video
@@ -1315,7 +1394,34 @@ const loginContext = {
                                     </div>
                                 </article>
                             </div>
-                            <div v-else class="ta-empty">
+                            <nav
+                                v-if="portfolioPageCount > 1"
+                                class="ta-pagination"
+                                aria-label="Portfolio pages"
+                            >
+                                <button
+                                    :disabled="portfolioPage === 1"
+                                    @click="portfolioPage--"
+                                >
+                                    ←
+                                </button>
+                                <span
+                                    >{{ portfolioPage }} /
+                                    {{ portfolioPageCount }}</span
+                                >
+                                <button
+                                    :disabled="
+                                        portfolioPage === portfolioPageCount
+                                    "
+                                    @click="portfolioPage++"
+                                >
+                                    →
+                                </button>
+                            </nav>
+                            <div
+                                v-if="!paginatedPortfolio.length"
+                                class="ta-empty"
+                            >
                                 <AppIcon name="works" :size="46" />
                                 <h2>{{ copy.noActivity }}</h2>
                             </div>
@@ -1389,6 +1495,33 @@ const loginContext = {
                                     <span>{{
                                         portfolioLabels.lightboxHint
                                     }}</span>
+                                </figcaption>
+                            </figure>
+                        </div>
+                        <div
+                            v-if="videoLightbox"
+                            class="ta-image-lightbox ta-video-lightbox"
+                            role="dialog"
+                            aria-modal="true"
+                            :aria-label="videoLightbox.title"
+                            @click.self="videoLightbox = null"
+                        >
+                            <button
+                                :aria-label="videoLabels.close"
+                                @click="videoLightbox = null"
+                            >
+                                ×
+                            </button>
+                            <figure>
+                                <video
+                                    :src="videoLightbox.src"
+                                    controls
+                                    autoplay
+                                    playsinline
+                                    preload="metadata"
+                                ></video>
+                                <figcaption>
+                                    <strong>{{ videoLightbox.title }}</strong>
                                 </figcaption>
                             </figure>
                         </div>
