@@ -55,4 +55,13 @@ class AdminAuditAndReminderOperationsTest extends TestCase
         $this->assertSame(0, $status['last_result']['processed'] ?? null);
         $this->assertNotEmpty(data_get(SystemSetting::read('queue_worker_heartbeat', []), 'last_run_at'));
     }
+
+    public function test_sms_connection_check_returns_an_actionable_validation_error_when_disabled(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true, 'is_active' => true]);
+
+        $this->actingAs($admin)->postJson('/api/control/sms/test')
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'SMS-Versand ist deaktiviert. Aktivieren und speichern Sie zuerst die globale SMS-Freigabe.');
+    }
 }

@@ -9,6 +9,7 @@ const router = useRouter();
 const busy = ref(false);
 const error = ref('');
 const notice = ref('');
+const persistedSmsEnabled = computed(() => Boolean(props.data?.settings?.integrations?.sms));
 const locales = [['de', 'Deutsch'], ['en', 'English'], ['ru', 'Русский'], ['uk', 'Українська']];
 const allowedGroups = ['legal', 'platform', 'media', 'sms', 'operation'];
 const group = computed(() => {
@@ -55,9 +56,9 @@ function showNotice(message: string) {
 async function save() {
     busy.value = true; error.value = '';
     try {
-        await api('/control/settings', { method: 'PUT', body: JSON.stringify({ settings: form }) });
-        form.sms_seven_api_key = ''; form.sms_seven_signing_key = '';
-        form.sms_clear_api_key = false; form.sms_clear_signing_key = false;
+        const result = await api<any>('/control/settings', { method: 'PUT', body: JSON.stringify({ settings: form }) });
+        Object.assign(props.data, result);
+        hydrate();
         showNotice('Einstellungen wurden gespeichert.');
     } catch (exception: any) { error.value = exception.message; }
     finally { busy.value = false; }
@@ -77,6 +78,10 @@ async function uploadMedia(event: Event, kind: 'image' | 'video', localeCode = '
 }
 
 async function testSms() {
+    if (!persistedSmsEnabled.value) {
+        error.value = 'SMS-Versand zuerst aktivieren und die Einstellungen speichern.';
+        return;
+    }
     busy.value = true; error.value = '';
     try {
         const result = await api<any>('/control/sms/test', { method: 'POST' });
@@ -134,9 +139,13 @@ async function testSms() {
 
         <section v-if="group === 'sms'" class="settings-panel sms-settings">
             <div class="settings-panel-head"><p class="eyebrow">SMS-GATEWAY</p><h2>SMS an Endkunden</h2><p>SMS werden nur bei aktivierten wichtigen Ereignissen und innerhalb des jeweiligen Tariflimits versendet.</p></div>
+            <div class="sms-master-switch" :class="form.integrations.sms ? 'active' : 'inactive'">
+                <label class="settings-toggle"><input v-model="form.integrations.sms" type="checkbox"><span><b>SMS-Versand aktivieren</b><small>Globale Freigabe für den Versand über seven.io. Tarifberechtigungen und Monatslimits gelten zusätzlich.</small></span></label>
+                <strong>{{ form.integrations.sms ? (persistedSmsEnabled ? 'Aktiv' : 'Aktivierung noch speichern') : 'Deaktiviert' }}</strong>
+            </div>
             <div class="settings-form-grid"><label>Anbieter<select v-model="form.sms_provider"><option v-for="provider in data.sms.providers" :key="provider.value" :value="provider.value">{{ provider.label }}</option></select></label><label>Absender<input v-model="form.sms_sender" maxlength="16" placeholder="LOOKDO"><small>Maximal 11 alphanumerische oder 16 numerische Zeichen.</small></label><label>seven.io API-Key<input v-model="form.sms_seven_api_key" type="password" autocomplete="new-password" :placeholder="data.sms.api_key_configured ? 'Gespeichert – leer lassen, um beizubehalten' : 'API-Key eintragen'"><small>{{ data.sms.api_key_configured ? 'API-Key ist verschlüsselt gespeichert.' : 'Noch kein API-Key gespeichert.' }}</small></label><label>seven.io Signing Key<input v-model="form.sms_seven_signing_key" type="password" autocomplete="new-password" :placeholder="data.sms.signing_key_configured ? 'Gespeichert – leer lassen, um beizubehalten' : 'Signing Key eintragen'"><small>{{ data.sms.signing_key_configured ? 'Signing Key ist verschlüsselt gespeichert.' : 'Für sichere Delivery-Reports erforderlich.' }}</small></label><label class="wide">Delivery-Webhook<input :value="data.sms.webhook_url" readonly></label><label class="check"><input v-model="form.sms_clear_api_key" type="checkbox"> Gespeicherten API-Key löschen</label><label class="check"><input v-model="form.sms_clear_signing_key" type="checkbox"> Gespeicherten Signing Key löschen</label></div>
             <div class="sms-event-settings"><h3>Wichtige Ereignisse</h3><div class="settings-choice-grid"><label class="settings-toggle"><input v-model="form.sms_events.request_received" type="checkbox"><span><b>Anfrage erhalten</b><small>Bestätigung für den Endkunden.</small></span></label><label class="settings-toggle"><input v-model="form.sms_events.master_replied" type="checkbox"><span><b>Meister hat geantwortet</b><small>Hinweis mit Link zur Antwort.</small></span></label><label class="settings-toggle"><input v-model="form.sms_events.work_ready" type="checkbox"><span><b>Arbeit fertig</b><small>Benachrichtigung über die Fertigstellung.</small></span></label><label class="settings-toggle"><input v-model="form.sms_events.agreement_reminder" type="checkbox"><span><b>Vereinbarung erinnern</b><small>Erinnerung an Termin oder Absprache.</small></span></label></div></div>
-            <div class="settings-panel-actions"><span>Neue Schlüssel zuerst speichern, danach kann die Verbindung geprüft werden.</span><button type="button" class="button ghost" :disabled="busy || !data.sms.api_key_configured" @click="testSms">seven.io-Verbindung prüfen</button></div>
+            <div class="settings-panel-actions"><span>{{ !form.integrations.sms ? 'SMS-Versand ist global deaktiviert.' : !persistedSmsEnabled ? 'Aktivierung zuerst speichern.' : 'Neue Schlüssel zuerst speichern, danach kann die Verbindung geprüft werden.' }}</span><button type="button" class="button ghost" :disabled="busy || !persistedSmsEnabled || !data.sms.api_key_configured" @click="testSms">seven.io-Verbindung prüfen</button></div>
         </section>
 
         <section v-if="group === 'operation'" class="settings-panel">

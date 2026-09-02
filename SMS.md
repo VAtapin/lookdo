@@ -6,7 +6,7 @@ SMS — дополнительный канал только для конечн
 
 В Super Admin открыть `Einstellungen` → `SMS an Endkunden`:
 
-- включить интеграцию SMS;
+- включить верхний переключатель `SMS-Versand aktivieren` и сохранить настройки;
 - выбрать `seven.io`;
 - указать имя отправителя, API Key и Signing Key;
 - включить нужные события;

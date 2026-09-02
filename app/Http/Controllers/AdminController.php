@@ -474,6 +474,12 @@ class AdminController extends Controller
         if (($data['settings']['demo_video_source'] ?? 'none') === 'youtube' && ! preg_match('~^(?:https?://)?(?:www\.)?(?:youtube\.com/watch\?v=|youtu\.be/)[A-Za-z0-9_-]{6,}~i', (string) $data['settings']['demo_video_url'])) {
             throw ValidationException::withMessages(['settings.demo_video_url' => 'Bitte tragen Sie eine gültige YouTube-URL ein.']);
         }
+        $smsEnabled = (bool) data_get($data, 'settings.integrations.sms', false);
+        $newSmsApiKey = trim((string) data_get($data, 'settings.sms_seven_api_key', ''));
+        $clearsSmsApiKey = (bool) data_get($data, 'settings.sms_clear_api_key', false);
+        if ($smsEnabled && ($clearsSmsApiKey || ($newSmsApiKey === '' && blank(SystemSetting::readSecret('sms_seven_api_key'))))) {
+            throw ValidationException::withMessages(['settings.sms_seven_api_key' => 'Zum Aktivieren des SMS-Versands ist ein seven.io API-Key erforderlich.']);
+        }
 
         DB::transaction(function () use ($data, $allowed, $audit): void {
             foreach ($allowed as $key) {

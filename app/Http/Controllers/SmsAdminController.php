@@ -90,10 +90,23 @@ class SmsAdminController extends Controller
 
     public function testConnection(SmsGateway $gateway): JsonResponse
     {
+        if (! $gateway->enabled()) {
+            return response()->json(['message' => 'SMS-Versand ist deaktiviert. Aktivieren und speichern Sie zuerst die globale SMS-Freigabe.'], 422);
+        }
+        if (! $gateway->configured()) {
+            return response()->json(['message' => 'SMS ist noch nicht vollständig konfiguriert. Prüfen Sie Provider und API-Key.'], 422);
+        }
+
+        try {
+            $balance = $gateway->balance();
+        } catch (Throwable $exception) {
+            return response()->json(['message' => 'seven.io konnte nicht erreicht oder authentifiziert werden: '.$exception->getMessage()], 502);
+        }
+
         return response()->json([
-            'configured' => $gateway->configured(),
+            'configured' => true,
             'provider' => $gateway->provider(),
-            'balance' => $gateway->balance(),
+            'balance' => $balance,
         ]);
     }
 }
