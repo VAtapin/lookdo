@@ -200,6 +200,12 @@ Route::get('/sw.js', function () {
         fn (array $match): string => 'importScripts("/build/'.ltrim($match[1], '/').'")',
         $source,
     ) ?? $source;
+    $source = preg_replace(
+        '~define\(\["\./(workbox-[^"]+)"\]~',
+        'define(["/build/$1"]',
+        $source,
+    ) ?? $source;
+    $source = str_replace('url:"assets/', 'url:"/build/assets/', $source);
 
     return response($source, 200, [
         'Content-Type' => 'application/javascript; charset=utf-8',

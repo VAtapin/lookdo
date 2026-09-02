@@ -32,7 +32,10 @@ export default defineConfig({
                 skipWaiting: true,
                 clientsClaim: true,
                 cleanupOutdatedCaches: true,
-                navigateFallbackDenylist: [/^\/api\//, /^\/control\//],
+                navigateFallback: null,
+                modifyURLPrefix: {
+                    'assets/': '/build/assets/',
+                },
                 importScripts: ['/push-sw.js'],
                 globPatterns: [
                     'assets/app-*.js',
