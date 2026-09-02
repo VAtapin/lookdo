@@ -18,6 +18,7 @@ const form=reactive<any>({
   description_translations:{...(existing.description_translations||{})},
   tagline_translations:{...(existing.tagline_translations||{})},
   service_modes:[...(existing.service_modes||['workshop'])],
+  phone:props.account?.tenant?.profile?.phone||'',
   vk_url:existing.vk_url||'',
   max_url:existing.max_url||'',
   working_hours:existing.working_hours||'',
@@ -92,6 +93,7 @@ function closePrompt(){
       <label>{{t('customers')}}<textarea v-model="form.customers" rows="3"></textarea></label>
       <label>{{t('visualStyle')}}<input v-model="form.style"></label>
       <label>{{t('avoid')}}<input v-model="form.avoid"></label>
+      <label>{{t('phone')}}<input v-model="form.phone" type="tel" autocomplete="tel" placeholder="+7 999 123-45-67"></label>
       <div class="mw-field-pair"><label>VK<input v-model="form.vk_url" type="url" placeholder="https://vk.com/..."></label><label>MAX<input v-model="form.max_url" type="url" placeholder="https://max.ru/u/..."></label></div>
       <label>{{t('workingHours')}}<input v-model="form.working_hours"></label>
       <button class="mw-secondary" :disabled="busy">{{t('saveDraft')}}</button>

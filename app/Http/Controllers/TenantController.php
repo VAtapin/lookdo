@@ -129,6 +129,7 @@ class TenantController extends Controller
             'tagline_translations.*' => 'nullable|string|max:300',
             'service_modes' => 'nullable|array|min:1|max:2',
             'service_modes.*' => ['required', Rule::in(['workshop', 'on_site'])],
+            'phone' => 'nullable|string|max:100',
             'vk_url' => 'nullable|url|max:500',
             'max_url' => 'nullable|url|max:500',
             'working_hours' => 'nullable|string|max:500',
@@ -136,13 +137,13 @@ class TenantController extends Controller
         ]);
         $profile = $tenant->profile()->firstOrCreate();
         $before = (array) data_get($profile->content, 'branding', []);
-        $branding = array_replace($before, Arr::except($data, ['business_description', 'confirmed']));
+        $branding = array_replace($before, Arr::except($data, ['business_description', 'phone', 'confirmed']));
         if (array_key_exists('confirmed', $data)) {
             $branding['confirmed_at'] = $data['confirmed'] ? now()->toIso8601String() : null;
         }
         $content = (array) $profile->content;
         $content['branding'] = $branding;
-        $profile->update(['content' => $content]);
+        $profile->update(['content' => $content] + (array_key_exists('phone', $data) ? ['phone' => $data['phone']] : []));
         if (array_key_exists('business_description', $data)) {
             $tenant->update(['business_description' => $data['business_description']]);
         }
