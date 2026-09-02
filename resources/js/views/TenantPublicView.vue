@@ -186,7 +186,7 @@ const paginatedPortfolio = computed(() => {
     return filteredPortfolio.value.slice(start, start + portfolioPageSize);
 });
 const mediaLabels = computed(() => ({
-    all: copy.value.all,
+    all: { de: "Alle", en: "All", ru: "Все", uk: "Усі" }[locale.value],
     photos: { de: "Fotos", en: "Photos", ru: "Фото", uk: "Фото" }[locale.value],
     videos: { de: "Videos", en: "Videos", ru: "Видео", uk: "Відео" }[
         locale.value
@@ -1262,7 +1262,10 @@ const loginContext = {
                                     }}
                                 </button>
                             </div>
-                            <div class="ta-filter-row ta-filter-row-secondary">
+                            <div
+                                v-if="!isBrows"
+                                class="ta-filter-row ta-filter-row-secondary"
+                            >
                                 <button
                                     :class="{ active: workFilter === 'all' }"
                                     @click="selectWorkFilter('all')"
