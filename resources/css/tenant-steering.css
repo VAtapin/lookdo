@@ -193,7 +193,8 @@
 
 /* In standalone mode the fixed inset, not browser viewport units, owns the screen edges. */
 .ta-ai-assistant{border-color:color-mix(in srgb,var(--ta-gold) 65%,transparent);box-shadow:0 0 28px color-mix(in srgb,var(--ta-gold) 10%,transparent)}
-.ta-ai-assistant h2{display:flex;align-items:center;gap:8px;color:var(--ta-gold-soft)}
+.ta-ai-assistant-toggle{width:auto;min-width:58px;min-height:36px;margin:0 0 10px auto;padding:0 12px;border:1px solid rgba(224,170,80,.45);border-radius:18px;background:#111315;color:var(--ta-gold-soft);display:flex;align-items:center;justify-content:center;gap:6px;font-weight:800}.ta-ai-assistant-toggle.active{background:rgba(224,170,80,.15)}
+.ta-ai-assistant>header{display:flex;align-items:center;justify-content:space-between;gap:10px}.ta-ai-assistant>header>button{width:34px;height:34px;border:0;background:transparent;color:#aaa;display:grid;place-items:center}.ta-ai-assistant h2{display:flex;align-items:center;gap:8px;color:var(--ta-gold-soft)}
 .ta-ai-assistant .ta-outline-button{margin-top:10px;min-height:46px}
 .ta-ai-assistant .ta-outline-button:disabled{opacity:.45}
 .ta-menu-overlay nav button>span{display:grid;gap:3px}.ta-menu-overlay nav button>span b{font-weight:700}.ta-menu-overlay nav button>span small{color:var(--ta-gold-soft);font-size:11px}

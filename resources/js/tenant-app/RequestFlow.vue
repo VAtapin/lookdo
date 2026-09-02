@@ -19,6 +19,7 @@ const notifying=ref(false);
 const notificationStatus=ref('');
 const assisting=ref(false);
 const assistantText=ref('');
+const aiAssistantOpen=ref(false);
 const form=reactive<any>({name:'',phone:'',email:'',summary:'',preferred_channel:'push',fields:{}});
 
 const configuredSlots=computed<any[]>(()=>props.app.template.media_slots||[]);
@@ -157,8 +158,9 @@ onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));})
         <button class="ta-help"><AppIcon name="info"/><span>{{copy.how}}</span></button>
       </header>
       <div class="ta-flow-scroll ta-detail-form">
-        <section class="ta-dark-card ta-ai-assistant">
-          <h2><AppIcon name="star"/> {{copy.aiAssistTitle}}</h2>
+        <button class="ta-ai-assistant-toggle" :class="{active:aiAssistantOpen}" @click="aiAssistantOpen=!aiAssistantOpen"><AppIcon name="star" :size="18"/>{{copy.aiAssistShort}}</button>
+        <section v-if="aiAssistantOpen" class="ta-dark-card ta-ai-assistant">
+          <header><h2><AppIcon name="star"/> {{copy.aiAssistTitle}}</h2><button :aria-label="copy.close" @click="aiAssistantOpen=false"><AppIcon name="close" :size="18"/></button></header>
           <p>{{copy.aiAssistText}}</p>
           <textarea v-model="assistantText" rows="3" maxlength="2000" :placeholder="copy.aiAssistPlaceholder"></textarea>
           <button class="ta-outline-button" :disabled="assisting||!assistantText.trim()" @click="assistForm">{{assisting?copy.aiAssisting:copy.aiAssistButton}}</button>

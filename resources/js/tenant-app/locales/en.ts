@@ -92,6 +92,7 @@ export default {
     notificationNudgeText: "Enable notifications in just a few seconds.",
     enable: "Enable",
     aiAssistTitle: "Fill with AI",
+    aiAssistShort: "AI",
     aiAssistText: "Describe everything in one sentence and we will fill the form for you.",
     aiAssistPlaceholder: "For example: 2018 Toyota Camry, black leather with red stitching",
     aiAssistButton: "Fill the form",

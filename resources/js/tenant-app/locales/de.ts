@@ -93,6 +93,7 @@ export default {
     notificationNudgeText: "Aktivieren Sie Benachrichtigungen in wenigen Sekunden.",
     enable: "Aktivieren",
     aiAssistTitle: "Mit KI ausfüllen",
+    aiAssistShort: "KI",
     aiAssistText: "Beschreiben Sie alles in einem Satz – wir füllen das Formular für Sie aus.",
     aiAssistPlaceholder: "Zum Beispiel: Toyota Camry 2018, schwarzes Leder mit roter Naht",
     aiAssistButton: "Formular ausfüllen",

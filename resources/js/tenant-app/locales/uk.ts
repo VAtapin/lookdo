@@ -90,6 +90,7 @@ export default {
     notificationNudgeText: "Увімкніть сповіщення — це займе кілька секунд.",
     enable: "Увімкнути",
     aiAssistTitle: "Заповнити за допомогою ШІ",
+    aiAssistShort: "ШІ",
     aiAssistText: "Опишіть усе одним реченням — решту форми ми заповнимо самі.",
     aiAssistPlaceholder: "Наприклад: Toyota Camry 2018, чорна шкіра з червоною строчкою",
     aiAssistButton: "Заповнити форму",
