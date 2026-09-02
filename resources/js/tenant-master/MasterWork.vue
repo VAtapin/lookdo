@@ -24,6 +24,7 @@ const tab = ref(
     busy = ref(false),
     error = ref(""),
     notice = ref(""),
+    socialConnectionError = ref(""),
     aiContext = ref(""),
     aiResult = ref(""),
     qrCode = ref("");
@@ -379,6 +380,11 @@ async function shareSocial() {
     }
 }
 async function connectSocial(provider: string) {
+    socialConnectionError.value = "";
+    if (!data.value.social_providers?.[provider]?.configured) {
+        socialConnectionError.value = props.t("socialProviderUnavailable");
+        return;
+    }
     busy.value = true;
     error.value = "";
     try {
@@ -401,6 +407,7 @@ async function connectSocial(provider: string) {
         window.location.assign(result.authorization_url);
     } catch (e: any) {
         error.value = e.message;
+        socialConnectionError.value = e.message;
         busy.value = false;
     }
 }
@@ -708,6 +715,7 @@ onMounted(async () => {
                 <h2>{{ t("socialComposer") }}</h2>
                 <section class="mw-social-connections full">
                     <b>{{ t("socialAccounts") }}</b>
+                    <p v-if="socialConnectionError" class="mw-warning">{{ socialConnectionError }}</p>
                     <div v-for="provider in directChannels" :key="provider">
                         <span>
                             <strong>{{ t(provider) }}</strong>
@@ -735,7 +743,7 @@ onMounted(async () => {
                             v-else
                             type="button"
                             class="mw-secondary"
-                            :disabled="busy || !data.social_providers?.[provider]?.configured || (provider === 'telegram' && !telegramTarget.trim())"
+                            :disabled="busy || (provider === 'telegram' && data.social_providers?.[provider]?.configured && !telegramTarget.trim())"
                             @click="connectSocial(provider)"
                         >{{ t("connect") }}</button>
                     </div>
