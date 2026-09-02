@@ -154,30 +154,15 @@ const portfolioLabels = computed(() => ({
     lightboxHint: { de: "Außerhalb des Bildes oder auf × tippen, um zu schließen", en: "Tap outside the image or × to close", ru: "Нажмите вне фотографии или на ×, чтобы закрыть", uk: "Натисніть поза фотографією або на ×, щоб закрити" }[locale.value],
 }));
 const navItems = computed(() => [
-    ...(isBrows.value
-        ? [
-              { key: "home", icon: "home", label: copy.value.home },
-              { key: "services", icon: "works", label: copy.value.servicesNav },
-              {
-                  key: "book",
-                  icon: "calendar",
-                  label: copy.value.book,
-                  central: true,
-              },
-              { key: "reviews", icon: "star", label: copy.value.reviews },
-          ]
-        : [
-              { key: "home", icon: "home", label: copy.value.home },
-              { key: "works", icon: "works", label: copy.value.works },
-              {
-                  key: actionScreen.value,
-                  icon: "camera",
-                  label: copy.value.action,
-                  central: true,
-              },
-              { key: "activity", icon: "message", label: copy.value.activity },
-              { key: "reviews", icon: "star", label: copy.value.reviews },
-          ]),
+    { key: "home", icon: "home", label: copy.value.home },
+    isBrows.value
+        ? { key: "services", icon: "works", label: copy.value.servicesNav }
+        : { key: "works", icon: "works", label: copy.value.works },
+    isBrows.value
+        ? { key: "book", icon: "measure", label: copy.value.book, central: true }
+        : { key: actionScreen.value, icon: "camera", label: copy.value.action, central: true },
+    { key: "activity", icon: "message", label: copy.value.activity },
+    { key: "reviews", icon: "star", label: copy.value.reviews },
 ]);
 const contactName = computed(
     () => app.value?.tenant?.contact?.name || app.value?.tenant?.name,
