@@ -23,8 +23,8 @@ class TenantSocialConnectionController extends Controller
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless(in_array($provider, SocialPublishingService::DIRECT_PROVIDERS, true), 404);
-        abort_unless($this->providerConfigured($provider), 503, 'SOCIAL_PROVIDER_NOT_CONFIGURED');
-        if ($provider === 'telegram' && $request->filled('target')) {
+        abort_unless($this->providerConfigured($tenant, $provider), 503, 'SOCIAL_PROVIDER_NOT_CONFIGURED');
+        if ($provider === 'telegram') {
             return $this->connectTelegramTarget($request, $tenant);
         }
         // Telegram limits deep-link payloads to 64 characters. The prefix plus
@@ -32,7 +32,27 @@ class TenantSocialConnectionController extends Controller
         $state = Str::random(48);
         Cache::put('social-oauth:'.hash('sha256', $state), ['tenant_id' => $tenant->id, 'user_id' => $request->user()->id, 'provider' => $provider], now()->addMinutes(15));
 
-        return response()->json(['authorization_url' => $this->authorizationUrl($provider, $state)]);
+        return response()->json(['authorization_url' => $this->authorizationUrl($tenant, $provider, $state)]);
+    }
+
+    public function saveProviderConfig(Request $request, Tenant $tenant, string $provider): JsonResponse
+    {
+        $this->authorizeWorkspace($request, $tenant);
+        abort_unless(in_array($provider, SocialPublishingService::DIRECT_PROVIDERS, true), 404);
+        $existing = (array) $tenant->socialProviderConfigs()->where('provider', $provider)->first()?->credentials;
+        $rules = $provider === 'telegram'
+            ? ['bot_token' => ['nullable', 'string', 'max:255']]
+            : ['client_id' => ['required', 'string', 'max:255'], 'client_secret' => ['nullable', 'string', 'max:1000']];
+        $data = $request->validate($rules);
+        foreach ($provider === 'telegram' ? ['bot_token'] : ['client_secret'] as $secret) {
+            if (blank($data[$secret] ?? null)) {
+                $data[$secret] = $existing[$secret] ?? null;
+            }
+            abort_if(blank($data[$secret]), 422, 'SOCIAL_PROVIDER_SECRET_REQUIRED');
+        }
+        $tenant->socialProviderConfigs()->updateOrCreate(['provider' => $provider], ['credentials' => $data]);
+
+        return response()->json(['configured' => true]);
     }
 
     public function callback(Request $request, string $provider): RedirectResponse
@@ -44,8 +64,8 @@ class TenantSocialConnectionController extends Controller
 
         try {
             $attributes = match ($provider) {
-                'facebook', 'instagram' => $this->connectMeta($request, $provider),
-                'vk' => $this->connectVk($request),
+                'facebook', 'instagram' => $this->connectMeta($request, $tenant, $provider),
+                'vk' => $this->connectVk($request, $tenant),
                 default => throw new RuntimeException('Unsupported OAuth provider.'),
             };
             $tenant->socialConnections()->updateOrCreate(['provider' => $provider], array_merge($attributes, [
@@ -57,7 +77,7 @@ class TenantSocialConnectionController extends Controller
             $result = 'error';
         }
 
-        return redirect('/app/work?tab=social&social='.$result.'&provider='.$provider);
+        return redirect('https://'.$tenant->slug.'.'.config('tenancy.platform_domain').'/app/work?tab=social&social='.$result.'&provider='.$provider);
     }
 
     public function disconnect(Request $request, Tenant $tenant, string $provider): JsonResponse
@@ -114,7 +134,7 @@ class TenantSocialConnectionController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    private function authorizationUrl(string $provider, string $state): string
+    private function authorizationUrl(Tenant $tenant, string $provider, string $state): string
     {
         if ($provider === 'telegram') {
             $username = ltrim((string) config('services.telegram.bot_username'), '@');
@@ -122,41 +142,53 @@ class TenantSocialConnectionController extends Controller
 
             return "https://t.me/{$username}?start=lookdo_{$state}";
         }
-        $redirect = route('social.callback', ['provider' => $provider]);
+        $redirect = $this->callbackUrl($tenant, $provider);
         if (in_array($provider, ['facebook', 'instagram'], true)) {
+            $credentials = $this->providerCredentials($tenant, $provider);
             $query = http_build_query([
-                'client_id' => config('services.social.meta.client_id'), 'redirect_uri' => $redirect, 'state' => $state,
+                'client_id' => $credentials['client_id'], 'redirect_uri' => $redirect, 'state' => $state,
                 'scope' => 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management',
                 'response_type' => 'code',
             ]);
 
             return 'https://www.facebook.com/'.config('services.social.meta.version').'/dialog/oauth?'.$query;
         }
+        $credentials = $this->providerCredentials($tenant, $provider);
         $query = http_build_query([
-            'client_id' => config('services.social.vk.client_id'), 'redirect_uri' => $redirect, 'display' => 'page', 'state' => $state,
+            'client_id' => $credentials['client_id'], 'redirect_uri' => $redirect, 'display' => 'page', 'state' => $state,
             'scope' => 'wall,photos,groups,offline', 'response_type' => 'code', 'v' => config('services.social.vk.version'),
         ]);
 
         return 'https://oauth.vk.com/authorize?'.$query;
     }
 
-    private function providerConfigured(string $provider): bool
+    private function providerConfigured(Tenant $tenant, string $provider): bool
     {
+        $credentials = $this->providerCredentials($tenant, $provider);
+
         return match ($provider) {
-            'facebook', 'instagram' => filled(config('services.social.meta.client_id')) && filled(config('services.social.meta.client_secret')),
-            'vk' => filled(config('services.social.vk.client_id')) && filled(config('services.social.vk.client_secret')),
-            'telegram' => filled(config('services.telegram.bot_token'))
-                && filled(config('services.telegram.bot_username'))
-                && filled(config('services.telegram.webhook_secret')),
+            'facebook', 'instagram', 'vk' => filled($credentials['client_id'] ?? null) && filled($credentials['client_secret'] ?? null),
+            'telegram' => filled($credentials['bot_token'] ?? null),
             default => false,
         };
     }
 
-    private function connectMeta(Request $request, string $provider): array
+    private function providerCredentials(Tenant $tenant, string $provider): array
     {
-        $redirect = route('social.callback', ['provider' => $provider]);
+        return (array) $tenant->socialProviderConfigs()->where('provider', $provider)->first()?->credentials;
+    }
+
+    private function callbackUrl(Tenant $tenant, string $provider): string
+    {
+        return 'https://'.$tenant->slug.'.'.config('tenancy.platform_domain').'/api/social/oauth/'.$provider.'/callback';
+    }
+
+    private function connectMeta(Request $request, Tenant $tenant, string $provider): array
+    {
+        $credentials = $this->providerCredentials($tenant, $provider);
+        $redirect = $this->callbackUrl($tenant, $provider);
         $shortLivedToken = Http::get('https://graph.facebook.com/'.config('services.social.meta.version').'/oauth/access_token', [
-            'client_id' => config('services.social.meta.client_id'), 'client_secret' => config('services.social.meta.client_secret'),
+            'client_id' => $credentials['client_id'], 'client_secret' => $credentials['client_secret'],
             'redirect_uri' => $redirect, 'code' => $request->query('code'),
         ])->throw()->json('access_token');
         if (! is_string($shortLivedToken) || $shortLivedToken === '') {
@@ -164,8 +196,8 @@ class TenantSocialConnectionController extends Controller
         }
         $longLived = Http::get('https://graph.facebook.com/'.config('services.social.meta.version').'/oauth/access_token', [
             'grant_type' => 'fb_exchange_token',
-            'client_id' => config('services.social.meta.client_id'),
-            'client_secret' => config('services.social.meta.client_secret'),
+            'client_id' => $credentials['client_id'],
+            'client_secret' => $credentials['client_secret'],
             'fb_exchange_token' => $shortLivedToken,
         ])->throw()->json();
         $token = (string) ($longLived['access_token'] ?? $shortLivedToken);
@@ -187,11 +219,12 @@ class TenantSocialConnectionController extends Controller
         ];
     }
 
-    private function connectVk(Request $request): array
+    private function connectVk(Request $request, Tenant $tenant): array
     {
-        $redirect = route('social.callback', ['provider' => 'vk']);
+        $credentials = $this->providerCredentials($tenant, 'vk');
+        $redirect = $this->callbackUrl($tenant, 'vk');
         $oauth = Http::get('https://oauth.vk.com/access_token', [
-            'client_id' => config('services.social.vk.client_id'), 'client_secret' => config('services.social.vk.client_secret'),
+            'client_id' => $credentials['client_id'], 'client_secret' => $credentials['client_secret'],
             'redirect_uri' => $redirect, 'code' => $request->query('code'),
         ])->throw()->json();
         $groups = Http::asForm()->post('https://api.vk.com/method/groups.get', [
@@ -211,7 +244,7 @@ class TenantSocialConnectionController extends Controller
         $data = $request->validate([
             'target' => ['required', 'string', 'max:128', 'regex:/^(?:-?\d+|@[A-Za-z0-9_]{5,})$/'],
         ]);
-        $token = (string) config('services.telegram.bot_token');
+        $token = (string) ($this->providerCredentials($tenant, 'telegram')['bot_token'] ?? '');
         $chat = Http::timeout(30)
             ->post("https://api.telegram.org/bot{$token}/getChat", ['chat_id' => $data['target']])
             ->throw()

@@ -103,7 +103,8 @@ class SocialPublishingService
 
     private function telegram(TenantSocialDraft $draft, TenantSocialConnection $connection, ?string $imageUrl): array
     {
-        $token = (string) config('services.telegram.bot_token');
+        $providerConfig = $connection->tenant->socialProviderConfigs()->where('provider', 'telegram')->first();
+        $token = (string) data_get($providerConfig?->credentials, 'bot_token');
         if ($token === '') {
             throw new RuntimeException('TELEGRAM_NOT_CONFIGURED');
         }

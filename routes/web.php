@@ -124,6 +124,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
         Route::delete('/tenant/{tenant}/social-drafts/{draft}', [TenantContentController::class, 'deleteSocial']);
         Route::post('/tenant/{tenant}/social-drafts/{draft}/publish', [TenantSocialConnectionController::class, 'publish'])->middleware('throttle:10,1');
         Route::post('/tenant/{tenant}/social-connections/{provider}/authorize', [TenantSocialConnectionController::class, 'authorizeProvider'])->middleware('throttle:10,1');
+        Route::put('/tenant/{tenant}/social-providers/{provider}', [TenantSocialConnectionController::class, 'saveProviderConfig'])->middleware('throttle:10,1');
         Route::delete('/tenant/{tenant}/social-connections/{provider}', [TenantSocialConnectionController::class, 'disconnect']);
         Route::post('/tenant/{tenant}/workspace/ai', [TenantContentController::class, 'ai'])->middleware('throttle:20,1');
         Route::post('/impersonation/stop', [AdminController::class, 'stopImpersonation']);

@@ -74,6 +74,20 @@ const channels = [
 ];
 const directChannels = ["instagram", "facebook", "telegram", "vk"];
 const telegramTarget = ref("");
+const providerModal = ref("");
+const providerForm = reactive({ client_id: "", client_secret: "", bot_token: "" });
+const providerHelpUrl = computed(() =>
+    providerModal.value === "telegram"
+        ? "https://core.telegram.org/bots/tutorial#obtain-your-bot-token"
+        : providerModal.value === "vk"
+          ? "https://id.vk.com/about/business/go/docs/ru/vkid/latest/vk-id/connection/create-application"
+          : "https://developers.facebook.com/apps/",
+);
+const providerCallbackUrl = computed(() =>
+    providerModal.value && providerModal.value !== "telegram"
+        ? `${window.location.origin}/api/social/oauth/${providerModal.value}/callback`
+        : "",
+);
 const enabled = (key: string) =>
     String(data.value.entitlements?.[key] || "0") === "1";
 const hasBeforeAfter = computed(() => enabled("before_after_enabled")),
@@ -411,7 +425,7 @@ async function shareSocial() {
 async function connectSocial(provider: string) {
     socialConnectionError.value = "";
     if (!data.value.social_providers?.[provider]?.configured) {
-        socialConnectionError.value = props.t("socialProviderUnavailable");
+        openProviderConfig(provider);
         return;
     }
     busy.value = true;
@@ -437,6 +451,33 @@ async function connectSocial(provider: string) {
     } catch (e: any) {
         error.value = e.message;
         socialConnectionError.value = e.message;
+        busy.value = false;
+    }
+}
+function openProviderConfig(provider: string) {
+    providerModal.value = provider;
+    Object.assign(providerForm, { client_id: "", client_secret: "", bot_token: "" });
+    socialConnectionError.value = "";
+}
+async function saveProviderConfig() {
+    busy.value = true;
+    socialConnectionError.value = "";
+    try {
+        const body = providerModal.value === "telegram"
+            ? { bot_token: providerForm.bot_token }
+            : { client_id: providerForm.client_id, client_secret: providerForm.client_secret };
+        await api(`/tenant/${props.tenantId}/social-providers/${providerModal.value}`, {
+            method: "PUT",
+            body: JSON.stringify(body),
+        });
+        const configuredProvider = providerModal.value;
+        providerModal.value = "";
+        await load();
+        notice.value = props.t("socialProviderSaved");
+        if (configuredProvider !== "telegram") await connectSocial(configuredProvider);
+    } catch (e: any) {
+        socialConnectionError.value = e.message;
+    } finally {
         busy.value = false;
     }
 }
@@ -751,7 +792,7 @@ onMounted(async () => {
                             <small v-if="data.social_connections?.find((item:any) => item.provider === provider && item.status === 'active')">
                                 {{ data.social_connections.find((item:any) => item.provider === provider && item.status === 'active')?.account_name || t("socialConnected") }}
                             </small>
-                            <small v-else-if="!data.social_providers?.[provider]?.configured">{{ t("socialProviderUnavailable") }}</small>
+                            <small v-else-if="!data.social_providers?.[provider]?.configured">{{ t("socialProviderNeedsSetup") }}</small>
                             <small v-else>{{ t("socialNotConnected") }}</small>
                         </span>
                         <input
@@ -774,7 +815,7 @@ onMounted(async () => {
                             class="mw-secondary"
                             :disabled="busy || (provider === 'telegram' && data.social_providers?.[provider]?.configured && !telegramTarget.trim())"
                             @click="connectSocial(provider)"
-                        >{{ t("connect") }}</button>
+                        >{{ data.social_providers?.[provider]?.configured ? t("connect") : t("configure") }}</button>
                     </div>
                 </section>
                 <label
@@ -883,4 +924,39 @@ onMounted(async () => {
             <textarea v-if="aiResult" v-model="aiResult" rows="8"></textarea>
         </div>
     </section>
+    <div v-if="providerModal" class="mw-brand-modal" @click.self="providerModal = ''">
+        <form class="mw-panel mw-form" @submit.prevent="saveProviderConfig">
+            <header>
+                <div>
+                    <small>{{ t("socialProviderSetup") }}</small>
+                    <h2>{{ t(providerModal) }}</h2>
+                </div>
+                <button type="button" :disabled="busy" @click="providerModal = ''">×</button>
+            </header>
+            <p class="mw-warning" v-if="socialConnectionError">{{ socialConnectionError }}</p>
+            <div class="mw-provider-help">
+                <b>{{ t("socialProviderHelpTitle") }}</b>
+                <ol>
+                    <li>{{ t(`socialProviderHelp_${providerModal}_1`) }}</li>
+                    <li>{{ t(`socialProviderHelp_${providerModal}_2`) }}</li>
+                    <li>{{ t(`socialProviderHelp_${providerModal}_3`) }}</li>
+                </ol>
+                <a :href="providerHelpUrl" target="_blank" rel="noopener noreferrer">{{ t("openOfficialInstructions") }} ↗</a>
+            </div>
+            <template v-if="providerModal === 'telegram'">
+                <label>{{ t("telegramBotToken") }}<input v-model="providerForm.bot_token" type="password" required autocomplete="new-password" /></label>
+            </template>
+            <template v-else>
+                <label>{{ t("applicationId") }}<input v-model="providerForm.client_id" required autocomplete="off" /></label>
+                <label>{{ t("applicationSecret") }}<input v-model="providerForm.client_secret" type="password" required autocomplete="new-password" /></label>
+                <label>{{ t("callbackUrl") }}<input :value="providerCallbackUrl" readonly @focus="($event.target as HTMLInputElement).select()" /></label>
+                <p>{{ t("callbackUrlHint") }}</p>
+            </template>
+            <p>{{ t("secretStorageHint") }}</p>
+            <div>
+                <button type="button" class="mw-secondary" :disabled="busy" @click="providerModal = ''">{{ t("cancel") }}</button>
+                <button class="mw-primary" :disabled="busy">{{ t("saveAndConnect") }}</button>
+            </div>
+        </form>
+    </div>
 </template>

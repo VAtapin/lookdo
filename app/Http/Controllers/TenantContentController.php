@@ -36,7 +36,7 @@ class TenantContentController extends Controller
                 'expires_at', 'last_validated_at', 'last_error',
             ]),
             'social_providers' => collect(SocialPublishingService::DIRECT_PROVIDERS)->mapWithKeys(fn (string $provider) => [
-                $provider => ['configured' => $this->socialProviderConfigured($provider)],
+                $provider => ['configured' => $this->socialProviderConfigured($tenant, $provider), 'custom' => $tenant->socialProviderConfigs()->where('provider', $provider)->exists()],
             ]),
             'entitlements' => $entitlements->all($tenant),
             'share_url' => 'https://'.$tenant->slug.'.'.config('tenancy.platform_domain'),
@@ -277,13 +277,15 @@ class TenantContentController extends Controller
         return Storage::disk('public')->url($path);
     }
 
-    private function socialProviderConfigured(string $provider): bool
+    private function socialProviderConfigured(Tenant $tenant, string $provider): bool
     {
-        return match ($provider) {
-            'facebook', 'instagram' => filled(config('services.social.meta.client_id')) && filled(config('services.social.meta.client_secret')),
-            'vk' => filled(config('services.social.vk.client_id')) && filled(config('services.social.vk.client_secret')),
-            'telegram' => filled(config('services.telegram.bot_token')) && filled(config('services.telegram.bot_username')) && filled(config('services.telegram.webhook_secret')),
-            default => false,
-        };
+        $credentials = (array) $tenant->socialProviderConfigs()->where('provider', $provider)->first()?->credentials;
+        if ($credentials !== []) {
+            return $provider === 'telegram'
+                ? filled($credentials['bot_token'] ?? null)
+                : filled($credentials['client_id'] ?? null) && filled($credentials['client_secret'] ?? null);
+        }
+
+        return false;
     }
 }
