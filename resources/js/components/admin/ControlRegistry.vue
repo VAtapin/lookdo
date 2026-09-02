@@ -130,7 +130,7 @@ const {
             </label>
             <span>Getrennte Aufbewahrung: {{ data.keep }} Stände je Kunde</span>
             <button class="button" :disabled="busy || !backupTenantId" @click="tenantBackupAction('create')">
-                {{ backupTenantId ? '＋ Kundenbackup erstellen' : 'Kunde für neues Backup auswählen' }}
+                {{ backupTenantId ? '＋ Vollständiges Kundenbackup' : 'Kunde für neues Backup auswählen' }}
             </button>
         </div>
         <div class="admin-table-wrap">

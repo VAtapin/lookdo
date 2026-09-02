@@ -12,12 +12,15 @@ use ZipArchive;
 
 class TenantBackupService
 {
-    /**
-     * Tenant-owned data in dependency order. Platform access, domains and billing
-     * are deliberately excluded so a content restore cannot change access rights.
-     */
+    /** Tenant-owned data in dependency order. Shared platform catalogues stay global. */
     private const TABLES = [
         'tenant_profiles',
+        'tenant_domains',
+        'tenant_users',
+        'subscriptions',
+        'subscription_payments',
+        'tenant_entitlement_overrides',
+        'business_classifications',
         'tenant_business_profiles',
         'tenant_services',
         'tenant_portfolio_items',
@@ -39,15 +42,11 @@ class TenantBackupService
         'tenant_social_drafts',
         'tenant_segments',
         'tenant_customer_segment',
-    ];
-
-    private const TENANT_COLUMNS = [
-        'name',
-        'country',
-        'locale',
-        'timezone',
-        'business_description',
-        'onboarding_completed_at',
+        'sms_messages',
+        'image_credit_purchases',
+        'legal_acceptances',
+        'ai_usage_records',
+        'audit_logs',
     ];
 
     private const STORAGE_PREFIXES = [
@@ -88,12 +87,14 @@ class TenantBackupService
             'tenant_id' => $tenant->id,
             'tenant_name' => $tenant->name,
             'tenant_slug' => $tenant->slug,
+            'scope' => 'full_tenant',
             'reason' => $reason,
             'created_at' => now()->toIso8601String(),
             'archive' => basename($archivePath),
             'bytes' => File::size($archivePath),
             'sha256' => hash_file('sha256', $archivePath),
             'rows' => collect($payload['tables'])->map(fn (array $rows): int => count($rows))->all(),
+            'user_count' => count($payload['users'] ?? []),
             'file_count' => $fileCount,
         ];
         File::put($directory.DIRECTORY_SEPARATOR.$name.'.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
@@ -171,10 +172,15 @@ class TenantBackupService
 
         $this->assertNoIdConflicts($tenant, $payload['tables'] ?? []);
         DB::transaction(function () use ($tenant, $payload): void {
-            $preserved = $this->preservedTenantData($tenant);
-            $this->deleteTenantData($tenant);
+            $tables = $payload['tables'] ?? [];
+            $isFull = (int) ($payload['format'] ?? 1) >= 2;
+            $preserved = $isFull ? [] : $this->preservedTenantData($tenant);
+            $userMap = $this->restoreUsers($tenant, $payload['users'] ?? []);
+            $tables = $this->remapUserReferences($tables, $userMap);
+            $this->assertUniqueTenantValues($tenant, $payload['tenant'] ?? [], $tables);
+            $this->deleteTenantData($tenant, array_keys($tables));
+            $this->insertTenantData($tables);
             $this->restoreTenantRecord($tenant, $payload['tenant'] ?? []);
-            $this->insertTenantData($payload['tables'] ?? []);
             $this->restorePreservedTenantData($tenant, $preserved);
         }, 3);
         $this->restoreFiles($zip, $tenant);
@@ -214,9 +220,11 @@ class TenantBackupService
         }
 
         return [
-            'format' => 1,
+            'format' => 2,
+            'scope' => 'full_tenant',
             'created_at' => now()->toIso8601String(),
-            'tenant' => collect($tenant->getAttributes())->only(array_merge(['id', 'slug'], self::TENANT_COLUMNS))->all(),
+            'tenant' => $tenant->getAttributes(),
+            'users' => $this->tenantUsers($tenant->id),
             'tables' => $tables,
         ];
     }
@@ -232,8 +240,118 @@ class TenantBackupService
         if ($table === 'tenant_customer_segment') {
             return DB::table($table)->whereIn('tenant_segment_id', DB::table('tenant_segments')->where('tenant_id', $tenantId)->select('id'))->orderBy('tenant_segment_id')->get()->map(fn ($row): array => (array) $row)->all();
         }
+        if ($table === 'subscription_payments') {
+            return DB::table($table)->whereIn('subscription_id', DB::table('subscriptions')->where('tenant_id', $tenantId)->select('id'))->orderBy('id')->get()->map(fn ($row): array => (array) $row)->all();
+        }
 
         return [];
+    }
+
+    private function tenantUsers(int $tenantId): array
+    {
+        if (! Schema::hasTable('users') || ! Schema::hasTable('tenant_users')) {
+            return [];
+        }
+
+        return DB::table('users')
+            ->whereIn('id', DB::table('tenant_users')->where('tenant_id', $tenantId)->select('user_id'))
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($row): array => (array) $row)
+            ->all();
+    }
+
+    private function restoreUsers(Tenant $tenant, array $users): array
+    {
+        if ($users === [] || ! Schema::hasTable('users')) {
+            return [];
+        }
+        $columns = array_flip(Schema::getColumnListing('users'));
+        $mapping = [];
+        foreach ($users as $snapshot) {
+            $oldId = (int) ($snapshot['id'] ?? 0);
+            $email = (string) ($snapshot['email'] ?? '');
+            if (! $oldId || $email === '') {
+                continue;
+            }
+            $byId = DB::table('users')->where('id', $oldId)->first();
+            $byEmail = DB::table('users')->where('email', $email)->first();
+            $existing = $byId && (string) $byId->email === $email ? $byId : $byEmail;
+            if ($existing) {
+                $mapping[$oldId] = (int) $existing->id;
+                $belongsToTenant = DB::table('tenant_users')->where('tenant_id', $tenant->id)->where('user_id', $existing->id)->exists();
+                $shared = DB::table('tenant_users')->where('tenant_id', '!=', $tenant->id)->where('user_id', $existing->id)->exists();
+                if ($belongsToTenant && ! $shared) {
+                    $updates = array_intersect_key($snapshot, $columns);
+                    unset($updates['id'], $updates['is_super_admin']);
+                    DB::table('users')->where('id', $existing->id)->update($updates);
+                }
+
+                continue;
+            }
+
+            $row = array_intersect_key($snapshot, $columns);
+            $row['is_super_admin'] = false;
+            if ($byId) {
+                unset($row['id']);
+            }
+            if (isset($row['id'])) {
+                DB::table('users')->insert($row);
+                $newId = (int) $row['id'];
+            } else {
+                $newId = (int) DB::table('users')->insertGetId($row);
+            }
+            $mapping[$oldId] = $newId;
+        }
+
+        return $mapping;
+    }
+
+    private function remapUserReferences(array $tables, array $mapping): array
+    {
+        $references = [
+            'tenant_users' => ['user_id'],
+            'tenant_messages' => ['sender_user_id'],
+            'tenant_appointments' => ['staff_user_id'],
+            'tenant_push_subscriptions' => ['user_id'],
+            'tenant_resources' => ['user_id'],
+            'tenant_social_connections' => ['connected_by_user_id'],
+            'image_credit_purchases' => ['user_id'],
+            'legal_acceptances' => ['user_id'],
+            'ai_usage_records' => ['user_id'],
+            'audit_logs' => ['actor_id'],
+        ];
+        foreach ($references as $table => $columns) {
+            if (! isset($tables[$table])) {
+                continue;
+            }
+            foreach ($tables[$table] as &$row) {
+                foreach ($columns as $column) {
+                    if (! empty($row[$column]) && isset($mapping[(int) $row[$column]])) {
+                        $row[$column] = $mapping[(int) $row[$column]];
+                    }
+                }
+                if ($table === 'tenant_users') {
+                    unset($row['id']);
+                }
+            }
+            unset($row);
+        }
+
+        return $tables;
+    }
+
+    private function assertUniqueTenantValues(Tenant $tenant, array $snapshot, array $tables): void
+    {
+        $slug = $snapshot['slug'] ?? null;
+        if ($slug && DB::table('tenants')->where('slug', $slug)->where('id', '!=', $tenant->id)->exists()) {
+            throw new RuntimeException('The backed-up tenant slug is now used by another tenant.');
+        }
+        foreach ($tables['tenant_domains'] ?? [] as $domain) {
+            if (! empty($domain['domain']) && DB::table('tenant_domains')->where('domain', $domain['domain'])->where('tenant_id', '!=', $tenant->id)->exists()) {
+                throw new RuntimeException('A backed-up domain is now used by another tenant.');
+            }
+        }
     }
 
     private function orderColumn(string $table): string
@@ -241,10 +359,13 @@ class TenantBackupService
         return Schema::hasColumn($table, 'id') ? 'id' : (Schema::hasColumn($table, 'created_at') ? 'created_at' : 'tenant_id');
     }
 
-    private function deleteTenantData(Tenant $tenant): void
+    private function deleteTenantData(Tenant $tenant, array $includedTables): void
     {
+        if (in_array('tenant_domains', $includedTables, true)) {
+            DB::table('tenants')->where('id', $tenant->id)->update(['primary_domain_id' => null]);
+        }
         foreach (array_reverse(self::TABLES) as $table) {
-            if (! Schema::hasTable($table)) {
+            if (! in_array($table, $includedTables, true) || ! Schema::hasTable($table)) {
                 continue;
             }
             if (Schema::hasColumn($table, 'tenant_id')) {
@@ -253,13 +374,16 @@ class TenantBackupService
                 DB::table($table)->whereIn('request_id', DB::table('tenant_requests')->where('tenant_id', $tenant->id)->select('id'))->delete();
             } elseif ($table === 'tenant_customer_segment') {
                 DB::table($table)->whereIn('tenant_segment_id', DB::table('tenant_segments')->where('tenant_id', $tenant->id)->select('id'))->delete();
+            } elseif ($table === 'subscription_payments') {
+                DB::table($table)->whereIn('subscription_id', DB::table('subscriptions')->where('tenant_id', $tenant->id)->select('id'))->delete();
             }
         }
     }
 
     private function restoreTenantRecord(Tenant $tenant, array $snapshot): void
     {
-        $columns = array_values(array_intersect(self::TENANT_COLUMNS, Schema::getColumnListing('tenants')));
+        $columns = array_values(array_intersect(array_keys($snapshot), Schema::getColumnListing('tenants')));
+        $columns = array_values(array_diff($columns, ['id']));
         DB::table('tenants')->where('id', $tenant->id)->update(collect($snapshot)->only($columns)->all());
     }
 
@@ -316,11 +440,21 @@ class TenantBackupService
     private function assertNoIdConflicts(Tenant $tenant, array $tables): void
     {
         foreach (self::TABLES as $table) {
-            if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'id') || ! Schema::hasColumn($table, 'tenant_id') || empty($tables[$table])) {
+            if ($table === 'tenant_users' || ! Schema::hasTable($table) || ! Schema::hasColumn($table, 'id') || ! Schema::hasColumn($table, 'tenant_id') || empty($tables[$table])) {
                 continue;
             }
             $ids = array_filter(array_column($tables[$table], 'id'));
             if ($ids !== [] && DB::table($table)->whereIn('id', $ids)->where('tenant_id', '!=', $tenant->id)->exists()) {
+                throw new RuntimeException("Cannot restore {$table}: an ID is already used by another tenant.");
+            }
+        }
+        foreach (['tenant_request_values', 'subscription_payments'] as $table) {
+            if (! Schema::hasTable($table) || empty($tables[$table])) {
+                continue;
+            }
+            $snapshotIds = array_filter(array_column($tables[$table], 'id'));
+            $ownedIds = array_column($this->rowsForTenant($table, $tenant->id), 'id');
+            if ($snapshotIds !== [] && DB::table($table)->whereIn('id', $snapshotIds)->whereNotIn('id', $ownedIds ?: [0])->exists()) {
                 throw new RuntimeException("Cannot restore {$table}: an ID is already used by another tenant.");
             }
         }
@@ -357,9 +491,15 @@ class TenantBackupService
             if (! $this->isTenantFile($relative, $tenant)) {
                 throw new RuntimeException('Unsafe file path found in tenant backup.');
             }
-            $contents = $zip->getFromIndex($index);
-            if (! is_string($contents) || ! $disk->put($relative, $contents)) {
+            $stream = $zip->getStream($entry);
+            if (! is_resource($stream) || ! $disk->put($relative, $stream)) {
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
                 throw new RuntimeException('A tenant file could not be restored.');
+            }
+            if (is_resource($stream)) {
+                fclose($stream);
             }
         }
     }

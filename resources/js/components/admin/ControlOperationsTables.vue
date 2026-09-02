@@ -25,12 +25,12 @@ const {
         <tr v-for="item in rows" :key="item.name">
             <td>
                 <b>{{ item.name }}</b>
-                <small>{{ item.reason === 'pre-restore' ? 'Sicherheitskopie vor Wiederherstellung' : item.reason === 'scheduled' ? 'Automatisch' : 'Manuell' }}</small>
+                <small>{{ item.reason === 'pre-restore' ? 'Sicherheitskopie vor Wiederherstellung' : item.reason === 'scheduled' ? 'Automatisch' : 'Manuell' }} · {{ item.scope === 'full_tenant' ? 'Vollständig' : 'Inhalte (älteres Format)' }}</small>
             </td>
             <td><b>{{ item.tenant_name }}</b><small>{{ item.tenant_slug }}</small></td>
             <td>{{ formatDate(item.created_at) }}</td>
             <td>
-                {{ Object.values(item.rows || {}).reduce((sum: number, count: any) => sum + Number(count || 0), 0) }} Datensätze ·
+                {{ Object.values(item.rows || {}).reduce((sum: number, count: any) => sum + Number(count || 0), 0) + Number(item.user_count || 0) }} Datensätze ·
                 {{ item.file_count || 0 }} Dateien
             </td>
             <td class="table-actions">

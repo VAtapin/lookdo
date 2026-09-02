@@ -676,8 +676,9 @@ class AdminController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    public function createTenantBackup(Tenant $tenant, TenantBackupService $backups, AuditService $audit): JsonResponse
+    public function createTenantBackup(Request $request, Tenant $tenant, TenantBackupService $backups, AuditService $audit): JsonResponse
     {
+        $request->validate(['confirmed' => ['accepted']]);
         $manifest = $backups->create($tenant);
         $audit->log('tenant_backup.created', $tenant, null, ['name' => $manifest['name']], $tenant->id);
 

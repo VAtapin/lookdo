@@ -841,9 +841,16 @@ async function tenantBackupAction(
     );
     if (!tenant) return;
     let confirmation: string | null = null;
+    if (
+        action === "create" &&
+        !window.confirm(
+            `Vollständiges Backup für „${tenant.name}“ erstellen? Enthalten sind auch Benutzer, Domains, Abrechnung, Zahlungen, Guthaben und Protokolle dieses Kunden.`,
+        )
+    )
+        return;
     if (action === "restore") {
         confirmation = window.prompt(
-            `Der Inhalt von „${tenant.name}“ wird auf diesen Stand zurückgesetzt. Abrechnung, Domains und Zugänge bleiben unverändert.\n\nZur Bestätigung Kundencode eingeben: ${tenant.slug}`,
+            `„${tenant.name}“ wird VOLLSTÄNDIG auf diesen Stand zurückgesetzt: Inhalte, Dateien, Benutzer/Team, Slug, Domains, Status, Abrechnung, Zahlungen, Guthaben und Protokolle. Andere Kunden bleiben unverändert. Vorher wird automatisch ein Sicherheitsbackup erstellt.\n\nZur Bestätigung Kundencode eingeben: ${tenant.slug}`,
         );
         if (confirmation === null) return;
     }
@@ -865,6 +872,8 @@ async function tenantBackupAction(
                     body:
                         action === "restore"
                             ? JSON.stringify({ confirmation })
+                            : action === "create"
+                              ? JSON.stringify({ confirmed: true })
                             : undefined,
                 },
             ),

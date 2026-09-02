@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\TenantBackupService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +40,7 @@ class TenantBackupServiceTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_it_restores_only_the_selected_tenant_and_preserves_access_settings(): void
+    public function test_it_fully_restores_only_the_selected_tenant(): void
     {
         $tenant = Tenant::create([
             'name' => 'Client One',
@@ -62,6 +63,46 @@ class TenantBackupServiceTest extends TestCase
             'secondary_color' => '#111111',
             'image_generation_free_used' => 0,
             'image_generation_credits' => 4,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $teamUser = User::factory()->create(['email' => 'team@example.test']);
+        DB::table('tenant_users')->insert([
+            'tenant_id' => $tenant->id,
+            'user_id' => $teamUser->id,
+            'role' => 'manager',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $domainId = DB::table('tenant_domains')->insertGetId([
+            'tenant_id' => $tenant->id,
+            'domain' => 'client-one.example.test',
+            'type' => 'custom',
+            'is_primary' => true,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $tenant->update(['primary_domain_id' => $domainId]);
+        $planId = DB::table('plans')->insertGetId([
+            'code' => 'backup-test',
+            'name' => json_encode(['de' => 'Test']),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $subscriptionId = DB::table('subscriptions')->insertGetId([
+            'tenant_id' => $tenant->id,
+            'plan_id' => $planId,
+            'provider' => 'manual',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $paymentId = DB::table('subscription_payments')->insertGetId([
+            'subscription_id' => $subscriptionId,
+            'amount' => 25,
+            'currency' => 'EUR',
+            'status' => 'paid',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -96,11 +137,15 @@ class TenantBackupServiceTest extends TestCase
 
         DB::table('tenant_services')->where('id', $serviceId)->update(['name' => json_encode(['de' => 'Damaged'])]);
         DB::table('tenant_services')->where('id', $otherServiceId)->update(['name' => json_encode(['de' => 'Other changed'])]);
-        $tenant->update(['name' => 'Damaged client', 'status' => 'suspended', 'manual_access_until' => now()->addMonth()]);
+        $tenant->update(['name' => 'Damaged client', 'slug' => 'damaged-client', 'status' => 'suspended', 'manual_access_until' => now()->addMonth()]);
         DB::table('tenant_profiles')->where('tenant_id', $tenant->id)->update([
             'contact_name' => 'Damaged contact',
             'image_generation_credits' => 9,
         ]);
+        DB::table('tenant_users')->where('tenant_id', $tenant->id)->update(['role' => 'viewer']);
+        DB::table('tenants')->where('id', $tenant->id)->update(['primary_domain_id' => null]);
+        DB::table('tenant_domains')->where('id', $domainId)->delete();
+        DB::table('subscription_payments')->where('id', $paymentId)->update(['status' => 'failed']);
         Storage::disk('public')->put("tenant-app/{$tenant->id}/portfolio/work.jpg", 'damaged-file');
 
         $result = $backups->restore($tenant->fresh(), $snapshot['name']);
@@ -113,14 +158,27 @@ class TenantBackupServiceTest extends TestCase
         $this->assertDatabaseHas('tenants', [
             'id' => $tenant->id,
             'name' => 'Client One',
-            'status' => 'suspended',
+            'slug' => 'client-one',
+            'status' => 'active',
         ]);
-        $this->assertNotNull(Tenant::findOrFail($tenant->id)->manual_access_until);
+        $this->assertNull(Tenant::findOrFail($tenant->id)->manual_access_until);
         $this->assertDatabaseHas('tenant_profiles', [
             'tenant_id' => $tenant->id,
             'contact_name' => 'Original contact',
-            'image_generation_credits' => 9,
+            'image_generation_credits' => 4,
         ]);
+        $this->assertDatabaseHas('tenant_users', [
+            'tenant_id' => $tenant->id,
+            'user_id' => $teamUser->id,
+            'role' => 'manager',
+        ]);
+        $this->assertDatabaseHas('tenant_domains', [
+            'id' => $domainId,
+            'tenant_id' => $tenant->id,
+            'domain' => 'client-one.example.test',
+        ]);
+        $this->assertSame($domainId, Tenant::findOrFail($tenant->id)->primary_domain_id);
+        $this->assertDatabaseHas('subscription_payments', ['id' => $paymentId, 'status' => 'paid']);
         $this->assertCount(2, $backups->list($tenant));
     }
 }
