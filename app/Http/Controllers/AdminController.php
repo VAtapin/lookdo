@@ -592,6 +592,32 @@ class AdminController extends Controller
         return response()->json($q->orderBy($sort, $this->sortDirection($request))->paginate($this->perPage($request)));
     }
 
+    public function clearAudits(Request $request, AuditService $audit): JsonResponse
+    {
+        $data = $request->validate([
+            'scope' => ['required', Rule::in(['older', 'all'])],
+            'days' => ['nullable', 'required_if:scope,older', 'integer', Rule::in([30, 90, 180, 365])],
+            'confirmation' => ['nullable', 'required_if:scope,all', Rule::in(['PRÜFPROTOKOLL LÖSCHEN'])],
+        ]);
+
+        $query = AuditLog::query();
+        $cutoff = null;
+        if ($data['scope'] === 'older') {
+            $cutoff = now()->subDays((int) $data['days']);
+            $query->where('created_at', '<', $cutoff);
+        }
+
+        $deleted = $query->delete();
+        $audit->log('audit.cleared', null, [
+            'scope' => $data['scope'],
+            'days' => $data['days'] ?? null,
+            'cutoff' => $cutoff?->toIso8601String(),
+            'deleted' => $deleted,
+        ], ['retained' => AuditLog::count()]);
+
+        return response()->json(['deleted' => $deleted, 'retained' => AuditLog::count()]);
+    }
+
     public function stripeStatus(StripeService $stripe): JsonResponse
     {
         return response()->json(['configured' => $stripe->configured(), 'webhook_configured' => filled(config('services.stripe.webhook_secret')), 'account' => $stripe->configured() ? $stripe->testConnection() : null, 'plans_pending' => Plan::whereNull('stripe_synced_at')->orWhereNotNull('stripe_sync_error')->count()]);

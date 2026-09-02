@@ -22,6 +22,9 @@ const {
     backupTenantId,
     selectBackupTenant,
     tenantBackupAction,
+    auditCleanupScope,
+    askAuditCleanup,
+    formatDate,
     changePage,
 } = ctx;
 </script>
@@ -134,6 +137,31 @@ const {
                 {{ backupTenantId ? '＋ Vollständiges Kundenbackup' : 'Kunde für neues Backup auswählen' }}
             </button>
         </div>
+        <div v-if="section === 'audit'" class="registry-context audit-cleanup-context">
+            <span>Prüfprotokolle enthalten sicherheitsrelevante Änderungen. Gelöschte Einträge können nur aus einem Backup wiederhergestellt werden.</span>
+            <select v-model="auditCleanupScope" aria-label="Zeitraum für Protokollbereinigung">
+                <option value="30">Älter als 30 Tage</option>
+                <option value="90">Älter als 90 Tage</option>
+                <option value="180">Älter als 180 Tage</option>
+                <option value="365">Älter als 1 Jahr</option>
+                <option value="all">Gesamtes Prüfprotokoll</option>
+            </select>
+            <button type="button" class="button ghost small danger" :disabled="busy" @click="askAuditCleanup">Protokoll bereinigen</button>
+        </div>
+        <section v-if="section === 'sms'" class="reminder-delivery-status">
+            <article :class="data.reminders?.scheduler_healthy ? 'ready' : 'warning'">
+                <span>Planer</span><strong>{{ data.reminders?.scheduler_healthy ? 'Läuft' : 'Nicht erkannt' }}</strong><small>Letzter Lauf: {{ formatDate(data.reminders?.last_run_at) }}</small>
+            </article>
+            <article :class="data.reminders?.push_configured ? 'ready' : 'warning'">
+                <span>Push</span><strong>{{ data.reminders?.push_configured ? 'Konfiguriert' : 'VAPID fehlt' }}</strong><small>{{ data.reminders?.scheduled || 0 }} geplant · {{ data.reminders?.due || 0 }} fällig</small>
+            </article>
+            <article :class="data.reminders?.sms_configured ? 'ready' : 'warning'">
+                <span>SMS</span><strong>{{ data.reminders?.sms_configured ? 'seven.io bereit' : 'Nicht konfiguriert' }}</strong><small>{{ data.reminders?.sms_waiting || 0 }} SMS warten</small>
+            </article>
+            <article :class="data.reminders?.queue_worker_healthy ? 'ready' : 'warning'">
+                <span>Queue-Worker</span><strong>{{ data.reminders?.queue_worker_healthy ? 'Läuft' : 'Nicht erkannt' }}</strong><small>Letzter Lauf: {{ formatDate(data.reminders?.queue_worker_last_run_at) }} · {{ data.reminders?.queue_pending ?? '—' }} Jobs warten</small>
+            </article>
+        </section>
         <div class="admin-table-wrap">
             <table>
                 <ControlCustomerTables :ctx="ctx" />

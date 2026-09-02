@@ -193,6 +193,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::post('/pages/translate', [AdminController::class, 'translatePage'])->middleware('throttle:20,1');
             Route::post('/content-media', [AdminController::class, 'uploadContentMedia']);
             Route::get('/audits', [AdminController::class, 'audits']);
+            Route::delete('/audits', [AdminController::class, 'clearAudits']);
         });
     });
 });

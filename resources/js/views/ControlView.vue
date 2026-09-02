@@ -52,6 +52,7 @@ const selectedPage = ref<any>(null);
 const selectedTemplate = ref<any>(null);
 const selectedAudit = ref<any>(null);
 const backupTenantId = ref<number | string>("");
+const auditCleanupScope = ref("90");
 const confirmAction = ref<any>(null);
 const subscriptionPaymentForm = reactive<any>({
     amount: 0,
@@ -794,6 +795,29 @@ function askConfirmation(config: any) {
     confirmAction.value = config;
     modal.value = "confirm";
 }
+function askAuditCleanup() {
+    const all = auditCleanupScope.value === "all";
+    const days = all ? null : Number(auditCleanupScope.value);
+    askConfirmation({
+        title: all ? "Gesamtes Prüfprotokoll leeren?" : "Alte Protokolleinträge löschen?",
+        message: all
+            ? "Alle vorhandenen Prüfprotokolleinträge werden dauerhaft gelöscht. Ein neuer Eintrag dokumentiert anschließend diese Leerung."
+            : `Alle Prüfprotokolleinträge, die älter als ${days} Tage sind, werden dauerhaft gelöscht.`,
+        confirmLabel: all ? "Gesamtes Protokoll leeren" : `Älter als ${days} Tage löschen`,
+        danger: true,
+        run: async () => {
+            const result = await api<any>("/control/audits", {
+                method: "DELETE",
+                body: JSON.stringify({
+                    scope: all ? "all" : "older",
+                    days,
+                    confirmation: all ? "PRÜFPROTOKOLL LÖSCHEN" : null,
+                }),
+            });
+            toast(`${result.deleted} Protokolleinträge wurden gelöscht.`);
+        },
+    });
+}
 async function executeConfirmed() {
     if (!confirmAction.value) return;
     busy.value = true;
@@ -1055,6 +1079,8 @@ const controlContext = {
     backupTenantId,
     selectBackupTenant,
     tenantBackupAction,
+    auditCleanupScope,
+    askAuditCleanup,
     smsEventLabels,
     smsStatusLabels,
     modal,
