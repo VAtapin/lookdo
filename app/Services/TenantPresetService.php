@@ -41,21 +41,41 @@ class TenantPresetService
                 ['category_id' => $template->category_id, 'variation_id' => $template->variation_id, 'request_template_id' => $template->id],
             );
 
-            foreach ((array) data_get($preset, 'configuration.starter_services', []) as $index => $service) {
+            $starterServices = (array) data_get($preset, 'configuration.starter_services', []);
+            $replaceServices = $force && (bool) data_get($preset, 'configuration.replace_services', false);
+            $existingServices = $tenant->services()->get();
+            $keptServiceIds = [];
+            foreach ($starterServices as $index => $service) {
                 $values = [
                     'name' => $service['name'],
                     'description' => $service['description'] ?? [],
                     'image_path' => $service['image'] ?? null,
                     'duration_minutes' => $service['duration'] ?? 60,
+                    'price' => $service['price'] ?? null,
+                    'currency' => $service['currency'] ?? 'EUR',
+                    'repeat_interval_days' => $service['repeat_interval_days'] ?? null,
                     'booking_enabled' => true,
                     'active' => true,
                 ];
-                $existing = $tenant->services()->where('sort_order', $index * 10)->first();
+                $existing = $replaceServices
+                    ? $existingServices->first(fn ($candidate) => data_get($candidate->name, 'uk') === data_get($service, 'name.uk'))
+                    : $existingServices->firstWhere('sort_order', $index * 10);
                 if (! $existing) {
-                    $tenant->services()->create($values + ['sort_order' => $index * 10]);
+                    $existing = $tenant->services()->create($values + ['sort_order' => $index * 10]);
                 } elseif ($force) {
-                    $existing->update($values);
+                    $existing->update($values + ['sort_order' => $index * 10]);
                 }
+                $keptServiceIds[] = $existing->id;
+            }
+
+            if ($replaceServices) {
+                $tenant->services()->whereNotIn('id', $keptServiceIds)->get()->each(function ($service): void {
+                    if ($service->appointments()->exists() || $service->portfolioItems()->exists()) {
+                        $service->update(['active' => false, 'booking_enabled' => false, 'sort_order' => 10000 + $service->id]);
+                    } else {
+                        $service->delete();
+                    }
+                });
             }
 
             if ($force) {

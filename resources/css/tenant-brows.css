@@ -56,7 +56,7 @@
 .ta-brows-service-catalog{display:grid;gap:13px}
 .ta-brows-service-catalog article{overflow:hidden;border:1px solid var(--ta-brow-line);border-radius:22px;background:#fff;box-shadow:0 10px 28px rgba(82,45,31,.06)}
 .ta-brows-service-catalog img{width:100%;aspect-ratio:2.1;object-fit:cover;display:block}
-.ta-brows-service-catalog article>div{padding:15px 16px 8px}.ta-brows-service-catalog h2{margin:0 0 5px;font-size:19px}.ta-brows-service-catalog p{margin:0;color:var(--ta-muted);font-size:13px;line-height:1.45}.ta-brows-service-catalog span{display:block;margin-top:9px;color:var(--ta-brow-primary);font-size:12px;font-weight:800}
+.ta-brows-service-catalog article>div{padding:15px 16px 8px}.ta-brows-service-catalog h2{margin:0 0 5px;font-size:19px}.ta-brows-service-catalog p{margin:0;color:var(--ta-muted);font-size:13px;line-height:1.45;white-space:pre-line}.ta-brows-service-catalog span{display:block;margin-top:9px;color:var(--ta-brow-primary);font-size:12px;font-weight:800}
 .ta-brows-service-catalog article>button{width:calc(100% - 28px);min-height:48px;margin:7px 14px 14px;border:0;border-radius:14px;background:var(--ta-brow-primary);color:#fff;font-weight:850;display:flex;align-items:center;justify-content:center;gap:7px}
 .theme-brows .ta-flow{background:linear-gradient(180deg,var(--ta-brow-surface),#fff);color:var(--ta-brow-ink)}
 .theme-brows .ta-flow-head{height:70px;border-color:var(--ta-brow-line);background:rgba(255,250,246,.95)}.theme-brows .ta-flow-head span{color:var(--ta-brow-primary)}.theme-brows .ta-icon-button{color:var(--ta-brow-primary)}

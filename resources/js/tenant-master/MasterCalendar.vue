@@ -95,6 +95,12 @@ const serviceTitle = computed({
         service.name[props.locale] = value;
     },
 });
+const serviceDescription = computed({
+    get: () => service.description[props.locale] || "",
+    set: (value: string) => {
+        service.description[props.locale] = value;
+    },
+});
 const events = computed(() =>
     [
         ...data.value.appointments.map((x: any) => ({
@@ -202,6 +208,9 @@ function serviceImageUrl(item: any) {
         : path.startsWith("/") || path.startsWith("http")
           ? path
           : `/storage/${path}`;
+}
+function localDescription(item: any) {
+    return item.description?.[props.locale] || "";
 }
 function resetService() {
     clearServicePreview();
@@ -530,9 +539,13 @@ onUnmounted(clearServicePreview);
                                     ? [
                                           localName(event.service),
                                           event.contact_snapshot?.service_mode
-                                              ? t(event.contact_snapshot.service_mode)
+                                              ? t(
+                                                    event.contact_snapshot
+                                                        .service_mode,
+                                                )
                                               : null,
-                                          event.contact_snapshot?.service_address,
+                                          event.contact_snapshot
+                                              ?.service_address,
                                           event.resource?.name,
                                       ]
                                           .filter(Boolean)
@@ -815,6 +828,10 @@ onUnmounted(clearServicePreview);
                     /><span
                         ><b>{{ localName(s) }}</b
                         ><small
+                            v-if="localDescription(s)"
+                            class="mw-service-description"
+                            >{{ localDescription(s) }}</small
+                        ><small
                             >{{ s.duration_minutes }} {{ t("minutes") }} ·
                             {{ s.price || "—" }} {{ s.currency }}</small
                         ></span
@@ -831,6 +848,12 @@ onUnmounted(clearServicePreview);
                 <label
                     >{{ t("title")
                     }}<input v-model="serviceTitle" required /></label
+                ><label
+                    >{{ t("description")
+                    }}<textarea
+                        v-model="serviceDescription"
+                        rows="7"
+                    ></textarea></label
                 ><label
                     >{{ t("duration")
                     }}<input

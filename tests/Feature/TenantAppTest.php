@@ -351,7 +351,17 @@ class TenantAppTest extends TestCase
             ->assertJsonPath('template.code', 'beauty.brows')
             ->assertJsonPath('template.hero.action', 'Записатися')
             ->assertJsonCount(3, 'template.locales')
-            ->assertJsonCount(5, 'services');
+            ->assertJsonCount(6, 'services')
+            ->assertJsonPath('services.0.name', 'Корекція та фарбування брів')
+            ->assertJsonPath('services.0.price', '20.00');
+
+        $this->assertDatabaseHas('tenant_services', [
+            'tenant_id' => $ivanna->id,
+            'repeat_interval_days' => 28,
+            'duration_minutes' => 50,
+            'active' => true,
+        ]);
+        $this->assertSame(6, $ivanna->services()->where('active', true)->count());
 
         $serviceId = $response->json('services.0.id');
         $date = CarbonImmutable::now('Europe/Berlin')->addDay();

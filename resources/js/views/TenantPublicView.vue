@@ -677,7 +677,7 @@ const loginContext = {
                     :appointment="rescheduleAppointment"
                     @close="rescheduleAppointment = null"
                     @success="flowSuccess"
-                    @enable-push="openPushExperience"
+                    @enable-push="openPushSettings"
                 />
                 <RequestFlow
                     v-else-if="screen === 'request'"
@@ -697,7 +697,7 @@ const loginContext = {
                     :push-state="pushState"
                     @close="go('home')"
                     @success="flowSuccess"
-                    @enable-push="openPushExperience"
+                    @enable-push="openPushSettings"
                 />
                 <TenantLogin
                     v-else-if="screen === 'login'"
