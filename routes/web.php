@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminSubscriptionController;
 use App\Http\Controllers\AdminTenantController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PlatformController;
@@ -150,6 +151,10 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::post('/tenants/{tenant}/impersonate', [AdminTenantController::class, 'impersonate']);
             Route::get('/administrators', [AdminController::class, 'administrators']);
             Route::get('/subscriptions', [AdminController::class, 'subscriptions']);
+            Route::get('/subscriptions/{subscription}', [AdminSubscriptionController::class, 'show']);
+            Route::patch('/subscriptions/{subscription}/status', [AdminSubscriptionController::class, 'updateStatus']);
+            Route::post('/subscriptions/{subscription}/payments', [AdminSubscriptionController::class, 'storePayment']);
+            Route::get('/subscriptions/{subscription}/payments/{payment}/receipt', [AdminSubscriptionController::class, 'receipt']);
             Route::get('/plans', [AdminController::class, 'plans']);
             Route::get('/plan-entitlements', [AdminController::class, 'planEntitlements']);
             Route::post('/plans/translate', [AdminController::class, 'translatePlan'])->middleware('throttle:20,1');

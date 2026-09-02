@@ -4,6 +4,7 @@ const {
     section,
     rows,
     openTenant,
+    openSubscription,
     tenantAccessClass,
     tenantAccessLabel,
     formatDate,
@@ -81,7 +82,7 @@ const {
         </tr>
     </thead>
     <tbody v-if="section === 'administrators'">
-        <tr v-for="item in rows" :key="item.id">
+        <tr v-for="item in rows" :key="item.id" class="clickable" @click="openSubscription(item)">
             <td>
                 <b>{{ item.name }}</b
                 ><small>{{ item.email }}</small>

@@ -68,7 +68,8 @@ const {
             >
                 <option value="">Alle Anbieter</option>
                 <option value="stripe">Stripe</option>
-                <option value="lookdo">LOOKDO-Testphase</option></select
+                <option value="lookdo">LOOKDO-Testphase</option>
+                <option value="manual">Manuell</option></select
             ><select v-else-if="section === 'ai'" v-model="filters.secondary">
                 <option value="">Alle Sprachen</option>
                 <option value="de">Deutsch</option>

@@ -28,6 +28,7 @@ import ControlOverview from "../components/admin/ControlOverview.vue";
 import ControlRegistry from "../components/admin/ControlRegistry.vue";
 import ControlTenantCreateModal from "../components/admin/ControlTenantCreateModal.vue";
 import ControlTenantDrawer from "../components/admin/ControlTenantDrawer.vue";
+import ControlSubscriptionModal from "../components/admin/ControlSubscriptionModal.vue";
 import ControlTranslationJob from "../components/admin/ControlTranslationJob.vue";
 import TemplateEditor from "../components/admin/TemplateEditor.vue";
 
@@ -46,11 +47,28 @@ const busy = ref(false);
 const translating = ref(false);
 const modal = ref("");
 const selectedTenant = ref<any>(null);
+const selectedSubscription = ref<any>(null);
 const selectedPage = ref<any>(null);
 const selectedTemplate = ref<any>(null);
 const selectedAudit = ref<any>(null);
 const backupTenantId = ref<number | string>("");
 const confirmAction = ref<any>(null);
+const subscriptionPaymentForm = reactive<any>({
+    amount: 0,
+    currency: "EUR",
+    payment_method: "cash",
+    paid_at: "",
+    reference: "",
+    note: "",
+    grant_access: true,
+    access_until: "",
+});
+const subscriptionStatusForm = reactive<any>({
+    status: "incomplete",
+    current_period_end: "",
+    cancel_at_period_end: false,
+    reason: "",
+});
 const pageTranslation = reactive<{
     phase: "idle" | "running" | "ready" | "error";
     pageId: number | null;
@@ -157,6 +175,7 @@ function resetFilters() {
 let debounce: number | undefined;
 watch(section, () => {
     selectedTenant.value = null;
+    selectedSubscription.value = null;
     selectedTemplate.value = null;
     modal.value = "";
     resetFilters();
@@ -622,6 +641,93 @@ async function openTenant(item: any) {
         selectedTenant.value = null;
     }
 }
+function dateTimeLocal(value: string | Date | null) {
+    if (!value) return "";
+    const date = new Date(value);
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 16);
+}
+async function openSubscription(item: any) {
+    error.value = "";
+    try {
+        const subscription = await api(`/control/subscriptions/${item.id}`);
+        selectedSubscription.value = subscription;
+        const monthly = Number(subscription.unit_amount || subscription.plan?.price_monthly || 0);
+        const discount = Number(subscription.discount_percent || 0);
+        const paidAt = new Date();
+        const accessUntil = new Date(paidAt);
+        accessUntil.setMonth(accessUntil.getMonth() + 1);
+        Object.assign(subscriptionPaymentForm, {
+            amount: Number((monthly * (100 - discount) / 100).toFixed(2)),
+            currency: subscription.currency || subscription.plan?.currency || "EUR",
+            payment_method: "cash",
+            paid_at: dateTimeLocal(paidAt),
+            reference: "",
+            note: "",
+            grant_access: true,
+            access_until: dateTimeLocal(accessUntil),
+        });
+        Object.assign(subscriptionStatusForm, {
+            status: subscription.status,
+            current_period_end: dateTimeLocal(subscription.current_period_end),
+            cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
+            reason: "",
+        });
+    } catch (exception: any) {
+        error.value = exception.message;
+        selectedSubscription.value = null;
+    }
+}
+function closeSubscription() {
+    selectedSubscription.value = null;
+}
+async function saveSubscriptionPayment() {
+    if (!selectedSubscription.value) return;
+    busy.value = true;
+    error.value = "";
+    try {
+        selectedSubscription.value = await api(`/control/subscriptions/${selectedSubscription.value.id}/payments`, {
+            method: "POST",
+            body: JSON.stringify(subscriptionPaymentForm),
+        });
+        Object.assign(subscriptionStatusForm, {
+            status: selectedSubscription.value.status,
+            current_period_end: dateTimeLocal(selectedSubscription.value.current_period_end),
+            cancel_at_period_end: Boolean(selectedSubscription.value.cancel_at_period_end),
+            reason: "",
+        });
+        subscriptionPaymentForm.reference = "";
+        subscriptionPaymentForm.note = "";
+        await load();
+        toast("Zahlung wurde erfasst. Der Beleg ist jetzt druckbar.");
+    } catch (exception: any) {
+        error.value = exception.message;
+    } finally {
+        busy.value = false;
+    }
+}
+async function saveSubscriptionStatus() {
+    if (!selectedSubscription.value) return;
+    busy.value = true;
+    error.value = "";
+    try {
+        selectedSubscription.value = await api(`/control/subscriptions/${selectedSubscription.value.id}/status`, {
+            method: "PATCH",
+            body: JSON.stringify(subscriptionStatusForm),
+        });
+        subscriptionStatusForm.reason = "";
+        await load();
+        toast("Abonnementstatus wurde manuell geändert und protokolliert.");
+    } catch (exception: any) {
+        error.value = exception.message;
+    } finally {
+        busy.value = false;
+    }
+}
+function openPaymentReceipt(payment: any) {
+    if (!selectedSubscription.value) return;
+    window.open(`/api/control/subscriptions/${selectedSubscription.value.id}/payments/${payment.id}/receipt`, "_blank", "noopener,noreferrer");
+}
 async function refreshSelectedTenant() {
     if (selectedTenant.value?.id)
         selectedTenant.value = await api(
@@ -934,6 +1040,7 @@ const controlContext = {
     syncAllPlans,
     rows,
     openTenant,
+    openSubscription,
     tenantAccessClass,
     subscriptionAccessClass,
     subscriptionAccessLabel,
@@ -952,6 +1059,13 @@ const controlContext = {
     smsStatusLabels,
     modal,
     selectedTenant,
+    selectedSubscription,
+    closeSubscription,
+    subscriptionPaymentForm,
+    subscriptionStatusForm,
+    saveSubscriptionPayment,
+    saveSubscriptionStatus,
+    openPaymentReceipt,
     saveTenantDetails,
     busy,
     formatDate,
@@ -1002,6 +1116,7 @@ const controlContext = {
     confirmAction,
     executeConfirmed,
     selectedAudit,
+    error,
 };
 </script>
 
@@ -1064,6 +1179,7 @@ const controlContext = {
             @error="templateError"
         />
         <ControlTenantDrawer v-if="selectedTenant" :ctx="controlContext" />
+        <ControlSubscriptionModal :ctx="controlContext" />
         <ControlTenantCreateModal :ctx="controlContext" />
         <ControlPlanModal :ctx="controlContext" />
         <ControlCatalogModals :ctx="controlContext" />

@@ -16,7 +16,7 @@ class Subscription extends Model
 
     protected function casts(): array
     {
-        return ['started_at' => 'datetime', 'current_period_start' => 'datetime', 'current_period_end' => 'datetime', 'cancel_at_period_end' => 'boolean', 'complimentary' => 'boolean'];
+        return ['started_at' => 'datetime', 'current_period_start' => 'datetime', 'current_period_end' => 'datetime', 'cancel_at_period_end' => 'boolean', 'complimentary' => 'boolean', 'manual_status_changed_at' => 'datetime'];
     }
 
     public function tenant(): BelongsTo
@@ -32,6 +32,11 @@ class Subscription extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(SubscriptionPayment::class);
+    }
+
+    public function manualStatusChangedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'manual_status_changed_by');
     }
 
     public function isTrialActive(): bool

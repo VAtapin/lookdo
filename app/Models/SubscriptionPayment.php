@@ -18,4 +18,9 @@ class SubscriptionPayment extends Model
     {
         return $this->belongsTo(Subscription::class);
     }
+
+    public function recordedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recorded_by_user_id');
+    }
 }
