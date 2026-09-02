@@ -37,8 +37,15 @@ const form = reactive({
 });
 const isReschedule = computed(() => Boolean(props.appointment));
 const detailLabels = computed(() => ({
-    inclusions: { de: "Was ist enthalten?", en: "What's included?", ru: "Что входит?", uk: "Що входить?" }[props.locale],
-    result: { de: "Ergebnis", en: "Result", ru: "Результат", uk: "Результат" }[props.locale],
+    inclusions: {
+        de: "Was ist enthalten?",
+        en: "What's included?",
+        ru: "Что входит?",
+        uk: "Що входить?",
+    }[props.locale],
+    result: { de: "Ergebnis", en: "Result", ru: "Результат", uk: "Результат" }[
+        props.locale
+    ],
 }));
 const serviceModes = computed<string[]>(() => {
     const modes = props.app?.tenant?.branding?.service_modes;
@@ -197,7 +204,9 @@ async function book() {
         let pushSubscription = null;
         if (pushSubscribed.value && "serviceWorker" in navigator) {
             const registration = await navigator.serviceWorker.ready;
-            pushSubscription = (await registration.pushManager.getSubscription())?.toJSON() || null;
+            pushSubscription =
+                (await registration.pushManager.getSubscription())?.toJSON() ||
+                null;
         }
         result.value = await api("/tenant-app/appointments", {
             method: "POST",
@@ -336,13 +345,35 @@ onMounted(() => {
                     class="ta-service-card"
                     :class="{ active: selectedService?.id === service.id }"
                 >
-                    <button class="ta-service-select" @click="chooseService(service)">
-                        <img v-if="service.image" :src="service.image" :alt="service.name" />
-                        <span><b>{{ service.name }}</b><small v-if="service.description">{{ service.description }}</small></span>
+                    <button
+                        class="ta-service-select"
+                        @click="chooseService(service)"
+                    >
+                        <img
+                            v-if="service.image"
+                            :src="service.image"
+                            :alt="service.name"
+                        />
+                        <span
+                            ><b>{{ service.name }}</b
+                            ><small v-if="service.description">{{
+                                service.description
+                            }}</small></span
+                        >
                         <strong>{{ price(service) }}</strong>
-                        <i><AppIcon :name="selectedService?.id === service.id ? 'check' : 'arrow'" /></i>
+                        <i
+                            ><AppIcon
+                                :name="
+                                    selectedService?.id === service.id
+                                        ? 'check'
+                                        : 'arrow'
+                                "
+                        /></i>
                     </button>
-                    <div v-if="service.inclusions || service.result" class="ta-service-details">
+                    <div
+                        v-if="service.inclusions || service.result"
+                        class="ta-service-details"
+                    >
                         <details v-if="service.inclusions">
                             <summary>{{ detailLabels.inclusions }}</summary>
                             <p>{{ service.inclusions }}</p>
@@ -440,7 +471,7 @@ onMounted(() => {
                 >
                     {{ slot.label }}
                 </button>
-                <p v-if="!slots.length" class="ta-no-slots">
+                <p v-if="!slots.length && !error" class="ta-no-slots">
                     {{ copy.noTimes }}
                 </p>
             </div>
@@ -491,17 +522,24 @@ onMounted(() => {
                         :class="{ active: form.service_mode === 'workshop' }"
                         @click="form.service_mode = 'workshop'"
                     >
-                        <AppIcon name="home" />{{ copy.serviceLocationWorkshop }}
+                        <AppIcon name="home" />{{
+                            copy.serviceLocationWorkshop
+                        }}
                     </button>
                     <button
                         v-if="serviceModes.includes('on_site')"
                         :class="{ active: form.service_mode === 'on_site' }"
                         @click="form.service_mode = 'on_site'"
                     >
-                        <AppIcon name="location" />{{ copy.serviceLocationOnSite }}
+                        <AppIcon name="location" />{{
+                            copy.serviceLocationOnSite
+                        }}
                     </button>
                 </div>
-                <label v-if="form.service_mode === 'on_site'" class="ta-service-address">
+                <label
+                    v-if="form.service_mode === 'on_site'"
+                    class="ta-service-address"
+                >
                     <span>{{ copy.serviceAddress }} *</span>
                     <input
                         v-model="form.service_address"
@@ -525,7 +563,11 @@ onMounted(() => {
                 </button>
             </div>
             <p class="ta-channel-hint">
-                {{ pushSubscribed ? copy.pushConfirmationHint : copy.pushUnavailableHint }}
+                {{
+                    pushSubscribed
+                        ? copy.pushConfirmationHint
+                        : copy.pushUnavailableHint
+                }}
             </p>
             <div class="ta-final-summary">
                 <b>{{ copy.yourBooking }}</b>

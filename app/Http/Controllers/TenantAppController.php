@@ -211,12 +211,22 @@ class TenantAppController extends Controller
             'appointment_id' => 'nullable|integer',
             'resource_id' => 'nullable|integer',
         ]);
-        $service = $tenant->services()->where('active', true)->findOrFail($data['service_id']);
         $exceptAppointmentId = null;
         if (filled($data['appointment_id'] ?? null)) {
             $customer = $this->requireCustomer($request, $tenant);
-            $appointment = $tenant->appointments()->where('customer_id', $customer->id)->findOrFail($data['appointment_id']);
+            $appointment = $tenant->appointments()
+                ->with('service')
+                ->where('customer_id', $customer->id)
+                ->findOrFail($data['appointment_id']);
+            abort_unless((int) $data['service_id'] === (int) $appointment->service_id, 422);
+            abort_unless($appointment->service, 409);
+            $service = $appointment->service;
             $exceptAppointmentId = $appointment->id;
+        } else {
+            $service = $tenant->services()
+                ->where('active', true)
+                ->where('booking_enabled', true)
+                ->findOrFail($data['service_id']);
         }
 
         $resourceIds = filled($data['resource_id'] ?? null)
@@ -325,7 +335,7 @@ class TenantAppController extends Controller
         abort_if(in_array($tenantAppointment->status, ['cancelled', 'completed', 'no_show'], true), 409);
         $data = $request->validate(['starts_at' => 'required|date|after:now']);
         $tenantAppointment->load('service');
-        abort_unless($tenantAppointment->service?->active && $tenantAppointment->service?->booking_enabled, 409);
+        abort_unless($tenantAppointment->service, 409);
         $start = CarbonImmutable::parse($data['starts_at'], TenantCalendarService::TIMEZONE);
         $end = $start->addMinutes($tenantAppointment->service->duration_minutes);
 

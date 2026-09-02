@@ -313,7 +313,16 @@ class TenantAppTest extends TestCase
             'service_id' => $serviceId, 'starts_at' => $startsAt, 'name' => 'Марія', 'phone' => '+380671111111',
         ])->assertUnprocessable()->assertJsonValidationErrors('starts_at');
 
-        $rescheduledStart = $availability->json('slots.1.starts_at');
+        $tenant->services()->whereKey($serviceId)->update([
+            'active' => false,
+            'booking_enabled' => false,
+            'archived_at' => now(),
+        ]);
+        $rescheduleAvailability = $this
+            ->withHeader('X-Lookdo-Client-Token', $token)
+            ->getJson($this->url($tenant, '/api/tenant-app/availability?service_id='.$serviceId.'&appointment_id='.$appointmentId.'&date='.$date->format('Y-m-d')))
+            ->assertOk();
+        $rescheduledStart = $rescheduleAvailability->json('slots.1.starts_at');
         $this->assertNotNull($rescheduledStart);
         $this->withHeader('X-Lookdo-Client-Token', $token)
             ->patchJson($this->url($tenant, '/api/tenant-app/appointments/'.$appointmentId), ['starts_at' => $rescheduledStart])
