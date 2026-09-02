@@ -256,7 +256,7 @@ class TenantContentController extends Controller
     {
         foreach (['image_path', 'before_image_path', 'after_image_path'] as $field) {
             if ($item->{$field}) {
-                $item->setAttribute(str_replace('_path', '_url', $field), Storage::disk('public')->url($item->{$field}));
+                $item->setAttribute(str_replace('_path', '_url', $field), $this->mediaUrl($item->{$field}));
             }
         }
     }
@@ -264,8 +264,17 @@ class TenantContentController extends Controller
     private function socialUrl(TenantSocialDraft $draft): void
     {
         if ($draft->image_path) {
-            $draft->setAttribute('image_url', Storage::disk('public')->url($draft->image_path));
+            $draft->setAttribute('image_url', $this->mediaUrl($draft->image_path));
         }
+    }
+
+    private function mediaUrl(string $path): string
+    {
+        if (str_starts_with($path, '/') || str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+
+        return Storage::disk('public')->url($path);
     }
 
     private function socialProviderConfigured(string $provider): bool
