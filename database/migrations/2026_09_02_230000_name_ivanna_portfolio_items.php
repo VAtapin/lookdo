@@ -2,11 +2,16 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('tenant_portfolio_items')) {
+            return;
+        }
+
         $tenantId = DB::table('tenants')->where('slug', 'ivanna-brows')->value('id');
 
         if (! $tenantId) {
@@ -30,7 +35,7 @@ return new class extends Migration
         ];
 
         foreach ($titles as $filename => $title) {
-            DB::table('portfolio_items')
+            DB::table('tenant_portfolio_items')
                 ->where('tenant_id', $tenantId)
                 ->where(function ($query) use ($filename) {
                     $query->where('image_path', 'like', '%'.$filename)
