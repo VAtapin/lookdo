@@ -9,6 +9,7 @@ use App\Models\TenantReview;
 use App\Models\TenantSocialDraft;
 use App\Services\EntitlementService;
 use App\Services\ImageStorageService;
+use App\Services\LocalizedContentTranslationService;
 use App\Services\OpenAiBudgetService;
 use App\Services\OpenAiService;
 use App\Services\SocialPublishingService;
@@ -20,6 +21,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Throwable;
 
 class TenantContentController extends Controller
 {
@@ -45,7 +47,7 @@ class TenantContentController extends Controller
         ]);
     }
 
-    public function savePortfolio(Request $request, Tenant $tenant, ImageStorageService $images, EntitlementService $entitlements, ?TenantPortfolioItem $item = null): JsonResponse
+    public function savePortfolio(Request $request, Tenant $tenant, ImageStorageService $images, EntitlementService $entitlements, LocalizedContentTranslationService $translations, ?TenantPortfolioItem $item = null): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         if ($item) {
@@ -54,6 +56,7 @@ class TenantContentController extends Controller
 
         $data = $request->validate([
             'service_id' => ['nullable', 'integer', Rule::exists('tenant_services', 'id')->where('tenant_id', $tenant->id)],
+            'source_locale' => ['nullable', Rule::in(['de', 'en', 'ru', 'uk'])],
             'title' => 'nullable|array',
             'description' => 'nullable|array',
             'featured' => 'required|boolean',
@@ -65,6 +68,33 @@ class TenantContentController extends Controller
             'before' => 'nullable|image|max:20480',
             'after' => 'nullable|image|max:20480',
         ]);
+
+        $sourceLocale = $data['source_locale'] ?? $tenant->locale;
+        unset($data['source_locale']);
+        $enabledLocales = (array) data_get($tenant->profile?->content, 'enabled_locales', [$sourceLocale]);
+        $sourceChanged = ! $item
+            || data_get($item->title, $sourceLocale, '') !== data_get($data, 'title.'.$sourceLocale, '')
+            || data_get($item->description, $sourceLocale, '') !== data_get($data, 'description.'.$sourceLocale, '');
+        $translationMissing = collect($enabledLocales)
+            ->reject(fn ($locale) => $locale === $sourceLocale)
+            ->contains(fn ($locale) => blank(data_get($data, 'title.'.$locale)));
+        if (count(array_unique($enabledLocales)) > 1 && ($sourceChanged || $translationMissing) && filled(data_get($data, 'title.'.$sourceLocale))) {
+            try {
+                $localized = $translations->translateFields(
+                    ['title' => (array) ($data['title'] ?? []), 'description' => (array) ($data['description'] ?? [])],
+                    $sourceLocale,
+                    $enabledLocales,
+                    $request->user()?->id,
+                    $tenant->id,
+                    'portfolio_translation',
+                );
+                $data['title'] = $localized['title'];
+                $data['description'] = $localized['description'];
+            } catch (Throwable $exception) {
+                report($exception);
+                throw ValidationException::withMessages(['translation' => 'Automatic translation failed: '.$exception->getMessage()]);
+            }
+        }
 
         if (($request->hasFile('before') || $request->hasFile('after')) && ! $this->enabled($entitlements, $tenant, 'before_after_enabled')) {
             abort(403, 'BEFORE_AFTER_NOT_INCLUDED');

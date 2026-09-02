@@ -48,6 +48,8 @@ class TenantPresetService
                 $values = [
                     'name' => $service['name'],
                     'description' => $service['description'] ?? [],
+                    'inclusions' => $service['inclusions'] ?? [],
+                    'result' => $service['result'] ?? [],
                     'image_path' => $service['image'] ?? null,
                     'duration_minutes' => $service['duration'] ?? 60,
                     'price' => $service['price'] ?? null,

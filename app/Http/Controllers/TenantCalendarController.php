@@ -102,6 +102,10 @@ class TenantCalendarController extends Controller
             'name.*' => 'nullable|string|max:160',
             'description' => 'nullable|array',
             'description.*' => 'nullable|string|max:10000',
+            'inclusions' => 'nullable|array',
+            'inclusions.*' => 'nullable|string|max:10000',
+            'result' => 'nullable|array',
+            'result.*' => 'nullable|string|max:10000',
             'duration_minutes' => 'required|integer|between:10,1440',
             'buffer_before_minutes' => 'nullable|integer|between:0,240',
             'buffer_after_minutes' => 'nullable|integer|between:0,240',
@@ -123,10 +127,14 @@ class TenantCalendarController extends Controller
         $translationLocales = array_values(array_unique([...$enabledLocales, $sourceLocale]));
         $sourceChanged = ! $service
             || data_get($service->name, $sourceLocale) !== data_get($data, 'name.'.$sourceLocale)
-            || data_get($service->description, $sourceLocale, '') !== data_get($data, 'description.'.$sourceLocale, '');
+            || data_get($service->description, $sourceLocale, '') !== data_get($data, 'description.'.$sourceLocale, '')
+            || data_get($service->inclusions, $sourceLocale, '') !== data_get($data, 'inclusions.'.$sourceLocale, '')
+            || data_get($service->result, $sourceLocale, '') !== data_get($data, 'result.'.$sourceLocale, '');
         $translationMissing = collect($enabledLocales)
             ->reject(fn ($locale) => $locale === $sourceLocale)
-            ->contains(fn ($locale) => blank(data_get($data, 'name.'.$locale)));
+            ->contains(fn ($locale) => blank(data_get($data, 'name.'.$locale))
+                || (filled(data_get($data, 'inclusions.'.$sourceLocale)) && blank(data_get($data, 'inclusions.'.$locale)))
+                || (filled(data_get($data, 'result.'.$sourceLocale)) && blank(data_get($data, 'result.'.$locale))));
 
         if (count($translationLocales) > 1 && ($sourceChanged || $translationMissing)) {
             try {
@@ -137,9 +145,15 @@ class TenantCalendarController extends Controller
                     $translationLocales,
                     $request->user()?->id,
                     $tenant->id,
+                    [
+                        'inclusions' => (array) ($data['inclusions'] ?? []),
+                        'result' => (array) ($data['result'] ?? []),
+                    ],
                 );
                 $data['name'] = $localized['name'];
                 $data['description'] = $localized['description'];
+                $data['inclusions'] = $localized['inclusions'];
+                $data['result'] = $localized['result'];
             } catch (Throwable $exception) {
                 report($exception);
                 throw ValidationException::withMessages(['translation' => 'Automatic translation failed: '.$exception->getMessage()]);
@@ -162,6 +176,10 @@ class TenantCalendarController extends Controller
             'name.*' => 'nullable|string|max:160',
             'description' => 'nullable|array',
             'description.*' => 'nullable|string|max:10000',
+            'inclusions' => 'nullable|array',
+            'inclusions.*' => 'nullable|string|max:10000',
+            'result' => 'nullable|array',
+            'result.*' => 'nullable|string|max:10000',
         ]);
         $enabledLocales = (array) data_get($tenant->profile?->content, 'enabled_locales', [$data['source_locale']]);
 
@@ -173,6 +191,10 @@ class TenantCalendarController extends Controller
                 $enabledLocales,
                 $request->user()?->id,
                 $tenant->id,
+                [
+                    'inclusions' => (array) ($data['inclusions'] ?? []),
+                    'result' => (array) ($data['result'] ?? []),
+                ],
             );
             $service->update($localized);
         } catch (Throwable $exception) {

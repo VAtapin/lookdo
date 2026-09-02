@@ -36,6 +36,10 @@ const form = reactive({
     service_address: "",
 });
 const isReschedule = computed(() => Boolean(props.appointment));
+const detailLabels = computed(() => ({
+    inclusions: { de: "Was ist enthalten?", en: "What's included?", ru: "Что входит?", uk: "Що входить?" }[props.locale],
+    result: { de: "Ergebnis", en: "Result", ru: "Результат", uk: "Результат" }[props.locale],
+}));
 const serviceModes = computed<string[]>(() => {
     const modes = props.app?.tenant?.branding?.service_modes;
     return Array.isArray(modes) && modes.length ? modes : ["workshop"];
@@ -326,33 +330,29 @@ onMounted(() => {
                 <p>{{ copy.chooseProcedureText }}</p>
             </div>
             <div class="ta-service-list">
-                <button
+                <article
                     v-for="service in app.services"
                     :key="service.id"
                     class="ta-service-card"
                     :class="{ active: selectedService?.id === service.id }"
-                    @click="chooseService(service)"
                 >
-                    <img
-                        v-if="service.image"
-                        :src="service.image"
-                        :alt="service.name"
-                    /><span
-                        ><b>{{ service.name }}</b
-                        ><small>{{ service.description }}</small
-                        ><em
-                            >{{ service.duration }} {{ copy.duration }}</em
-                        ></span
-                    ><strong>{{ price(service) }}</strong
-                    ><i
-                        ><AppIcon
-                            :name="
-                                selectedService?.id === service.id
-                                    ? 'check'
-                                    : 'arrow'
-                            "
-                    /></i>
-                </button>
+                    <button class="ta-service-select" @click="chooseService(service)">
+                        <img v-if="service.image" :src="service.image" :alt="service.name" />
+                        <span><b>{{ service.name }}</b><small v-if="service.description">{{ service.description }}</small></span>
+                        <strong>{{ price(service) }}</strong>
+                        <i><AppIcon :name="selectedService?.id === service.id ? 'check' : 'arrow'" /></i>
+                    </button>
+                    <div v-if="service.inclusions || service.result" class="ta-service-details">
+                        <details v-if="service.inclusions">
+                            <summary>{{ detailLabels.inclusions }}</summary>
+                            <p>{{ service.inclusions }}</p>
+                        </details>
+                        <details v-if="service.result">
+                            <summary>{{ detailLabels.result }}</summary>
+                            <p>{{ service.result }}</p>
+                        </details>
+                    </div>
+                </article>
             </div>
             <a
                 v-if="app.tenant.contact.whatsapp_url"

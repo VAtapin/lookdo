@@ -9,6 +9,7 @@ use App\Services\AuditService;
 use App\Services\DomainService;
 use App\Services\EntitlementService;
 use App\Services\ImageStorageService;
+use App\Services\LocalizedContentTranslationService;
 use App\Services\OpenAiBudgetService;
 use App\Services\OpenAiService;
 use App\Services\StripeService;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
@@ -113,7 +115,7 @@ class TenantController extends Controller
         return response()->json(['tenant' => $tenant->fresh('profile')]);
     }
 
-    public function updateBranding(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
+    public function updateBranding(Request $request, Tenant $tenant, AuditService $audit, LocalizedContentTranslationService $translations): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
         $data = $request->validate([
@@ -127,6 +129,7 @@ class TenantController extends Controller
             'description_translations.*' => 'nullable|string|max:3000',
             'tagline_translations' => 'nullable|array',
             'tagline_translations.*' => 'nullable|string|max:300',
+            'source_locale' => ['nullable', Rule::in(['de', 'en', 'ru', 'uk'])],
             'service_modes' => 'nullable|array|min:1|max:2',
             'service_modes.*' => ['required', Rule::in(['workshop', 'on_site'])],
             'phone' => 'nullable|string|max:100',
@@ -141,8 +144,35 @@ class TenantController extends Controller
             'working_hours' => 'nullable|string|max:500',
             'confirmed' => 'nullable|boolean',
         ]);
+        $sourceLocale = $data['source_locale'] ?? $tenant->locale;
+        unset($data['source_locale']);
         $profile = $tenant->profile()->firstOrCreate();
         $before = (array) data_get($profile->content, 'branding', []);
+        $enabledLocales = (array) data_get($profile->content, 'enabled_locales', [$sourceLocale]);
+        $sourceDescription = data_get($data, 'description_translations.'.$sourceLocale, '');
+        $sourceTagline = data_get($data, 'tagline_translations.'.$sourceLocale, '');
+        $sourceChanged = $sourceDescription !== data_get($before, 'description_translations.'.$sourceLocale, '')
+            || $sourceTagline !== data_get($before, 'tagline_translations.'.$sourceLocale, '');
+        $translationMissing = collect($enabledLocales)
+            ->reject(fn ($locale) => $locale === $sourceLocale)
+            ->contains(fn ($locale) => blank(data_get($data, 'description_translations.'.$locale)));
+        if (count(array_unique($enabledLocales)) > 1 && ($sourceChanged || $translationMissing) && filled($sourceDescription)) {
+            try {
+                $localized = $translations->translateFields(
+                    ['description' => (array) ($data['description_translations'] ?? []), 'tagline' => (array) ($data['tagline_translations'] ?? [])],
+                    $sourceLocale,
+                    $enabledLocales,
+                    $request->user()?->id,
+                    $tenant->id,
+                    'branding_translation',
+                );
+                $data['description_translations'] = $localized['description'];
+                $data['tagline_translations'] = $localized['tagline'];
+            } catch (Throwable $exception) {
+                report($exception);
+                throw ValidationException::withMessages(['translation' => 'Automatic translation failed: '.$exception->getMessage()]);
+            }
+        }
         $branding = array_replace($before, Arr::except($data, ['business_description', 'phone', 'confirmed']));
         if (array_key_exists('confirmed', $data)) {
             $branding['confirmed_at'] = $data['confirmed'] ? now()->toIso8601String() : null;

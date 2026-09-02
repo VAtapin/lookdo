@@ -51,6 +51,8 @@ const service = reactive<any>({
     id: null,
     name: { de: "", en: "", ru: "", uk: "" },
     description: {},
+    inclusions: {},
+    result: {},
     image_path: null,
     image: null,
     duration_minutes: 60,
@@ -101,6 +103,18 @@ const serviceDescription = computed({
     get: () => service.description[props.locale] || "",
     set: (value: string) => {
         service.description[props.locale] = value;
+    },
+});
+const serviceInclusions = computed({
+    get: () => service.inclusions[props.locale] || "",
+    set: (value: string) => {
+        service.inclusions[props.locale] = value;
+    },
+});
+const serviceResult = computed({
+    get: () => service.result[props.locale] || "",
+    set: (value: string) => {
+        service.result[props.locale] = value;
     },
 });
 const events = computed(() =>
@@ -216,6 +230,8 @@ async function translateCurrentService() {
                     source_locale: props.locale,
                     name: service.name,
                     description: service.description,
+                    inclusions: service.inclusions,
+                    result: service.result,
                 }),
             },
         );
@@ -223,6 +239,8 @@ async function translateCurrentService() {
             ...saved.service,
             name: { de: "", en: "", ru: "", uk: "", ...saved.service.name },
             description: { ...(saved.service.description || {}) },
+            inclusions: { ...(saved.service.inclusions || {}) },
+            result: { ...(saved.service.result || {}) },
             image: null,
         });
         translationStatus.value = props.t("serviceTranslated");
@@ -255,6 +273,8 @@ function resetService() {
         id: null,
         name: { de: "", en: "", ru: "", uk: "" },
         description: {},
+        inclusions: {},
+        result: {},
         image_path: null,
         image: null,
         duration_minutes: 60,
@@ -275,6 +295,8 @@ function editService(item: any) {
         ...item,
         name: { de: "", en: "", ru: "", uk: "", ...(item.name || {}) },
         description: { ...(item.description || {}) },
+        inclusions: { ...(item.inclusions || {}) },
+        result: { ...(item.result || {}) },
         image: null,
     });
     servicePreview.value = serviceImageUrl(item);
@@ -889,8 +911,16 @@ onUnmounted(clearServicePreview);
                     >{{ t("description")
                     }}<textarea
                         v-model="serviceDescription"
-                        rows="7"
+                        rows="3"
                     ></textarea>
+                </label>
+                <label
+                    >{{ t("whatIncluded")
+                    }}<textarea v-model="serviceInclusions" rows="5"></textarea>
+                </label>
+                <label
+                    >{{ t("serviceResult")
+                    }}<textarea v-model="serviceResult" rows="5"></textarea>
                 </label>
                 <div class="mw-service-translation">
                     <button

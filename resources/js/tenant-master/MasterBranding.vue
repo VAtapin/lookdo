@@ -112,6 +112,7 @@ function brandingPayload() {
     return {
         ...form,
         ...contacts,
+        source_locale: props.locale,
         business_description:
             form.description_translations[mainLocale.value] ||
             form.business_description,

@@ -553,7 +553,7 @@ class TenantAppController extends Controller
         $starterServices = (array) ($configuration['starter_services'] ?? []);
         if ($tenant->services()->doesntExist()) {
             foreach ($starterServices as $index => $service) {
-                $tenant->services()->create(['name' => $service['name'], 'description' => $service['description'] ?? [], 'image_path' => $service['image'] ?? null, 'duration_minutes' => $service['duration'] ?? 60, 'booking_enabled' => true, 'active' => true, 'sort_order' => $index * 10]);
+                $tenant->services()->create(['name' => $service['name'], 'description' => $service['description'] ?? [], 'inclusions' => $service['inclusions'] ?? [], 'result' => $service['result'] ?? [], 'image_path' => $service['image'] ?? null, 'duration_minutes' => $service['duration'] ?? 60, 'booking_enabled' => true, 'active' => true, 'sort_order' => $index * 10]);
             }
         } else {
             foreach ($starterServices as $index => $service) {
@@ -788,7 +788,7 @@ class TenantAppController extends Controller
 
     private function servicePayload(TenantService $service, string $locale): array
     {
-        return ['id' => $service->id, 'name' => $service->localized('name', $locale), 'description' => $service->localized('description', $locale), 'image' => $this->assetUrl($service->image_path), 'duration' => $service->duration_minutes, 'price' => $service->price, 'currency' => $service->currency];
+        return ['id' => $service->id, 'name' => $service->localized('name', $locale), 'description' => $service->localized('description', $locale), 'inclusions' => $service->localized('inclusions', $locale), 'result' => $service->localized('result', $locale), 'image' => $this->assetUrl($service->image_path), 'duration' => $service->duration_minutes, 'price' => $service->price, 'currency' => $service->currency];
     }
 
     private function requestPayload(TenantRequest $request): array

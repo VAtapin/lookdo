@@ -206,6 +206,20 @@ const portfolioLabels = computed(() => ({
         uk: "Натисніть поза фотографією або на ×, щоб закрити",
     }[locale.value],
 }));
+const serviceDetailLabels = computed(() => ({
+    inclusions: {
+        de: "Was ist enthalten?",
+        en: "What's included?",
+        ru: "Что входит?",
+        uk: "Що входить?",
+    }[locale.value],
+    result: {
+        de: "Ergebnis",
+        en: "Result",
+        ru: "Результат",
+        uk: "Результат",
+    }[locale.value],
+}));
 const navItems = computed(() => [
     { key: "home", icon: "home", label: copy.value.home },
     isBrows.value
@@ -1110,11 +1124,21 @@ const loginContext = {
                                     />
                                     <div>
                                         <h2>{{ service.name }}</h2>
-                                        <p>{{ service.description }}</p>
-                                        <span
-                                            >{{ service.duration }}
-                                            {{ copy.duration }}</span
-                                        >
+                                        <p v-if="service.description">
+                                            {{ service.description }}
+                                        </p>
+                                        <details v-if="service.inclusions">
+                                            <summary>
+                                                {{ serviceDetailLabels.inclusions }}
+                                            </summary>
+                                            <p>{{ service.inclusions }}</p>
+                                        </details>
+                                        <details v-if="service.result">
+                                            <summary>
+                                                {{ serviceDetailLabels.result }}
+                                            </summary>
+                                            <p>{{ service.result }}</p>
+                                        </details>
                                     </div>
                                     <button @click="go('book')">
                                         {{ copy.bookNow

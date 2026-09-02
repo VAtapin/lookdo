@@ -180,6 +180,7 @@ async function saveWork() {
     if (work.id) f.append("_method", "PUT");
     f.append(`title[${props.locale}]`, work.title);
     f.append(`description[${props.locale}]`, work.description);
+    f.append("source_locale", props.locale);
     for (const x of ["featured", "published", "publication_confirmed"])
         f.append(x, work[x] ? "1" : "0");
     f.append("remove_video", work.remove_video ? "1" : "0");

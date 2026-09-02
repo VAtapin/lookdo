@@ -15,7 +15,7 @@ class TenantService extends Model
 
     protected function casts(): array
     {
-        return ['name' => 'array', 'description' => 'array', 'price' => 'decimal:2', 'booking_enabled' => 'boolean', 'media_allowed' => 'boolean', 'active' => 'boolean', 'archived_at' => 'datetime'];
+        return ['name' => 'array', 'description' => 'array', 'inclusions' => 'array', 'result' => 'array', 'price' => 'decimal:2', 'booking_enabled' => 'boolean', 'media_allowed' => 'boolean', 'active' => 'boolean', 'archived_at' => 'datetime'];
     }
 
     public function tenant(): BelongsTo
