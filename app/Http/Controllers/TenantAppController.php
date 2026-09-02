@@ -122,7 +122,7 @@ class TenantAppController extends Controller
         }
 
         $data = $request->validate([
-            'name' => 'nullable|string|max:120', 'phone' => 'required|string|max:50', 'email' => 'nullable|email|max:190',
+            'name' => 'nullable|string|max:120', 'phone' => 'required|string|max:100', 'email' => 'nullable|string|max:190',
             'preferred_channel' => 'nullable|in:phone,whatsapp,sms,email,push,vk', 'summary' => 'nullable|string|max:5000',
             'fields' => 'nullable', 'media_slots' => 'nullable', 'media' => 'required|array|min:1|max:12',
             'media.*' => 'file|mimetypes:image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime|max:262144',
@@ -241,7 +241,7 @@ class TenantAppController extends Controller
         }
         $data = $request->validate([
             'service_id' => 'required|integer', 'starts_at' => 'required|date|after:now', 'name' => 'nullable|string|max:120',
-            'phone' => 'required|string|max:50', 'email' => 'nullable|email|max:190', 'comment' => 'nullable|string|max:2000',
+            'phone' => 'required|string|max:100', 'email' => 'nullable|string|max:190', 'comment' => 'nullable|string|max:2000',
             'preferred_channel' => 'nullable|in:phone,whatsapp,viber,telegram,sms,email,push,vk',
             'resource_id' => 'nullable|integer',
             'service_mode' => 'nullable|in:workshop,on_site',
@@ -654,6 +654,7 @@ class TenantAppController extends Controller
                 'postal_code' => $profile?->postal_code,
                 'city' => $profile?->city,
                 'vk_url' => $branding['vk_url'] ?? null,
+                'max_url' => $branding['max_url'] ?? null,
                 'working_hours' => $branding['working_hours'] ?? null,
             ],
             'branding' => [

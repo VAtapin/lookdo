@@ -130,6 +130,7 @@ class TenantController extends Controller
             'service_modes' => 'nullable|array|min:1|max:2',
             'service_modes.*' => ['required', Rule::in(['workshop', 'on_site'])],
             'vk_url' => 'nullable|url|max:500',
+            'max_url' => 'nullable|url|max:500',
             'working_hours' => 'nullable|string|max:500',
             'confirmed' => 'nullable|boolean',
         ]);

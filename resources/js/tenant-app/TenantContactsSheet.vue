@@ -32,6 +32,15 @@ defineEmits<{ close: [] }>();
                 <AppIcon name="arrow" />
             </a>
             <a
+                v-if="app.tenant.contact.max_url"
+                :href="app.tenant.contact.max_url"
+                target="_blank"
+            >
+                <span><b>MAX</b></span>
+                <div><b>MAX</b><em>{{ app.tenant.contact.max_url }}</em></div>
+                <AppIcon name="arrow" />
+            </a>
+            <a
                 v-if="app.tenant.contact.vk_url"
                 :href="app.tenant.contact.vk_url"
                 target="_blank"

@@ -32,6 +32,7 @@ const selectedRequest = ref<any>(null);
 const message = ref("");
 const sending = ref(false);
 const menuOpen = ref(false);
+const contactOpen = ref(false);
 const installOpen = ref(false);
 const installPrompt = ref<any>(null);
 const pushPrompt = ref(false);
@@ -739,14 +740,22 @@ const loginContext = {
                                         app.template.hero.eyebrow
                                     }}</span>
                                     <div>
-                                        <a
-                                            v-if="app.tenant.contact.vk_url"
-                                            :href="app.tenant.contact.vk_url"
-                                            target="_blank"
-                                            >VK</a
-                                        ><button @click="menuOpen = true">
+                                        <button
+                                            v-if="app.tenant.contact.phone || app.tenant.contact.max_url || app.tenant.contact.vk_url"
+                                            class="ta-contact-trigger"
+                                            :aria-label="copy.contacts"
+                                            @click="contactOpen = !contactOpen"
+                                        ><AppIcon name="phone" /></button>
+                                        <button @click="contactOpen = false; menuOpen = true">
                                             <AppIcon name="menu" />
                                         </button>
+                                        <div v-if="contactOpen" class="ta-contact-popover">
+                                            <button class="ta-contact-popover-close" @click="contactOpen=false"><AppIcon name="close" :size="18" /></button>
+                                            <b>{{ copy.contacts }}</b>
+                                            <a v-if="app.tenant.contact.phone" :href="'tel:' + app.tenant.contact.phone"><AppIcon name="phone" /><span>{{ copy.call }}<small>{{ app.tenant.contact.phone }}</small></span></a>
+                                            <a v-if="app.tenant.contact.max_url" :href="app.tenant.contact.max_url" target="_blank"><strong>MAX</strong><span>MAX</span></a>
+                                            <a v-if="app.tenant.contact.vk_url" :href="app.tenant.contact.vk_url" target="_blank"><strong>VK</strong><span>VK</span></a>
+                                        </div>
                                     </div>
                                 </header>
                                 <div class="ta-hero-content">
