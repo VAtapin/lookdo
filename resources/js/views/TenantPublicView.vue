@@ -78,6 +78,9 @@ const locale = ref<TenantLocale>(
     (hasSelectedLocale.value ? savedLocale : "de") as TenantLocale,
 );
 const copy = computed(() => appCopy(locale.value));
+const hasMultipleLocales = computed(
+    () => (app.value?.template?.locales || []).length > 1,
+);
 const installPlatform = computed<"ios" | "android" | "desktop">(() => {
     const agent = navigator.userAgent.toLowerCase();
     if (/iphone|ipad|ipod/.test(agent)) return "ios";
@@ -735,6 +738,7 @@ const loginContext = {
                                 </button>
                                 <div>
                                     <button
+                                        v-if="hasMultipleLocales"
                                         class="ta-language-trigger"
                                         @click="languageOpen = true"
                                     >
@@ -928,6 +932,7 @@ const loginContext = {
                                     }}</span>
                                     <div>
                                         <button
+                                            v-if="hasMultipleLocales"
                                             class="ta-language-trigger"
                                             @click="languageOpen = true"
                                         >
@@ -1383,7 +1388,7 @@ const loginContext = {
                         @install="installApp"
                     />
                     <TenantLanguagePrompt
-                        v-if="languageOpen"
+                        v-if="languageOpen && hasMultipleLocales"
                         :locales="app.template.locales"
                         :current="locale"
                         @select="changeLocale"

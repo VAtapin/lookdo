@@ -68,14 +68,17 @@ const navigate = (screen: string) => {
                     }}<AppIcon name="arrow" />
                 </button>
                 <button @click="$emit('notifications')">
-                    <AppIcon name="bell" /><span><b>{{ copy.notificationsMenu }}</b><small>{{ pushStateLabel }}</small></span><AppIcon name="arrow" />
+                    <AppIcon name="bell" /><span
+                        ><b>{{ copy.notificationsMenu }}</b
+                        ><small>{{ pushStateLabel }}</small></span
+                    ><AppIcon name="arrow" />
                 </button>
                 <button @click="navigate('login')">
                     <AppIcon name="shield" />{{ copy.login
                     }}<AppIcon name="arrow" />
                 </button>
             </nav>
-            <label>
+            <label v-if="app.template.locales?.length > 1">
                 {{ copy.language }}
                 <select
                     :value="locale"
