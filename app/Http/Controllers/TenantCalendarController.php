@@ -50,7 +50,7 @@ class TenantCalendarController extends Controller
             'appointments' => $tenant->appointments()->with(['customer', 'service', 'resource'])->where('starts_at', '<', $to)->where('ends_at', '>', $from)->orderBy('starts_at')->get(),
             'blocks' => $tenant->calendarBlocks()->with('resource')->where('starts_at', '<', $to)->where('ends_at', '>', $from)->orderBy('starts_at')->get(),
             'working_hours' => $tenant->workingHours()->orderBy('weekday')->get(),
-            'services' => $tenant->services()->orderBy('sort_order')->get(),
+            'services' => $tenant->services()->whereNull('archived_at')->orderBy('sort_order')->get(),
             'reminders' => $tenant->reminders()->with(['customer', 'appointment'])->whereBetween('scheduled_at', [$from, $to])->orderBy('scheduled_at')->get(),
             'customers' => $tenant->customers()->orderBy('name')->orderBy('phone')->get(['id', 'name', 'phone']),
             'resources' => $tenant->resources()->with('user:id,name,email')->where('active', true)->orderBy('sort_order')->orderBy('name')->get(),
@@ -215,7 +215,11 @@ class TenantCalendarController extends Controller
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($service->tenant_id === $tenant->id, 404);
-        abort_if($service->appointments()->exists(), 422, 'SERVICE_HAS_APPOINTMENTS');
+        if ($service->appointments()->exists()) {
+            $service->update(['active' => false, 'booking_enabled' => false, 'archived_at' => now()]);
+
+            return response()->json(['deleted' => true, 'archived' => true]);
+        }
         $imagePath = $service->image_path;
         $service->delete();
         if ($imagePath && str_starts_with($imagePath, 'tenant-app/'.$tenant->id.'/services/')) {

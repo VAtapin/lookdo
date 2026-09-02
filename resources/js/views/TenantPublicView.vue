@@ -170,6 +170,16 @@ const filteredPortfolio = computed(() => {
         );
     return rows;
 });
+const portfolioVideos = computed(() =>
+    (app.value?.portfolio || []).filter((item: any) => item.video),
+);
+const portfolioImages = computed(() =>
+    (app.value?.portfolio || []).filter(
+        (item: any) =>
+            !item.video &&
+            (item.image || item.before_image || item.after_image),
+    ),
+);
 const portfolioLabels = computed(() => ({
     finished: {
         de: "Fertige Arbeiten",
@@ -807,11 +817,11 @@ const loginContext = {
                                     </button>
                                 </div>
                                 <div
-                                    v-if="app.portfolio.length"
+                                    v-if="portfolioImages.length"
                                     class="ta-work-strip"
                                 >
                                     <button
-                                        v-for="item in app.portfolio.slice(
+                                        v-for="item in portfolioImages.slice(
                                             0,
                                             4,
                                         )"
@@ -856,32 +866,29 @@ const loginContext = {
                                     <p>{{ item.label }}</p>
                                 </article>
                             </section>
-                            <section class="ta-section ta-recent">
+                            <section
+                                v-if="portfolioVideos.length"
+                                class="ta-section ta-video-works"
+                            >
                                 <div class="ta-section-head">
-                                    <h2>{{ copy.recent }}</h2>
+                                    <h2>{{ copy.works }}</h2>
                                     <button @click="go('works')">
                                         {{ copy.all }}
                                         <AppIcon name="arrow" :size="17" />
                                     </button>
                                 </div>
-                                <div class="ta-work-grid">
+                                <div class="ta-video-work-grid">
                                     <article
-                                        v-for="item in app.portfolio.slice(
-                                            0,
-                                            8,
-                                        )"
+                                        v-for="item in portfolioVideos.slice(0, 4)"
                                         :key="item.id"
                                     >
-                                        <img
-                                            :src="
-                                                item.image ||
-                                                item.after_image ||
-                                                item.before_image
-                                            "
-                                            :alt="item.title"
-                                        />
+                                        <video
+                                            :src="item.video"
+                                            controls
+                                            playsinline
+                                            preload="metadata"
+                                        ></video>
                                         <h3>{{ item.title }}</h3>
-                                        <p>{{ item.description }}</p>
                                     </article>
                                 </div>
                             </section>
@@ -995,11 +1002,11 @@ const loginContext = {
                                     </button>
                                 </div>
                                 <div
-                                    v-if="app.portfolio.length"
+                                    v-if="portfolioImages.length"
                                     class="ta-work-strip"
                                 >
                                     <button
-                                        v-for="item in app.portfolio.slice(
+                                        v-for="item in portfolioImages.slice(
                                             0,
                                             4,
                                         )"
@@ -1044,32 +1051,29 @@ const loginContext = {
                                     <p>{{ item.label }}</p>
                                 </article>
                             </section>
-                            <section class="ta-section ta-recent">
+                            <section
+                                v-if="portfolioVideos.length"
+                                class="ta-section ta-video-works"
+                            >
                                 <div class="ta-section-head">
-                                    <h2>{{ copy.recent }}</h2>
+                                    <h2>{{ copy.works }}</h2>
                                     <button @click="go('works')">
                                         {{ copy.all }}
                                         <AppIcon name="arrow" :size="17" />
                                     </button>
                                 </div>
-                                <div class="ta-work-grid">
+                                <div class="ta-video-work-grid">
                                     <article
-                                        v-for="item in app.portfolio.slice(
-                                            0,
-                                            8,
-                                        )"
+                                        v-for="item in portfolioVideos.slice(0, 4)"
                                         :key="item.id"
                                     >
-                                        <img
-                                            :src="
-                                                item.image ||
-                                                item.after_image ||
-                                                item.before_image
-                                            "
-                                            :alt="item.title"
-                                        />
+                                        <video
+                                            :src="item.video"
+                                            controls
+                                            playsinline
+                                            preload="metadata"
+                                        ></video>
                                         <h3>{{ item.title }}</h3>
-                                        <p>{{ item.description }}</p>
                                     </article>
                                 </div>
                             </section>
@@ -1224,8 +1228,16 @@ const loginContext = {
                                     v-for="item in filteredPortfolio"
                                     :key="item.id"
                                 >
-                                    <BeforeAfterSlider
-                                        v-if="
+                                    <video
+                                        v-if="item.video"
+                                        class="ta-portfolio-video"
+                                        :src="item.video"
+                                        controls
+                                        playsinline
+                                        preload="metadata"
+                                    ></video
+                                    ><BeforeAfterSlider
+                                        v-else-if="
                                             item.before_image &&
                                             item.after_image
                                         "

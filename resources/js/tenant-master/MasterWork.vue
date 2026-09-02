@@ -36,6 +36,9 @@ const work = reactive<any>({
     published: false,
     publication_confirmed: false,
     image: null,
+    video: null,
+    video_url: "",
+    remove_video: false,
     before: null,
     after: null,
 });
@@ -91,6 +94,7 @@ const providerCallbackUrl = computed(() =>
 const enabled = (key: string) =>
     String(data.value.entitlements?.[key] || "0") === "1";
 const hasBeforeAfter = computed(() => enabled("before_after_enabled")),
+    hasVideo = computed(() => enabled("video_enabled")),
     hasSocial = computed(() => enabled("social_content_enabled")),
     hasAi = computed(() => enabled("ai_communication_enabled"));
 const tabs = computed(() => [
@@ -147,6 +151,9 @@ function resetWork() {
         published: false,
         publication_confirmed: false,
         image: null,
+        video: null,
+        video_url: "",
+        remove_video: false,
         before: null,
         after: null,
     });
@@ -160,6 +167,9 @@ function editWork(item: any) {
         published: !!item.published,
         publication_confirmed: !!item.published,
         image: null,
+        video: null,
+        video_url: item.video_url || "",
+        remove_video: false,
         before: null,
         after: null,
     });
@@ -172,7 +182,8 @@ async function saveWork() {
     f.append(`description[${props.locale}]`, work.description);
     for (const x of ["featured", "published", "publication_confirmed"])
         f.append(x, work[x] ? "1" : "0");
-    for (const x of ["image", "before", "after"])
+    f.append("remove_video", work.remove_video ? "1" : "0");
+    for (const x of ["image", "video", "before", "after"])
         if (work[x]) f.append(x, work[x]);
     busy.value = true;
     error.value = "";
@@ -584,7 +595,14 @@ onMounted(async () => {
                         :before-label="t('before')"
                         :after-label="t('after')"
                         :alt="localized(item.title)"
-                    /><img
+                    /><video
+                        v-else-if="item.video_url"
+                        :src="item.video_url"
+                        controls
+                        playsinline
+                        preload="metadata"
+                    ></video
+                    ><img
                         v-else-if="
                             item.image_url ||
                             item.after_image_url ||
@@ -634,6 +652,20 @@ onMounted(async () => {
                                 $event.target as HTMLInputElement
                             ).files?.[0]
                         " /></label
+                ><label v-if="hasVideo"
+                    >{{ t("video")
+                    }}<input
+                        type="file"
+                        accept="video/mp4,video/webm,video/quicktime"
+                        @change="
+                            work.video = (
+                                $event.target as HTMLInputElement
+                            ).files?.[0]
+                        " /><small>{{ t("portfolioVideoHint") }}</small></label
+                ><label v-if="work.video_url" class="mw-check"
+                    ><input v-model="work.remove_video" type="checkbox" />{{
+                        t("removeVideo")
+                    }}</label
                 ><template v-if="hasBeforeAfter"
                     ><p class="mw-form-hint">{{ t("beforeAfterHint") }}</p>
                     <label

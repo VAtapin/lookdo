@@ -16,7 +16,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class TenantContentController extends Controller
@@ -57,7 +59,9 @@ class TenantContentController extends Controller
             'featured' => 'required|boolean',
             'published' => 'required|boolean',
             'publication_confirmed' => 'nullable|boolean',
+            'remove_video' => 'nullable|boolean',
             'image' => 'nullable|image|max:20480',
+            'video' => 'nullable|file|mimetypes:video/mp4,video/webm,video/quicktime',
             'before' => 'nullable|image|max:20480',
             'after' => 'nullable|image|max:20480',
         ]);
@@ -65,6 +69,29 @@ class TenantContentController extends Controller
         if (($request->hasFile('before') || $request->hasFile('after')) && ! $this->enabled($entitlements, $tenant, 'before_after_enabled')) {
             abort(403, 'BEFORE_AFTER_NOT_INCLUDED');
         }
+        if (($data['remove_video'] ?? false) && $item?->video_path) {
+            Storage::disk('public')->delete($item->video_path);
+            $data['video_path'] = null;
+        }
+        unset($data['remove_video']);
+        if ($request->hasFile('video')) {
+            abort_unless($this->enabled($entitlements, $tenant, 'video_enabled'), 403, 'VIDEO_NOT_INCLUDED');
+            $maxVideoKb = max(1024, (int) $entitlements->get($tenant, 'video_max_mb', 100) * 1024);
+            if ($request->file('video')->getSize() > $maxVideoKb * 1024) {
+                throw ValidationException::withMessages(['video' => 'The video exceeds the plan size limit.']);
+            }
+            $old = $item?->video_path;
+            $file = $request->file('video');
+            $data['video_path'] = $file->storeAs(
+                'tenant-app/'.$tenant->id.'/portfolio',
+                Str::uuid().'.'.strtolower($file->getClientOriginalExtension()),
+                'public',
+            );
+            if ($old && Storage::disk('public')->exists($old)) {
+                Storage::disk('public')->delete($old);
+            }
+        }
+        unset($data['video']);
 
         foreach (['image' => 'image_path', 'before' => 'before_image_path', 'after' => 'after_image_path'] as $field => $column) {
             if ($request->hasFile($field)) {
@@ -93,7 +120,7 @@ class TenantContentController extends Controller
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($item->tenant_id === $tenant->id, 404);
 
-        foreach (['image_path', 'before_image_path', 'after_image_path'] as $field) {
+        foreach (['image_path', 'video_path', 'before_image_path', 'after_image_path'] as $field) {
             if ($item->{$field}) {
                 Storage::disk('public')->delete($item->{$field});
             }
@@ -254,7 +281,7 @@ class TenantContentController extends Controller
 
     private function urls(TenantPortfolioItem $item): void
     {
-        foreach (['image_path', 'before_image_path', 'after_image_path'] as $field) {
+        foreach (['image_path', 'video_path', 'before_image_path', 'after_image_path'] as $field) {
             if ($item->{$field}) {
                 $item->setAttribute(str_replace('_path', '_url', $field), $this->mediaUrl($item->{$field}));
             }

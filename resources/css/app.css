@@ -180,6 +180,7 @@ body{background:#fff}
 .mw-service-thumb{width:64px;height:52px;flex:0 0 64px;border-radius:11px;object-fit:cover;background:#ece9e2}.mw-service-media{display:grid;grid-column:1/-1;grid-template-columns:minmax(150px,240px) 1fr 1fr;gap:10px;align-items:center}.mw-service-media>span{grid-row:1/3;overflow:hidden;height:138px;border-radius:15px;background:#f0ede7}.mw-service-media img{width:100%;height:100%;object-fit:cover}.mw-service-media label,.mw-service-media button{margin:0;cursor:pointer}.mw-service-media small{grid-column:2/-1;color:#72767d;line-height:1.4}
 .mw-service-description{display:-webkit-box!important;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:pre-line}
 .mw-service-translation{display:flex;grid-column:1/-1;align-items:center;gap:12px}.mw-service-translation button{width:auto;margin:0}.mw-service-translation small{color:#72767d;line-height:1.4}
+.mw-work-grid video{width:100%;height:190px;display:block;object-fit:cover;background:#111}
 @media(max-width:520px){.mw-service-media{grid-template-columns:1fr 1fr}.mw-service-media>span{grid-column:1/-1;grid-row:auto}.mw-service-media small{grid-column:1/-1}}
 .mw-review-reply {
     display: grid;

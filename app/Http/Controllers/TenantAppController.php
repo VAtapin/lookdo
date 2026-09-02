@@ -53,7 +53,7 @@ class TenantAppController extends Controller
             'services' => $tenant->services()->where('active', true)->orderBy('sort_order')->get()->map(fn (TenantService $service) => $this->servicePayload($service, $locale)),
             'portfolio' => $tenant->portfolioItems()->where('published', true)->orderByDesc('featured')->orderBy('sort_order')->get()->map(fn ($item) => [
                 'id' => $item->id, 'title' => $item->localized('title', $locale), 'description' => $item->localized('description', $locale),
-                'image' => $this->assetUrl($item->image_path), 'before_image' => $this->assetUrl($item->before_image_path), 'after_image' => $this->assetUrl($item->after_image_path), 'featured' => $item->featured,
+                'image' => $this->assetUrl($item->image_path), 'video' => $this->assetUrl($item->video_path), 'before_image' => $this->assetUrl($item->before_image_path), 'after_image' => $this->assetUrl($item->after_image_path), 'featured' => $item->featured,
             ]),
             'reviews' => $tenant->reviews()->with('customer')->where('published', true)->latest('received_at')->get()->map(fn ($review) => [
                 'id' => $review->id,
@@ -569,6 +569,7 @@ class TenantAppController extends Controller
                     'title' => $item['title'] ?? [],
                     'description' => $item['description'] ?? [],
                     'image_path' => $item['image'] ?? null,
+                    'video_path' => $item['video'] ?? null,
                     'before_image_path' => $item['before_image'] ?? null,
                     'after_image_path' => $item['after_image'] ?? null,
                     'featured' => $item['featured'] ?? false,
