@@ -15,6 +15,7 @@ const {
     <thead v-if="section === 'backups'">
         <tr>
             <th>Backup</th>
+            <th>Kunde</th>
             <th>Erstellt</th>
             <th>Inhalt</th>
             <th>Aktionen</th>
@@ -26,19 +27,20 @@ const {
                 <b>{{ item.name }}</b>
                 <small>{{ item.reason === 'pre-restore' ? 'Sicherheitskopie vor Wiederherstellung' : item.reason === 'scheduled' ? 'Automatisch' : 'Manuell' }}</small>
             </td>
+            <td><b>{{ item.tenant_name }}</b><small>{{ item.tenant_slug }}</small></td>
             <td>{{ formatDate(item.created_at) }}</td>
             <td>
                 {{ Object.values(item.rows || {}).reduce((sum: number, count: any) => sum + Number(count || 0), 0) }} Datensätze ·
                 {{ item.file_count || 0 }} Dateien
             </td>
             <td class="table-actions">
-                <button @click="tenantBackupAction('verify', item.name)">
+                <button @click="tenantBackupAction('verify', item.name, item.tenant_id)">
                     Prüfen</button
-                ><button @click="tenantBackupAction('restore', item.name)">
+                ><button @click="tenantBackupAction('restore', item.name, item.tenant_id)">
                     Wiederherstellen</button
                 ><button
                     class="danger"
-                    @click="tenantBackupAction('delete', item.name)"
+                    @click="tenantBackupAction('delete', item.name, item.tenant_id)"
                 >
                     Löschen
                 </button>

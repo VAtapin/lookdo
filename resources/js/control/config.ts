@@ -44,6 +44,7 @@ export const serverSections = new Set([
     "ai",
     "classifications",
     "sms",
+    "backups",
     "audit",
 ]);
 export const addLabels: Record<string, string> = {
@@ -166,6 +167,7 @@ export const sortOptions: Record<string, Array<[string, string]>> = {
     backups: [
         ["created_at", "Erstellt"],
         ["name", "Name"],
+        ["tenant_name", "Kunde"],
     ],
     audit: [
         ["created_at", "Datum"],

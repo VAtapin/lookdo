@@ -111,8 +111,11 @@ async function load() {
             data.value = plans;
             entitlementCatalog.value = catalog;
         } else if (section.value === "backups") {
+            const params = new URLSearchParams(queryString());
+            if (backupTenantId.value)
+                params.set("tenant_id", String(backupTenantId.value));
             data.value = await api(
-                `${url}${backupTenantId.value ? `?tenant_id=${backupTenantId.value}` : ""}`,
+                `${url}?${params.toString()}`,
             );
             backupTenantId.value = data.value?.selected_tenant_id || "";
         } else
@@ -826,9 +829,15 @@ async function selectBackupTenant() {
     filters.page = 1;
     await load();
 }
-async function tenantBackupAction(action: string, name?: string) {
+async function tenantBackupAction(
+    action: string,
+    name?: string,
+    rowTenantId?: number,
+) {
     const tenant = (data.value?.tenants || []).find(
-        (item: any) => Number(item.id) === Number(backupTenantId.value),
+        (item: any) =>
+            Number(item.id) ===
+            Number(rowTenantId || backupTenantId.value),
     );
     if (!tenant) return;
     let confirmation: string | null = null;

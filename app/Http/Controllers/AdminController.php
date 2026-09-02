@@ -608,18 +608,47 @@ class AdminController extends Controller
     public function backups(Request $request, BackupService $backups, TenantBackupService $tenantBackups): JsonResponse
     {
         $tenants = Tenant::query()->orderBy('name')->get(['id', 'name', 'slug', 'status']);
-        $selectedId = $request->integer('tenant_id') ?: (int) ($tenants->first()?->id ?? 0);
+        $selectedId = $request->filled('tenant_id') ? $request->integer('tenant_id') : null;
         $selected = $selectedId ? $tenants->firstWhere('id', $selectedId) : null;
         if ($selectedId && ! $selected) {
             throw ValidationException::withMessages(['tenant_id' => 'Der ausgewählte Kunde wurde nicht gefunden.']);
         }
+
+        $items = ($selected ? collect([$selected]) : $tenants)
+            ->flatMap(fn (Tenant $tenant) => collect($tenantBackups->list($tenant))->map(fn (array $backup): array => $backup + [
+                'tenant_id' => $tenant->id,
+                'tenant_name' => $tenant->name,
+                'tenant_slug' => $tenant->slug,
+            ]));
+        $search = mb_strtolower(trim($request->string('search')->toString()));
+        if ($search !== '') {
+            $items = $items->filter(fn (array $item): bool => str_contains(mb_strtolower(implode(' ', [
+                $item['name'] ?? '',
+                $item['tenant_name'] ?? '',
+                $item['tenant_slug'] ?? '',
+                $item['reason'] ?? '',
+            ])), $search));
+        }
+        $sort = $this->sortColumn($request, ['created_at', 'name', 'tenant_name']);
+        $items = $items->sortBy($sort, SORT_NATURAL | SORT_FLAG_CASE, $this->sortDirection($request) === 'desc')->values();
+        $perPage = $this->perPage($request);
+        $page = max(1, $request->integer('page', 1));
+        $total = $items->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $lastPage);
+        $pageItems = $items->slice(($page - 1) * $perPage, $perPage)->values();
 
         return response()->json([
             'path' => $tenantBackups->path(),
             'keep' => config('backup.tenant_keep'),
             'selected_tenant_id' => $selected?->id,
             'tenants' => $tenants,
-            'backups' => $selected ? $tenantBackups->list($selected) : [],
+            'data' => $pageItems,
+            'current_page' => $page,
+            'last_page' => $lastPage,
+            'from' => $total ? (($page - 1) * $perPage) + 1 : null,
+            'to' => $total ? min($page * $perPage, $total) : null,
+            'total' => $total,
             'platform_backups' => $backups->list(),
             'platform_path' => config('backup.path'),
             'platform_keep' => config('backup.keep'),

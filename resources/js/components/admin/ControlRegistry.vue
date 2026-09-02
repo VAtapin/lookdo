@@ -122,6 +122,7 @@ const {
             <label>
                 <span>Kunde</span>
                 <select v-model="backupTenantId" @change="selectBackupTenant">
+                    <option value="">Alle Kunden</option>
                     <option v-for="tenant in data.tenants || []" :key="tenant.id" :value="tenant.id">
                         {{ tenant.name }} · {{ tenant.slug }}
                     </option>
@@ -129,7 +130,7 @@ const {
             </label>
             <span>Getrennte Aufbewahrung: {{ data.keep }} Stände je Kunde</span>
             <button class="button" :disabled="busy || !backupTenantId" @click="tenantBackupAction('create')">
-                ＋ Kundenbackup erstellen
+                {{ backupTenantId ? '＋ Kundenbackup erstellen' : 'Kunde für neues Backup auswählen' }}
             </button>
         </div>
         <div class="admin-table-wrap">
