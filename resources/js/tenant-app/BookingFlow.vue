@@ -335,13 +335,9 @@ onMounted(() => {
                 </button>
             </div>
             <a
+                v-if="app.tenant.contact.whatsapp_url"
                 class="ta-booking-help"
-                :href="
-                    app.tenant.contact.phone
-                        ? 'https://wa.me/' +
-                          app.tenant.contact.phone.replace(/\D/g, '')
-                        : '#'
-                "
+                :href="app.tenant.contact.whatsapp_url"
                 target="_blank"
                 ><span><AppIcon name="message" /></span>
                 <div>

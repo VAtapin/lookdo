@@ -661,6 +661,12 @@ class TenantAppController extends Controller
                 'city' => $profile?->city,
                 'vk_url' => $branding['vk_url'] ?? null,
                 'max_url' => $branding['max_url'] ?? null,
+                'whatsapp_url' => $branding['whatsapp_url'] ?? null,
+                'telegram_url' => $branding['telegram_url'] ?? null,
+                'viber_url' => $branding['viber_url'] ?? null,
+                'instagram_url' => $branding['instagram_url'] ?? null,
+                'facebook_url' => $branding['facebook_url'] ?? null,
+                'website_url' => $branding['website_url'] ?? null,
                 'working_hours' => $branding['working_hours'] ?? null,
             ],
             'branding' => [

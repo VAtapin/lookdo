@@ -132,6 +132,12 @@ class TenantController extends Controller
             'phone' => 'nullable|string|max:100',
             'vk_url' => 'nullable|url|max:500',
             'max_url' => 'nullable|url|max:500',
+            'whatsapp_url' => 'nullable|url|max:500',
+            'telegram_url' => 'nullable|url|max:500',
+            'viber_url' => ['nullable', 'string', 'max:500', 'regex:~^(?:https?://|viber://)~i'],
+            'instagram_url' => 'nullable|url|max:500',
+            'facebook_url' => 'nullable|url|max:500',
+            'website_url' => 'nullable|url|max:500',
             'working_hours' => 'nullable|string|max:500',
             'confirmed' => 'nullable|boolean',
         ]);

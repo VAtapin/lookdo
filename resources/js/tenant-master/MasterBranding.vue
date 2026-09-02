@@ -21,6 +21,12 @@ const form=reactive<any>({
   phone:props.account?.tenant?.profile?.phone||'',
   vk_url:existing.vk_url||'',
   max_url:existing.max_url||'',
+  whatsapp_url:existing.whatsapp_url||'',
+  telegram_url:existing.telegram_url||'',
+  viber_url:existing.viber_url||'',
+  instagram_url:existing.instagram_url||'',
+  facebook_url:existing.facebook_url||'',
+  website_url:existing.website_url||'',
   working_hours:existing.working_hours||'',
 });
 const busy=ref(false),error=ref(''),success=ref('');
@@ -94,7 +100,13 @@ function closePrompt(){
       <label>{{t('visualStyle')}}<input v-model="form.style"></label>
       <label>{{t('avoid')}}<input v-model="form.avoid"></label>
       <label>{{t('phone')}}<input v-model="form.phone" type="tel" autocomplete="tel" placeholder="+7 999 123-45-67"></label>
-      <div class="mw-field-pair"><label>VK<input v-model="form.vk_url" type="url" placeholder="https://vk.com/..."></label><label>MAX<input v-model="form.max_url" type="url" placeholder="https://max.ru/u/..."></label></div>
+      <fieldset class="mw-contact-fields"><legend>{{t('contacts')}}</legend>
+        <p>{{t('contactsHint')}}</p>
+        <div class="mw-field-pair"><label>WhatsApp<input v-model="form.whatsapp_url" type="url" placeholder="https://wa.me/..."></label><label>MAX<input v-model="form.max_url" type="url" placeholder="https://max.ru/u/..."></label></div>
+        <div class="mw-field-pair"><label>Telegram<input v-model="form.telegram_url" type="url" placeholder="https://t.me/..."></label><label>Viber<input v-model="form.viber_url" type="url" placeholder="viber://chat?number=..."></label></div>
+        <div class="mw-field-pair"><label>VK<input v-model="form.vk_url" type="url" placeholder="https://vk.com/..."></label><label>Instagram<input v-model="form.instagram_url" type="url" placeholder="https://instagram.com/..."></label></div>
+        <div class="mw-field-pair"><label>Facebook<input v-model="form.facebook_url" type="url" placeholder="https://facebook.com/..."></label><label>{{t('website')}}<input v-model="form.website_url" type="url" placeholder="https://..."></label></div>
+      </fieldset>
       <label>{{t('workingHours')}}<input v-model="form.working_hours"></label>
       <button class="mw-secondary" :disabled="busy">{{t('saveDraft')}}</button>
     </form>

@@ -32,6 +32,13 @@ defineEmits<{ close: [] }>();
                 <AppIcon name="arrow" />
             </a>
             <a
+                v-if="app.tenant.contact.whatsapp_url"
+                :href="app.tenant.contact.whatsapp_url"
+                target="_blank"
+            >
+                <span><b>WA</b></span><div><b>WhatsApp</b></div><AppIcon name="arrow" />
+            </a>
+            <a
                 v-if="app.tenant.contact.max_url"
                 :href="app.tenant.contact.max_url"
                 target="_blank"
@@ -39,6 +46,20 @@ defineEmits<{ close: [] }>();
                 <span><b>MAX</b></span>
                 <div><b>MAX</b><em>{{ app.tenant.contact.max_url }}</em></div>
                 <AppIcon name="arrow" />
+            </a>
+            <a
+                v-if="app.tenant.contact.telegram_url"
+                :href="app.tenant.contact.telegram_url"
+                target="_blank"
+            >
+                <span><b>TG</b></span><div><b>Telegram</b></div><AppIcon name="arrow" />
+            </a>
+            <a
+                v-if="app.tenant.contact.viber_url"
+                :href="app.tenant.contact.viber_url"
+                target="_blank"
+            >
+                <span><b>VI</b></span><div><b>Viber</b></div><AppIcon name="arrow" />
             </a>
             <a
                 v-if="app.tenant.contact.vk_url"
@@ -51,6 +72,30 @@ defineEmits<{ close: [] }>();
                     ><em>{{ app.tenant.contact.vk_url }}</em>
                 </div>
                 <AppIcon name="arrow" />
+            </a>
+            <a
+                v-if="app.tenant.contact.instagram_url"
+                :href="app.tenant.contact.instagram_url"
+                target="_blank"
+            >
+                <span><b>IG</b></span><div><b>Instagram</b></div><AppIcon name="arrow" />
+            </a>
+            <a
+                v-if="app.tenant.contact.facebook_url"
+                :href="app.tenant.contact.facebook_url"
+                target="_blank"
+            >
+                <span><b>FB</b></span><div><b>Facebook</b></div><AppIcon name="arrow" />
+            </a>
+            <a v-if="app.tenant.contact.email" :href="'mailto:' + app.tenant.contact.email">
+                <span><b>@</b></span><div><b>E-mail</b><em>{{ app.tenant.contact.email }}</em></div><AppIcon name="arrow" />
+            </a>
+            <a
+                v-if="app.tenant.contact.website_url"
+                :href="app.tenant.contact.website_url"
+                target="_blank"
+            >
+                <span><b>WEB</b></span><div><b>Website</b></div><AppIcon name="arrow" />
             </a>
             <a
                 v-if="address"

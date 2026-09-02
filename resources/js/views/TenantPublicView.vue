@@ -14,6 +14,7 @@ import RequestFlow from "../tenant-app/RequestFlow.vue";
 import TenantActivity from "../tenant-app/TenantActivity.vue";
 import TenantBottomNav from "../tenant-app/TenantBottomNav.vue";
 import TenantContactsSheet from "../tenant-app/TenantContactsSheet.vue";
+import TenantContactPopover from "../tenant-app/TenantContactPopover.vue";
 import TenantDesktopAside from "../tenant-app/TenantDesktopAside.vue";
 import TenantLogin from "../tenant-app/TenantLogin.vue";
 import TenantInstallPrompt from "../tenant-app/TenantInstallPrompt.vue";
@@ -168,6 +169,10 @@ const navItems = computed(() => [
 ]);
 const contactName = computed(
     () => app.value?.tenant?.contact?.name || app.value?.tenant?.name,
+);
+const hasContactMethods = computed(() =>
+    ["phone", "whatsapp_url", "max_url", "telegram_url", "viber_url", "vk_url", "instagram_url", "facebook_url", "email", "website_url"]
+        .some((key) => Boolean(app.value?.tenant?.contact?.[key])),
 );
 const rescheduleAppointment = ref<any>(null);
 
@@ -612,20 +617,11 @@ const loginContext = {
                                 </button>
                                 <div>
                                     <button class="ta-language-trigger" @click="languageOpen = true">{{ locale.toUpperCase() }}</button>
-                                    <a
-                                        v-if="app.tenant.contact.phone"
-                                        :href="
-                                            'https://wa.me/' +
-                                            app.tenant.contact.phone.replace(
-                                                /\D/g,
-                                                '',
-                                            )
-                                        "
-                                        target="_blank"
-                                        ><AppIcon name="message" /></a
-                                    ><button @click="menuOpen = true">
+                                    <button v-if="hasContactMethods" class="ta-contact-trigger" :aria-label="copy.contacts" @click="contactOpen = !contactOpen"><AppIcon name="phone" /></button>
+                                    <button @click="contactOpen = false; menuOpen = true">
                                         <AppIcon name="menu" />
                                     </button>
+                                    <TenantContactPopover v-if="contactOpen" :contact="app.tenant.contact" :copy="copy" @close="contactOpen = false" />
                                 </div>
                             </header>
                             <article class="ta-brows-hero">
@@ -782,7 +778,7 @@ const loginContext = {
                                     <div>
                                         <button class="ta-language-trigger" @click="languageOpen = true">{{ locale.toUpperCase() }}</button>
                                         <button
-                                            v-if="app.tenant.contact.phone || app.tenant.contact.max_url || app.tenant.contact.vk_url"
+                                            v-if="hasContactMethods"
                                             class="ta-contact-trigger"
                                             :aria-label="copy.contacts"
                                             @click="contactOpen = !contactOpen"
@@ -790,13 +786,7 @@ const loginContext = {
                                         <button @click="contactOpen = false; menuOpen = true">
                                             <AppIcon name="menu" />
                                         </button>
-                                        <div v-if="contactOpen" class="ta-contact-popover">
-                                            <button class="ta-contact-popover-close" @click="contactOpen=false"><AppIcon name="close" :size="18" /></button>
-                                            <b>{{ copy.contacts }}</b>
-                                            <a v-if="app.tenant.contact.phone" :href="'tel:' + app.tenant.contact.phone"><AppIcon name="phone" /><span>{{ copy.call }}<small>{{ app.tenant.contact.phone }}</small></span></a>
-                                            <a v-if="app.tenant.contact.max_url" :href="app.tenant.contact.max_url" target="_blank"><strong>MAX</strong><span>MAX</span></a>
-                                            <a v-if="app.tenant.contact.vk_url" :href="app.tenant.contact.vk_url" target="_blank"><strong>VK</strong><span>VK</span></a>
-                                        </div>
+                                        <TenantContactPopover v-if="contactOpen" :contact="app.tenant.contact" :copy="copy" @close="contactOpen = false" />
                                     </div>
                                 </header>
                                 <div class="ta-hero-content">
@@ -972,18 +962,8 @@ const loginContext = {
                                     /><span>{{ app.tenant.name }}</span>
                                 </button>
                                 <div>
-                                    <a
-                                        v-if="app.tenant.contact.vk_url"
-                                        :href="app.tenant.contact.vk_url"
-                                        target="_blank"
-                                        >VK</a
-                                    ><a
-                                        v-if="app.tenant.contact.phone"
-                                        :href="
-                                            'tel:' + app.tenant.contact.phone
-                                        "
-                                        ><AppIcon name="phone"
-                                    /></a>
+                                    <button v-if="hasContactMethods" class="ta-contact-trigger" :aria-label="copy.contacts" @click="contactOpen = !contactOpen"><AppIcon name="phone" /></button>
+                                    <TenantContactPopover v-if="contactOpen" :contact="app.tenant.contact" :copy="copy" @close="contactOpen = false" />
                                 </div>
                             </header>
                             <div class="ta-page-title">
