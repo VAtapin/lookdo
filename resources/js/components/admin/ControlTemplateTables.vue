@@ -4,6 +4,7 @@ const {
     section,
     rows,
     editTemplate,
+    hasEditableTemplate,
     toggleCatalog,
     togglePhrase,
     formatDate,
@@ -27,9 +28,9 @@ const {
             v-for="item in rows"
             :key="`${item.kind}-${item.id}`"
             :class="{
-                clickable: item.kind === 'template',
+                clickable: hasEditableTemplate(item),
             }"
-            @click="editTemplate(item)"
+            @click="hasEditableTemplate(item) && editTemplate(item)"
         >
             <td>
                 {{
@@ -61,10 +62,10 @@ const {
             </td>
             <td class="table-actions">
                 <button
-                    v-if="item.kind === 'template'"
+                    v-if="hasEditableTemplate(item)"
                     @click.stop="editTemplate(item)"
                 >
-                    Bearbeiten</button
+                    {{ item.kind === "template" ? "Bearbeiten" : "App bearbeiten" }}</button
                 ><button @click.stop="toggleCatalog(item)">
                     {{ item.enabled ? "Deaktivieren" : "Aktivieren" }}
                 </button>

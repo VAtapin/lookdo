@@ -134,6 +134,27 @@ const theme = computed(() => ({
     "--ta-template-surface": app.value?.template?.theme?.surface || "#fff",
     "--ta-template-text": app.value?.template?.theme?.text || "#111318",
 }));
+const homeBlocks = computed<any[]>(() => {
+    const screens = app.value?.template?.screens || [];
+    return screens.find((item: any) => item.key === "home")?.blocks || [];
+});
+function homeBlock(types: string | string[]) {
+    const accepted = Array.isArray(types) ? types : [types];
+    return homeBlocks.value.find((item: any) => accepted.includes(item.type));
+}
+function homeBlockVisible(types: string | string[]) {
+    const block = homeBlock(types);
+    if (block) return block.enabled !== false;
+    return !app.value?.template?.capabilities?.ui_builder_enabled;
+}
+function homeBlockStyle(types: string | string[], fallback: number) {
+    const block = homeBlock(types);
+    const index = block ? homeBlocks.value.indexOf(block) : -1;
+    return { order: index >= 0 ? index : 100 + fallback };
+}
+function homeBlockTitle(types: string | string[], fallback: string) {
+    return homeBlock(types)?.title || fallback;
+}
 const address = computed(() =>
     [
         app.value?.tenant?.contact?.street,
@@ -294,27 +315,27 @@ const videoLabels = computed(() => ({
         locale.value
     ],
 }));
-const navItems = computed(() => [
-    { key: "home", icon: "home", label: copy.value.home },
-    isBrows.value
-        ? { key: "services", icon: "works", label: copy.value.servicesNav }
-        : { key: "works", icon: "works", label: copy.value.works },
-    isBrows.value
-        ? {
-              key: "book",
-              icon: "measure",
-              label: copy.value.book,
-              central: true,
-          }
-        : {
-              key: actionScreen.value,
-              icon: "camera",
-              label: copy.value.action,
-              central: true,
-          },
-    { key: "activity", icon: "message", label: copy.value.activity },
-    { key: "reviews", icon: "star", label: copy.value.reviews },
-]);
+const navItems = computed(() => {
+    const fallback = isBrows.value
+        ? ["home", "services", "book", "activity", "reviews"]
+        : ["home", "works", "action", "activity", "reviews"];
+    const configured = app.value?.template?.navigation || fallback;
+    const catalog: Record<string, any> = {
+        home: { key: "home", icon: "home", label: copy.value.home },
+        works: { key: "works", icon: "works", label: copy.value.works },
+        services: { key: "services", icon: "works", label: copy.value.servicesNav },
+        action: { key: actionScreen.value, icon: "camera", label: copy.value.action, central: true },
+        request: { key: "request", icon: "camera", label: copy.value.action, central: true },
+        book: { key: "book", icon: "measure", label: copy.value.book, central: true },
+        activity: { key: "activity", icon: "message", label: copy.value.activity },
+        reviews: { key: "reviews", icon: "star", label: copy.value.reviews },
+        contacts: { key: "contacts", icon: "phone", label: copy.value.contacts },
+    };
+    const seen = new Set<string>();
+    return configured
+        .map((key: string) => catalog[key])
+        .filter((item: any) => item && !seen.has(item.key) && seen.add(item.key));
+});
 const contactName = computed(
     () => app.value?.tenant?.contact?.name || app.value?.tenant?.name,
 );
@@ -880,7 +901,11 @@ const loginContext = {
                                     />
                                 </div>
                             </header>
-                            <article class="ta-brows-hero">
+                            <article
+                                v-if="homeBlockVisible('hero')"
+                                class="ta-brows-hero"
+                                :style="homeBlockStyle('hero', 0)"
+                            >
                                 <img
                                     :src="
                                         app.template.hero.image ||
@@ -910,9 +935,13 @@ const loginContext = {
                                     </button>
                                 </section>
                             </article>
-                            <section class="ta-section ta-featured">
+                            <section
+                                v-if="homeBlockVisible(['gallery', 'before-after'])"
+                                class="ta-section ta-featured"
+                                :style="homeBlockStyle(['gallery', 'before-after'], 1)"
+                            >
                                 <div class="ta-section-head">
-                                    <h2>{{ copy.works }}</h2>
+                                    <h2>{{ homeBlockTitle(['gallery', 'before-after'], copy.works) }}</h2>
                                     <button @click="go('works')">
                                         {{ copy.all }}
                                         <AppIcon name="arrow" :size="17" />
@@ -964,8 +993,9 @@ const loginContext = {
                                 </div>
                             </section>
                             <section
-                                v-if="app.template.trust.length"
+                                v-if="app.template.trust.length && homeBlockVisible('trust')"
                                 class="ta-brows-trust"
+                                :style="homeBlockStyle('trust', 2)"
                             >
                                 <article
                                     v-for="item in app.template.trust"
@@ -976,11 +1006,12 @@ const loginContext = {
                                 </article>
                             </section>
                             <section
-                                v-if="portfolioVideos.length"
+                                v-if="portfolioVideos.length && homeBlockVisible('videos')"
                                 class="ta-section ta-video-works"
+                                :style="homeBlockStyle('videos', 3)"
                             >
                                 <div class="ta-section-head">
-                                    <h2>{{ videoLabels.heading }}</h2>
+                                    <h2>{{ homeBlockTitle('videos', videoLabels.heading) }}</h2>
                                     <button @click="go('works')">
                                         {{ copy.all }}
                                         <AppIcon name="arrow" :size="17" />
@@ -1016,7 +1047,11 @@ const loginContext = {
                             v-else-if="screen === 'home'"
                             class="ta-home-screen"
                         >
-                            <article class="ta-hero">
+                            <article
+                                v-if="homeBlockVisible('hero')"
+                                class="ta-hero"
+                                :style="homeBlockStyle('hero', 0)"
+                            >
                                 <img
                                     class="ta-hero-image"
                                     :src="
@@ -1111,9 +1146,13 @@ const loginContext = {
                                     </button>
                                 </div>
                             </article>
-                            <section class="ta-section ta-featured">
+                            <section
+                                v-if="homeBlockVisible(['gallery', 'before-after'])"
+                                class="ta-section ta-featured"
+                                :style="homeBlockStyle(['gallery', 'before-after'], 1)"
+                            >
                                 <div class="ta-section-head">
-                                    <h2>{{ copy.featured }}</h2>
+                                    <h2>{{ homeBlockTitle(['gallery', 'before-after'], copy.featured) }}</h2>
                                     <button @click="go('works')">
                                         {{ copy.all }}
                                         <AppIcon name="arrow" :size="17" />
@@ -1165,8 +1204,9 @@ const loginContext = {
                                 </div>
                             </section>
                             <section
-                                v-if="app.template.trust.length"
+                                v-if="app.template.trust.length && homeBlockVisible('trust')"
                                 class="ta-trust"
+                                :style="homeBlockStyle('trust', 2)"
                             >
                                 <article
                                     v-for="item in app.template.trust"
@@ -1177,11 +1217,12 @@ const loginContext = {
                                 </article>
                             </section>
                             <section
-                                v-if="portfolioVideos.length"
+                                v-if="portfolioVideos.length && homeBlockVisible('videos')"
                                 class="ta-section ta-video-works"
+                                :style="homeBlockStyle('videos', 3)"
                             >
                                 <div class="ta-section-head">
-                                    <h2>{{ videoLabels.heading }}</h2>
+                                    <h2>{{ homeBlockTitle('videos', videoLabels.heading) }}</h2>
                                     <button @click="go('works')">
                                         {{ copy.all }}
                                         <AppIcon name="arrow" :size="17" />

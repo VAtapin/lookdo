@@ -18,7 +18,7 @@ defineEmits<{ navigate: [screen: string] }>();
     <nav
         class="ta-bottom-nav"
         :aria-label="label"
-        style="grid-template-columns: repeat(5, minmax(0, 1fr))"
+        :style="{ gridTemplateColumns: `repeat(${Math.max(1, items.length)}, minmax(0, 1fr))` }"
     >
         <button
             v-for="item in items"

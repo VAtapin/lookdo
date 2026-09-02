@@ -166,13 +166,14 @@ function resetFilters() {
     Object.assign(filters, {
         search: "",
         status: "",
-        secondary: "",
+        secondary: section.value === "templates" ? "template" : "",
         sort: sortOptions[section.value]?.[0]?.[0] || "created_at",
         direction: "desc",
         per_page: 25,
         page: 1,
     });
 }
+resetFilters();
 let debounce: number | undefined;
 watch(section, () => {
     selectedTenant.value = null;
@@ -620,9 +621,37 @@ async function toggleCatalog(item: any) {
     });
     await load();
 }
+function linkedTemplate(item: any) {
+    if (item.kind === "template") return item;
+    const templates = data.value?.templates || [];
+    if (item.kind === "variation" && item.template_code)
+        return templates.find(
+            (template: any) => template.code === item.template_code,
+        );
+    if (item.kind === "category")
+        return templates.find(
+            (template: any) =>
+                Number(template.category_id) === Number(item.id) &&
+                !template.variation_id,
+        );
+    return null;
+}
+function hasEditableTemplate(item: any) {
+    return Boolean(linkedTemplate(item));
+}
 function editTemplate(item: any) {
-    if (item.kind === "template")
-        selectedTemplate.value = JSON.parse(JSON.stringify(item));
+    const template = linkedTemplate(item);
+    if (!template) {
+        error.value = "Für diesen Katalogeintrag ist noch keine App-Vorlage verknüpft.";
+        return;
+    }
+    selectedTemplate.value = JSON.parse(
+        JSON.stringify({
+            ...template,
+            kind: "template",
+            label: template.name?.de || template.name?.ru || template.code,
+        }),
+    );
 }
 async function templateSaved() {
     selectedTemplate.value = null;
@@ -1072,6 +1101,7 @@ const controlContext = {
     editPlan,
     syncPlan,
     editTemplate,
+    hasEditableTemplate,
     toggleCatalog,
     togglePhrase,
     editPage,
