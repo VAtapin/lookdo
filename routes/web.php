@@ -65,6 +65,8 @@ Route::prefix('api')->middleware('locale')->group(function () {
         Route::delete('/tenant/{tenant}/domains/{domain}', [TenantController::class, 'removeDomain']);
         Route::post('/tenant/{tenant}/checkout', [TenantController::class, 'checkout']);
         Route::post('/tenant/{tenant}/billing-portal', [TenantController::class, 'billingPortal']);
+        Route::get('/tenant/{tenant}/invoices/{invoice}', [TenantController::class, 'invoice']);
+        Route::get('/tenant/{tenant}/payments/{payment}/receipt', [TenantController::class, 'paymentReceipt']);
         Route::get('/tenant/{tenant}/export', [TenantController::class, 'exportData']);
         Route::delete('/tenant/{tenant}/account', [TenantController::class, 'destroyOwnAccount']);
         Route::get('/tenant/{tenant}/workspace', [TenantWorkspaceController::class, 'bootstrap']);
@@ -155,6 +157,9 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::patch('/subscriptions/{subscription}/status', [AdminSubscriptionController::class, 'updateStatus']);
             Route::post('/subscriptions/{subscription}/payments', [AdminSubscriptionController::class, 'storePayment']);
             Route::get('/subscriptions/{subscription}/payments/{payment}/receipt', [AdminSubscriptionController::class, 'receipt']);
+            Route::post('/subscriptions/{subscription}/invoices', [AdminSubscriptionController::class, 'storeInvoice']);
+            Route::patch('/subscriptions/{subscription}/invoices/{invoice}', [AdminSubscriptionController::class, 'updateInvoice']);
+            Route::get('/subscriptions/{subscription}/invoices/{invoice}', [AdminSubscriptionController::class, 'invoice']);
             Route::get('/plans', [AdminController::class, 'plans']);
             Route::get('/plan-entitlements', [AdminController::class, 'planEntitlements']);
             Route::post('/plans/translate', [AdminController::class, 'translatePlan'])->middleware('throttle:20,1');

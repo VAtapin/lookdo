@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ImageCreditPurchase;
 use App\Models\StripeWebhookEvent;
 use App\Models\Subscription;
+use App\Models\SubscriptionInvoice;
 use App\Services\StripeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -45,16 +46,27 @@ class StripeWebhookController extends Controller
                 }
             }
         }
+        if (in_array($type, ['invoice.created', 'invoice.finalized'], true)) {
+            $subscription = $this->subscriptionForInvoice($object);
+            if ($subscription) {
+                $this->syncInvoice($subscription, $object);
+            }
+        }
         if ($type === 'invoice.paid') {
-            $subscription = Subscription::where('provider_subscription_id', $object['subscription'] ?? null)->first();
+            $subscription = $this->subscriptionForInvoice($object);
             if ($subscription) {
                 $periodEnd = data_get($object, 'lines.data.0.period.end');
                 $subscription->update(['status' => 'active', 'current_period_end' => $periodEnd ? now()->setTimestamp($periodEnd) : $subscription->current_period_end]);
-                $subscription->payments()->updateOrCreate(['provider_payment_id' => $object['id'] ?? null], ['amount' => ((int) ($object['amount_paid'] ?? 0)) / 100, 'currency' => strtoupper($object['currency'] ?? 'EUR'), 'status' => 'paid', 'paid_at' => now(), 'provider_payload' => $object]);
+                $invoice = $this->syncInvoice($subscription, $object, 'paid');
+                $subscription->payments()->updateOrCreate(['provider_payment_id' => $object['id'] ?? null], ['subscription_invoice_id' => $invoice->id, 'amount' => ((int) ($object['amount_paid'] ?? 0)) / 100, 'currency' => strtoupper($object['currency'] ?? 'EUR'), 'status' => 'paid', 'paid_at' => isset($object['status_transitions']['paid_at']) ? now()->setTimestamp((int) $object['status_transitions']['paid_at']) : now(), 'provider_payload' => $object]);
             }
         }
         if ($type === 'invoice.payment_failed') {
-            Subscription::where('provider_subscription_id', $object['subscription'] ?? null)->update(['status' => 'past_due']);
+            $subscription = $this->subscriptionForInvoice($object);
+            if ($subscription) {
+                $subscription->update(['status' => 'past_due']);
+                $this->syncInvoice($subscription, $object, 'overdue');
+            }
         }
         if ($type === 'customer.subscription.deleted') {
             Subscription::where('provider_subscription_id', $object['id'] ?? null)->update(['status' => 'canceled']);
@@ -62,5 +74,72 @@ class StripeWebhookController extends Controller
         $record->update(['processed_at' => now()]);
 
         return response()->json(['received' => true]);
+    }
+
+    private function subscriptionForInvoice(array $invoice): ?Subscription
+    {
+        $providerSubscriptionId = is_array($invoice['subscription'] ?? null)
+            ? ($invoice['subscription']['id'] ?? null)
+            : ($invoice['subscription'] ?? data_get($invoice, 'parent.subscription_details.subscription'));
+
+        if (filled($providerSubscriptionId)) {
+            return Subscription::where('provider_subscription_id', $providerSubscriptionId)->first();
+        }
+
+        $localSubscriptionId = data_get($invoice, 'parent.subscription_details.metadata.subscription_id')
+            ?? data_get($invoice, 'lines.data.0.metadata.subscription_id');
+
+        return filled($localSubscriptionId) ? Subscription::find($localSubscriptionId) : null;
+    }
+
+    private function syncInvoice(Subscription $subscription, array $payload, ?string $forcedStatus = null): SubscriptionInvoice
+    {
+        $subscription->loadMissing(['tenant.profile', 'plan']);
+        $profile = $subscription->tenant->profile;
+        $total = ((int) ($payload['total'] ?? $payload['amount_due'] ?? $payload['amount_paid'] ?? 0)) / 100;
+        $subtotal = ((int) ($payload['subtotal'] ?? $payload['subtotal_excluding_tax'] ?? round($total * 100))) / 100;
+        $tax = max(0, round($total - $subtotal, 2));
+        $taxRate = $subtotal > 0 ? round($tax / $subtotal * 100, 2) : 0;
+        $stripeStatus = (string) ($payload['status'] ?? 'open');
+        $status = $forcedStatus ?? match ($stripeStatus) {
+            'paid' => 'paid',
+            'void', 'uncollectible' => 'void',
+            default => 'open',
+        };
+        $periodStart = data_get($payload, 'lines.data.0.period.start');
+        $periodEnd = data_get($payload, 'lines.data.0.period.end');
+        $createdAt = isset($payload['created']) ? now()->setTimestamp((int) $payload['created']) : now();
+        $dueAt = isset($payload['due_date']) ? now()->setTimestamp((int) $payload['due_date']) : $createdAt->copy()->addDays(14);
+        $paidAt = data_get($payload, 'status_transitions.paid_at');
+        $recipientAddress = collect([
+            $profile?->street,
+            trim(implode(' ', array_filter([$profile?->postal_code, $profile?->city]))),
+            $subscription->tenant->country,
+        ])->filter()->implode("\n");
+
+        return SubscriptionInvoice::updateOrCreate(
+            ['provider_invoice_id' => (string) ($payload['id'] ?? '')],
+            [
+                'tenant_id' => $subscription->tenant_id,
+                'subscription_id' => $subscription->id,
+                'invoice_number' => filled($payload['number'] ?? null) ? (string) $payload['number'] : 'STRIPE-'.($payload['id'] ?? uniqid()),
+                'status' => $status,
+                'issue_date' => $createdAt->toDateString(),
+                'due_date' => $dueAt->toDateString(),
+                'period_start' => $periodStart ? now()->setTimestamp((int) $periodStart) : null,
+                'period_end' => $periodEnd ? now()->setTimestamp((int) $periodEnd) : null,
+                'description' => 'LOOKDO '.data_get($subscription->plan?->name, 'de', $subscription->plan?->code ?? 'Abonnement'),
+                'amount_net' => $subtotal,
+                'tax_rate' => $taxRate,
+                'tax_amount' => $tax,
+                'amount_total' => $total,
+                'currency' => strtoupper((string) ($payload['currency'] ?? $subscription->currency ?? 'EUR')),
+                'recipient_name' => $subscription->tenant->name,
+                'recipient_address' => $recipientAddress,
+                'hosted_invoice_url' => $payload['hosted_invoice_url'] ?? null,
+                'invoice_pdf_url' => $payload['invoice_pdf'] ?? null,
+                'paid_at' => $paidAt ? now()->setTimestamp((int) $paidAt) : null,
+            ],
+        );
     }
 }

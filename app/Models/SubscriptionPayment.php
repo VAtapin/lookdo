@@ -19,6 +19,11 @@ class SubscriptionPayment extends Model
         return $this->belongsTo(Subscription::class);
     }
 
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(SubscriptionInvoice::class, 'subscription_invoice_id');
+    }
+
     public function recordedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by_user_id');

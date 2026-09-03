@@ -337,6 +337,20 @@ async function openBillingPortal() {
         busy.value = false;
     }
 }
+function openInvoiceDocument(invoice: any) {
+    window.open(
+        `/api/tenant/${props.tenantId}/invoices/${invoice.id}`,
+        "_blank",
+        "noopener,noreferrer",
+    );
+}
+function openPaymentReceipt(payment: any) {
+    window.open(
+        `/api/tenant/${props.tenantId}/payments/${payment.id}/receipt`,
+        "_blank",
+        "noopener,noreferrer",
+    );
+}
 async function loadTeam() {
     try {
         team.value = await api(`/tenant/${props.tenantId}/workspace/team`);
@@ -840,6 +854,42 @@ const planName = (p: any) => p?.name?.[props.locale] || p?.name?.de || p?.code;
                     </select>
                 </div>
             </article>
+            <article class="mw-panel">
+                <h2>{{ t("invoiceHistory") }}</h2>
+                <div
+                    v-for="invoice in account.tenant.current_subscription
+                        ?.invoices || []"
+                    :key="invoice.id"
+                    class="mw-service-row"
+                >
+                    <span
+                        ><b>{{ invoice.invoice_number }}</b
+                        ><small
+                            >{{ invoice.amount_total }} {{ invoice.currency }} ·
+                            {{
+                                new Date(
+                                    invoice.issue_date,
+                                ).toLocaleDateString(locale)
+                            }}
+                            · {{ t(`invoice_${invoice.status}`) }}</small
+                        ></span
+                    ><button
+                        type="button"
+                        class="mw-secondary mw-document-button"
+                        @click="openInvoiceDocument(invoice)"
+                    >
+                        {{ t("openInvoice") }}
+                    </button>
+                </div>
+                <p
+                    v-if="
+                        !account.tenant.current_subscription?.invoices?.length
+                    "
+                    class="mw-empty"
+                >
+                    {{ t("noInvoices") }}
+                </p>
+            </article>
             <article
                 v-if="account.tenant.current_subscription?.payments?.length"
                 class="mw-panel"
@@ -861,7 +911,13 @@ const planName = (p: any) => p?.name?.[props.locale] || p?.name?.de || p?.code;
                             }}
                             · {{ payment.status }}</small
                         ></span
+                    ><button
+                        type="button"
+                        class="mw-secondary mw-document-button"
+                        @click="openPaymentReceipt(payment)"
                     >
+                        {{ t("openReceipt") }}
+                    </button>
                 </div>
             </article>
             <div class="mw-plan-grid">

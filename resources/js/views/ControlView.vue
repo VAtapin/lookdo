@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { api } from "../api";
 import { createControlState } from "../control/state";
@@ -63,6 +63,18 @@ const subscriptionPaymentForm = reactive<any>({
     note: "",
     grant_access: true,
     access_until: "",
+    subscription_invoice_id: "",
+});
+const subscriptionInvoiceForm = reactive<any>({
+    amount_total: 0,
+    tax_rate: 19,
+    currency: "EUR",
+    issue_date: "",
+    due_date: "",
+    period_start: "",
+    period_end: "",
+    description: "LOOKDO Abonnement",
+    notes: "",
 });
 const subscriptionStatusForm = reactive<any>({
     status: "incomplete",
@@ -677,7 +689,7 @@ function dateTimeLocal(value: string | Date | null) {
     const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
     return local.toISOString().slice(0, 16);
 }
-async function openSubscription(item: any) {
+async function openSubscription(item: any, focus = "details") {
     error.value = "";
     try {
         const subscription = await api(`/control/subscriptions/${item.id}`);
@@ -696,6 +708,21 @@ async function openSubscription(item: any) {
             note: "",
             grant_access: true,
             access_until: dateTimeLocal(accessUntil),
+            subscription_invoice_id: "",
+        });
+        const issueDate = new Date();
+        const dueDate = new Date(issueDate);
+        dueDate.setDate(dueDate.getDate() + 14);
+        Object.assign(subscriptionInvoiceForm, {
+            amount_total: Number((monthly * (100 - discount) / 100).toFixed(2)),
+            tax_rate: 19,
+            currency: subscription.currency || subscription.plan?.currency || "EUR",
+            issue_date: dateTimeLocal(issueDate).slice(0, 10),
+            due_date: dateTimeLocal(dueDate).slice(0, 10),
+            period_start: dateTimeLocal(issueDate),
+            period_end: dateTimeLocal(accessUntil),
+            description: `LOOKDO ${subscription.plan?.name?.de || subscription.plan?.code || "Abonnement"}`,
+            notes: "",
         });
         Object.assign(subscriptionStatusForm, {
             status: subscription.status,
@@ -703,6 +730,10 @@ async function openSubscription(item: any) {
             cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
             reason: "",
         });
+        await nextTick();
+        document
+            .getElementById(`subscription-${focus}`)
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (exception: any) {
         error.value = exception.message;
         selectedSubscription.value = null;
@@ -728,6 +759,7 @@ async function saveSubscriptionPayment() {
         });
         subscriptionPaymentForm.reference = "";
         subscriptionPaymentForm.note = "";
+        subscriptionPaymentForm.subscription_invoice_id = "";
         await load();
         toast("Zahlung wurde erfasst. Der Beleg ist jetzt druckbar.");
     } catch (exception: any) {
@@ -735,6 +767,54 @@ async function saveSubscriptionPayment() {
     } finally {
         busy.value = false;
     }
+}
+async function saveSubscriptionInvoice() {
+    if (!selectedSubscription.value) return;
+    busy.value = true;
+    error.value = "";
+    try {
+        selectedSubscription.value = await api(`/control/subscriptions/${selectedSubscription.value.id}/invoices`, {
+            method: "POST",
+            body: JSON.stringify(subscriptionInvoiceForm),
+        });
+        subscriptionInvoiceForm.notes = "";
+        await load();
+        toast("Rechnung wurde ausgestellt und ist im Kundenkonto sichtbar.");
+    } catch (exception: any) {
+        error.value = exception.message;
+    } finally {
+        busy.value = false;
+    }
+}
+async function voidSubscriptionInvoice(invoice: any) {
+    if (!selectedSubscription.value) return;
+    const reason = window.prompt("Grund für die Stornierung der Rechnung:");
+    if (!reason) return;
+    busy.value = true;
+    error.value = "";
+    try {
+        selectedSubscription.value = await api(`/control/subscriptions/${selectedSubscription.value.id}/invoices/${invoice.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ status: "void", reason }),
+        });
+        await load();
+        toast("Rechnung wurde storniert.");
+    } catch (exception: any) {
+        error.value = exception.message;
+    } finally {
+        busy.value = false;
+    }
+}
+function prepareInvoicePayment(invoice: any) {
+    subscriptionPaymentForm.subscription_invoice_id = invoice.id;
+    subscriptionPaymentForm.amount = Number(invoice.amount_total);
+    subscriptionPaymentForm.currency = invoice.currency;
+    subscriptionPaymentForm.reference = invoice.invoice_number;
+    subscriptionPaymentForm.payment_method = "cash";
+}
+function openInvoiceDocument(invoice: any) {
+    if (!selectedSubscription.value) return;
+    window.open(`/api/control/subscriptions/${selectedSubscription.value.id}/invoices/${invoice.id}`, "_blank", "noopener,noreferrer");
 }
 async function saveSubscriptionStatus() {
     if (!selectedSubscription.value) return;
@@ -1118,8 +1198,13 @@ const controlContext = {
     selectedSubscription,
     closeSubscription,
     subscriptionPaymentForm,
+    subscriptionInvoiceForm,
     subscriptionStatusForm,
     saveSubscriptionPayment,
+    saveSubscriptionInvoice,
+    voidSubscriptionInvoice,
+    prepareInvoicePayment,
+    openInvoiceDocument,
     saveSubscriptionStatus,
     openPaymentReceipt,
     saveTenantDetails,

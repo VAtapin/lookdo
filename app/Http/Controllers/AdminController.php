@@ -150,7 +150,7 @@ class AdminController extends Controller
 
     public function subscriptions(Request $request): JsonResponse
     {
-        $query = Subscription::with(['tenant:id,name,slug', 'plan:id,code,name'])->where('status', '!=', 'superseded');
+        $query = Subscription::with(['tenant:id,name,slug', 'plan:id,code,name'])->withCount(['payments', 'invoices'])->where('status', '!=', 'superseded');
         if ($status = $request->string('status')->toString()) {
             $query->where('status', $status);
         }

@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Plan;
+use App\Models\SubscriptionInvoice;
+use App\Models\SubscriptionPayment;
+use App\Models\SystemSetting;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Services\AuditService;
@@ -23,6 +26,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
@@ -42,7 +46,16 @@ class TenantController extends Controller
     public function show(Request $request, Tenant $tenant, EntitlementService $entitlements, TenantImageGenerationService $imageGenerations): JsonResponse
     {
         $this->authorizeTenant($request, $tenant);
-        $tenant->load(['profile', 'domains', 'currentSubscription.plan.entitlements', 'currentSubscription.payments', 'businessProfile.category', 'businessProfile.variation', 'businessProfile.template']);
+        $tenant->load([
+            'profile',
+            'domains',
+            'currentSubscription.plan.entitlements',
+            'currentSubscription.payments' => fn ($query) => $query->latest('paid_at')->latest('id'),
+            'currentSubscription.invoices' => fn ($query) => $query->latest('issue_date')->latest('id'),
+            'businessProfile.category',
+            'businessProfile.variation',
+            'businessProfile.template',
+        ]);
         if ($tenant->profile?->social_image_path) {
             $tenant->profile->setAttribute('social_image_url', Storage::disk('public')->url($tenant->profile->social_image_path));
         }
@@ -80,6 +93,43 @@ class TenantController extends Controller
             'image_generation' => $imageGenerations->status($tenant),
             'platform_url' => 'https://'.$tenant->slug.'.'.config('tenancy.platform_domain'),
         ]);
+    }
+
+    public function invoice(Request $request, Tenant $tenant, SubscriptionInvoice $invoice): View
+    {
+        $this->authorizeTenant($request, $tenant);
+        abort_unless($invoice->tenant_id === $tenant->id, 404);
+        $invoice->loadMissing(['tenant.users' => fn ($query) => $query->wherePivot('role', 'owner'), 'subscription.plan', 'payments']);
+
+        return view('admin.invoice', ['invoice' => $invoice, 'operator' => $this->billingOperator()]);
+    }
+
+    public function paymentReceipt(Request $request, Tenant $tenant, SubscriptionPayment $payment): View
+    {
+        $this->authorizeTenant($request, $tenant);
+        $payment->loadMissing(['subscription.tenant.users' => fn ($query) => $query->wherePivot('role', 'owner'), 'subscription.plan', 'recordedBy']);
+        abort_unless($payment->subscription?->tenant_id === $tenant->id, 404);
+
+        return view('admin.payment-receipt', [
+            'subscription' => $payment->subscription,
+            'payment' => $payment,
+            'documentNumber' => $payment->receipt_number
+                ?: $payment->provider_payment_id
+                ?: sprintf('ZB-%s-%06d', ($payment->paid_at ?? $payment->created_at)->format('Y'), $payment->id),
+            'operator' => $this->billingOperator(),
+        ]);
+    }
+
+    private function billingOperator(): array
+    {
+        return [
+            'name' => SystemSetting::read('legal_operator_name', 'LOOKDO'),
+            'address' => SystemSetting::read('legal_operator_address'),
+            'email' => SystemSetting::read('legal_email'),
+            'phone' => SystemSetting::read('legal_phone'),
+            'vat_id' => SystemSetting::read('legal_vat_id'),
+            'register' => SystemSetting::read('legal_register'),
+        ];
     }
 
     public function updateProfile(Request $request, Tenant $tenant, AuditService $audit, EntitlementService $entitlements): JsonResponse

@@ -34,6 +34,11 @@ class Subscription extends Model
         return $this->hasMany(SubscriptionPayment::class);
     }
 
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(SubscriptionInvoice::class);
+    }
+
     public function manualStatusChangedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'manual_status_changed_by');

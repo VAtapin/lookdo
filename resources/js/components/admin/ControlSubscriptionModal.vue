@@ -9,8 +9,13 @@ const {
     subscriptionAccessClass,
     subscriptionAccessLabel,
     subscriptionPaymentForm,
+    subscriptionInvoiceForm,
     subscriptionStatusForm,
     saveSubscriptionPayment,
+    saveSubscriptionInvoice,
+    voidSubscriptionInvoice,
+    prepareInvoicePayment,
+    openInvoiceDocument,
     saveSubscriptionStatus,
     openPaymentReceipt,
     busy,
@@ -24,6 +29,10 @@ const paymentMethodLabel = (method: string) =>
         card: "Kartenzahlung",
         other: "Sonstige Zahlung",
     })[method] || "Online-Zahlung";
+const invoiceStatusLabel = (status: string) =>
+    ({ open: "Offen", paid: "Bezahlt", void: "Storniert", overdue: "Überfällig" })[status] || status;
+const openInvoices = (invoices: any[] | undefined) =>
+    (invoices || []).filter((invoice: any) => invoice.status === "open");
 </script>
 
 <template>
@@ -35,7 +44,7 @@ const paymentMethodLabel = (method: string) =>
     >
         <div class="subscription-admin">
             <p v-if="error" class="alert error">{{ error }}</p>
-            <section class="subscription-summary">
+            <section id="subscription-details" class="subscription-summary">
                 <div>
                     <span>Kunde</span><strong>{{ selectedSubscription.tenant?.name }}</strong
                     ><small>{{ selectedSubscription.tenant?.slug }}</small>
@@ -78,6 +87,19 @@ const paymentMethodLabel = (method: string) =>
             </details>
 
             <section class="billing-panel wide-panel">
+                <header><div><h3>Rechnungen</h3><p>Ausgestellte Rechnungen sind sofort auch im Kundenkonto sichtbar.</p></div></header>
+                <div class="payment-history invoice-history">
+                    <article v-for="invoice in selectedSubscription.invoices || []" :key="invoice.id">
+                        <div><b>{{ invoice.invoice_number }}</b><small>{{ invoice.description }} · fällig {{ formatDate(invoice.due_date) }}</small></div>
+                        <strong>{{ Number(invoice.amount_total).toFixed(2) }} {{ invoice.currency }}</strong>
+                        <span class="table-status" :class="invoice.status">{{ invoiceStatusLabel(invoice.status) }}</span>
+                        <div class="billing-row-actions"><button type="button" class="button ghost small" @click="openInvoiceDocument(invoice)">Rechnung</button><button v-if="invoice.status === 'open'" type="button" class="button ghost small" @click="prepareInvoicePayment(invoice)">Zahlung erfassen</button><button v-if="invoice.status === 'open'" type="button" class="button ghost small danger" @click="voidSubscriptionInvoice(invoice)">Stornieren</button></div>
+                    </article>
+                    <p v-if="!selectedSubscription.invoices?.length" class="empty-payment-history">Noch keine Rechnung ausgestellt.</p>
+                </div>
+            </section>
+
+            <section class="billing-panel wide-panel">
                 <header><div><h3>Zahlungsverlauf</h3><p>Manuelle und über Stripe eingegangene Zahlungen.</p></div></header>
                 <div class="payment-history">
                     <article v-for="payment in selectedSubscription.payments || []" :key="payment.id">
@@ -91,10 +113,29 @@ const paymentMethodLabel = (method: string) =>
             </section>
 
             <div class="billing-editor-grid">
-                <section class="billing-panel">
+                <section id="subscription-invoice" class="billing-panel">
+                    <h3>Rechnung ausstellen</h3>
+                    <p>Die Rechnung erscheint nach dem Speichern sofort im Kundenkonto und kann auf beiden Seiten gedruckt werden.</p>
+                    <form class="modal-form" @submit.prevent="saveSubscriptionInvoice">
+                        <label>Leistung / Beschreibung<input v-model.trim="subscriptionInvoiceForm.description" maxlength="255" required></label>
+                        <div class="billing-two-columns">
+                            <label>Gesamtbetrag<input v-model.number="subscriptionInvoiceForm.amount_total" type="number" min="0.01" step="0.01" required></label>
+                            <label>Währung<input v-model.trim="subscriptionInvoiceForm.currency" maxlength="3" required></label>
+                            <label>Umsatzsteuer %<input v-model.number="subscriptionInvoiceForm.tax_rate" type="number" min="0" max="100" step="0.01" required></label>
+                            <label>Rechnungsdatum<input v-model="subscriptionInvoiceForm.issue_date" type="date" required></label>
+                            <label>Fällig am<input v-model="subscriptionInvoiceForm.due_date" type="date" required></label>
+                            <label>Leistungsbeginn<input v-model="subscriptionInvoiceForm.period_start" type="datetime-local"></label>
+                            <label>Leistungsende<input v-model="subscriptionInvoiceForm.period_end" type="datetime-local"></label>
+                        </div>
+                        <label>Hinweis auf der Rechnung<textarea v-model="subscriptionInvoiceForm.notes" rows="3" maxlength="2000"></textarea></label>
+                        <button class="button" :disabled="busy">Rechnung ausstellen</button>
+                    </form>
+                </section>
+                <section id="subscription-payment" class="billing-panel">
                     <h3>Zahlung erfassen</h3>
                     <p>Für Barzahlung, Überweisung oder eine außerhalb von Stripe erhaltene Zahlung.</p>
                     <form class="modal-form" @submit.prevent="saveSubscriptionPayment">
+                        <label v-if="openInvoices(selectedSubscription.invoices).length">Zugehörige Rechnung<select v-model="subscriptionPaymentForm.subscription_invoice_id"><option value="">Ohne Rechnung</option><option v-for="invoice in openInvoices(selectedSubscription.invoices)" :key="invoice.id" :value="invoice.id">{{ invoice.invoice_number }} · {{ Number(invoice.amount_total).toFixed(2) }} {{ invoice.currency }}</option></select></label>
                         <div class="billing-two-columns">
                             <label>Betrag<input v-model.number="subscriptionPaymentForm.amount" type="number" min="0.01" step="0.01" required></label>
                             <label>Währung<input v-model.trim="subscriptionPaymentForm.currency" maxlength="3" required></label>
@@ -108,8 +149,7 @@ const paymentMethodLabel = (method: string) =>
                         <button class="button" :disabled="busy">Zahlung speichern & Beleg erstellen</button>
                     </form>
                 </section>
-
-                <section class="billing-panel">
+                <section class="billing-panel wide-panel">
                     <h3>Status manuell ändern</h3>
                     <p>Die Änderung wird mit Administrator, Zeitpunkt und Begründung protokolliert.</p>
                     <form class="modal-form" @submit.prevent="saveSubscriptionStatus">

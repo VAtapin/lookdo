@@ -82,7 +82,7 @@ const {
         </tr>
     </thead>
     <tbody v-if="section === 'administrators'">
-        <tr v-for="item in rows" :key="item.id" class="clickable" @click="openSubscription(item)">
+        <tr v-for="item in rows" :key="item.id">
             <td>
                 <b>{{ item.name }}</b
                 ><small>{{ item.email }}</small>
@@ -106,10 +106,12 @@ const {
             <th>Periodenende</th>
             <th>Rabatt</th>
             <th>Provider-ID</th>
+            <th>Dokumente</th>
+            <th>Aktionen</th>
         </tr>
     </thead>
     <tbody v-if="section === 'subscriptions'">
-        <tr v-for="item in rows" :key="item.id">
+        <tr v-for="item in rows" :key="item.id" class="clickable" @click="openSubscription(item)">
             <td>
                 <b>{{ item.tenant?.name }}</b
                 ><small>{{ item.tenant?.slug }}</small>
@@ -133,6 +135,12 @@ const {
             <td>{{ item.discount_percent }}%</td>
             <td>
                 <small>{{ item.provider_subscription_id || "—" }}</small>
+            </td>
+            <td><small>{{ item.invoices_count || 0 }} Rechnungen · {{ item.payments_count || 0 }} Zahlungen</small></td>
+            <td class="table-actions">
+                <button type="button" @click.stop="openSubscription(item, 'details')">Details</button>
+                <button type="button" @click.stop="openSubscription(item, 'invoice')">Rechnung</button>
+                <button type="button" @click.stop="openSubscription(item, 'payment')">Barzahlung</button>
             </td>
         </tr>
     </tbody>
