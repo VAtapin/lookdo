@@ -350,7 +350,7 @@ async function register() {
         <div class="form-actions"><button type="button" class="button ghost" @click="step = 1">← {{ tr('back') }}</button><button type="submit" class="button ghost" :disabled="classifying">{{ tr('checkAgain') }}</button><button v-if="form.variation_id" type="button" class="button" @click="confirmActivity">{{ tr('showTemplate') }} →</button></div>
       </form>
 
-      <form v-if="step === 3" @submit.prevent="confirmTemplate">
+      <form v-if="step === 3" class="template-step" @submit.prevent="confirmTemplate">
         <p class="eyebrow">{{ tr('stepLabel') }} 03</p><h2>{{ tr('yourTemplateReady') }}</h2><p>{{ tr('templateChangesLive') }}</p>
         <div class="template-confirmation" :style="previewStyle"><img decoding="async" :src="preview.image" :alt="chosen?.variation"><div><small>{{ chosen?.category }}</small><h3>{{ chosen?.variation }}</h3><p>{{ tr('templateConfirmText') }}</p><code>{{ chosen?.template_code }}</code></div></div>
         <div class="form-actions"><button type="button" class="button ghost" @click="step = 2">← {{ tr('changeActivity') }}</button><button class="button">{{ tr('confirm') }} →</button></div>
@@ -378,5 +378,60 @@ async function register() {
 
 .password-rules span.met {
     color: var(--success);
+}
+
+.register-main,
+.register-card,
+.register-card form,
+.template-confirmation > div {
+    min-width: 0;
+}
+
+.register-card h2,
+.template-confirmation h3,
+.template-confirmation p,
+.template-confirmation code {
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+    .register-main {
+        width: 100%;
+        max-width: 100vw;
+        overflow-x: clip;
+    }
+
+    .register-card {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .register-card h2 {
+        font-size: clamp(27px, 8.5vw, 34px);
+        line-height: 1.12;
+    }
+
+    .template-step .template-confirmation {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 16px;
+    }
+
+    .template-step .template-confirmation img {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 16 / 10;
+    }
+
+    .template-step .form-actions {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .template-step .form-actions .button {
+        width: 100%;
+        min-width: 0;
+        padding-inline: 16px;
+        white-space: normal;
+        text-align: center;
+    }
 }
 </style>
