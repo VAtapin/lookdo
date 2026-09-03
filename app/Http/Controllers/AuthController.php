@@ -56,12 +56,41 @@ class AuthController extends Controller
             $budget->ensureAvailable();
             $result = $openAi->transcribe($request->file('audio'), $data['locale'] ?? app()->getLocale());
             $budget->recordTranscription('registration_business_transcription', $result['model'], $result['input_tokens'], $result['output_tokens']);
+            $text = $result['text'];
+            $refined = false;
+            try {
+                $text = $this->refineDescription($text, $data['locale'] ?? app()->getLocale(), $openAi, $budget);
+                $refined = true;
+            } catch (Throwable $exception) {
+                report($exception);
+            }
 
-            return response()->json(['text' => $result['text']]);
+            return response()->json(['text' => $text, 'refined' => $refined]);
         } catch (Throwable $exception) {
             report($exception);
 
             return response()->json(['message' => $this->registrationMessage('transcription_failed')], 503);
+        }
+    }
+
+    public function refineBusinessDescription(Request $request, OpenAiService $openAi, OpenAiBudgetService $budget): JsonResponse
+    {
+        $data = $request->validate([
+            'description' => 'required|string|min:3|max:1000',
+            'locale' => ['nullable', Rule::in(['de', 'en', 'ru', 'uk'])],
+        ]);
+        if (! $openAi->configured()) {
+            return response()->json(['message' => $this->registrationMessage('transcription_unavailable')], 503);
+        }
+
+        try {
+            $text = $this->refineDescription($data['description'], $data['locale'] ?? app()->getLocale(), $openAi, $budget);
+
+            return response()->json(['text' => $text]);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return response()->json(['message' => $this->registrationMessage('description_refinement_failed')], 503);
         }
     }
 
@@ -337,6 +366,23 @@ class AuthController extends Controller
         ]);
     }
 
+    private function refineDescription(string $description, string $locale, OpenAiService $openAi, OpenAiBudgetService $budget): string
+    {
+        $language = ['de' => 'German', 'en' => 'English', 'ru' => 'Russian', 'uk' => 'Ukrainian'][$locale] ?? 'English';
+        $budget->ensureAvailable();
+        $result = $openAi->text(
+            'Edit a business owner\'s rough or dictated description into polished public copy in '.$language.'. Preserve every concrete business fact and category, but remove speech fillers, repetitions, false starts, self-references and vague phrases. Correct grammar. State clearly what the business offers or buys and from whom. Use one or two natural sentences, at most 300 characters. Do not add claims, prices, locations, promises, marketing hype, links, headings, quotes or commentary. Return only the final description.',
+            Str::squish(strip_tags($description)),
+        );
+        $text = trim(Str::squish(strip_tags($result['text'])), " \t\n\r\0\x0B\"'“”«»");
+        if ($text === '') {
+            throw new \RuntimeException('OpenAI returned an empty refined business description.');
+        }
+        $budget->record('registration_business_description_refinement', $result['model'], $result['input_tokens'], $result['output_tokens']);
+
+        return Str::limit($text, 300, '');
+    }
+
     private function registrationMessage(string $key): string
     {
         $passwordMessages = [
@@ -375,10 +421,10 @@ class AuthController extends Controller
         }
 
         $messages = [
-            'de' => ['email_invalid' => 'Bitte geben Sie eine gültige E-Mail-Adresse ein.', 'email_available' => 'Diese E-Mail-Adresse kann verwendet werden.', 'email_taken' => 'Diese E-Mail-Adresse ist bereits registriert. Bitte melden Sie sich an oder verwenden Sie eine andere Adresse.', 'slug_invalid' => 'Die App-Adresse darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten.', 'slug_available' => 'Diese App-Adresse ist verfügbar.', 'slug_taken' => 'Diese App-Adresse ist bereits vergeben. Wir haben eine freie Alternative vorbereitet.', 'price_unavailable' => 'Für diese Währung ist noch kein Preis hinterlegt.', 'business_confirmation_required' => 'Bitte bestätigen Sie, dass Sie als Unternehmen oder selbstständige Person handeln.', 'transcription_unavailable' => 'Die Spracheingabe ist derzeit nicht eingerichtet.', 'transcription_failed' => 'Die Aufnahme konnte nicht erkannt werden. Bitte versuchen Sie es erneut oder geben Sie den Text ein.'],
-            'en' => ['email_invalid' => 'Enter a valid email address.', 'email_available' => 'This email address is available.', 'email_taken' => 'This email address is already registered. Sign in or use another address.', 'slug_invalid' => 'The app address may contain lowercase letters, numbers and hyphens only.', 'slug_available' => 'This app address is available.', 'slug_taken' => 'This app address is already taken. We prepared an available alternative.', 'price_unavailable' => 'No price has been configured for this currency yet.', 'business_confirmation_required' => 'Confirm that you are acting as a business or self-employed professional.', 'transcription_unavailable' => 'Voice input is not configured right now.', 'transcription_failed' => 'The recording could not be transcribed. Try again or enter the text.'],
-            'ru' => ['email_invalid' => 'Укажите корректный адрес электронной почты.', 'email_available' => 'Этот email можно использовать.', 'email_taken' => 'Этот email уже зарегистрирован. Войдите в аккаунт или укажите другой адрес.', 'slug_invalid' => 'В адресе приложения допустимы только латинские строчные буквы, цифры и дефисы.', 'slug_available' => 'Этот адрес приложения свободен.', 'slug_taken' => 'Этот адрес приложения уже занят. Мы подготовили свободный вариант.', 'price_unavailable' => 'Для выбранной валюты цена пока не настроена.', 'business_confirmation_required' => 'Подтвердите, что вы действуете как фирма или предприниматель.', 'transcription_unavailable' => 'Голосовой ввод сейчас не настроен.', 'transcription_failed' => 'Не удалось распознать запись. Попробуйте ещё раз или введите текст.'],
-            'uk' => ['email_invalid' => 'Укажіть коректну адресу електронної пошти.', 'email_available' => 'Цю електронну адресу можна використовувати.', 'email_taken' => 'Цю електронну адресу вже зареєстровано. Увійдіть або вкажіть іншу адресу.', 'slug_invalid' => 'В адресі застосунку дозволені лише латинські малі літери, цифри та дефіси.', 'slug_available' => 'Ця адреса застосунку вільна.', 'slug_taken' => 'Ця адреса застосунку вже зайнята. Ми підготували вільний варіант.', 'price_unavailable' => 'Для вибраної валюти ціну ще не налаштовано.', 'business_confirmation_required' => 'Підтвердьте, що ви дієте як компанія або підприємець.', 'transcription_unavailable' => 'Голосове введення зараз не налаштовано.', 'transcription_failed' => 'Не вдалося розпізнати запис. Спробуйте ще раз або введіть текст.'],
+            'de' => ['email_invalid' => 'Bitte geben Sie eine gültige E-Mail-Adresse ein.', 'email_available' => 'Diese E-Mail-Adresse kann verwendet werden.', 'email_taken' => 'Diese E-Mail-Adresse ist bereits registriert. Bitte melden Sie sich an oder verwenden Sie eine andere Adresse.', 'slug_invalid' => 'Die App-Adresse darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten.', 'slug_available' => 'Diese App-Adresse ist verfügbar.', 'slug_taken' => 'Diese App-Adresse ist bereits vergeben. Wir haben eine freie Alternative vorbereitet.', 'price_unavailable' => 'Für diese Währung ist noch kein Preis hinterlegt.', 'business_confirmation_required' => 'Bitte bestätigen Sie, dass Sie als Unternehmen oder selbstständige Person handeln.', 'transcription_unavailable' => 'Die Spracheingabe ist derzeit nicht eingerichtet.', 'transcription_failed' => 'Die Aufnahme konnte nicht erkannt werden. Bitte versuchen Sie es erneut oder geben Sie den Text ein.', 'description_refinement_failed' => 'Der Text konnte nicht überarbeitet werden. Sie können mit Ihrer eigenen Formulierung fortfahren.'],
+            'en' => ['email_invalid' => 'Enter a valid email address.', 'email_available' => 'This email address is available.', 'email_taken' => 'This email address is already registered. Sign in or use another address.', 'slug_invalid' => 'The app address may contain lowercase letters, numbers and hyphens only.', 'slug_available' => 'This app address is available.', 'slug_taken' => 'This app address is already taken. We prepared an available alternative.', 'price_unavailable' => 'No price has been configured for this currency yet.', 'business_confirmation_required' => 'Confirm that you are acting as a business or self-employed professional.', 'transcription_unavailable' => 'Voice input is not configured right now.', 'transcription_failed' => 'The recording could not be transcribed. Try again or enter the text.', 'description_refinement_failed' => 'The text could not be polished. You can continue with your own wording.'],
+            'ru' => ['email_invalid' => 'Укажите корректный адрес электронной почты.', 'email_available' => 'Этот email можно использовать.', 'email_taken' => 'Этот email уже зарегистрирован. Войдите в аккаунт или укажите другой адрес.', 'slug_invalid' => 'В адресе приложения допустимы только латинские строчные буквы, цифры и дефисы.', 'slug_available' => 'Этот адрес приложения свободен.', 'slug_taken' => 'Этот адрес приложения уже занят. Мы подготовили свободный вариант.', 'price_unavailable' => 'Для выбранной валюты цена пока не настроена.', 'business_confirmation_required' => 'Подтвердите, что вы действуете как фирма или предприниматель.', 'transcription_unavailable' => 'Голосовой ввод сейчас не настроен.', 'transcription_failed' => 'Не удалось распознать запись. Попробуйте ещё раз или введите текст.', 'description_refinement_failed' => 'Не удалось отредактировать текст. Можно продолжить со своей формулировкой.'],
+            'uk' => ['email_invalid' => 'Укажіть коректну адресу електронної пошти.', 'email_available' => 'Цю електронну адресу можна використовувати.', 'email_taken' => 'Цю електронну адресу вже зареєстровано. Увійдіть або вкажіть іншу адресу.', 'slug_invalid' => 'В адресі застосунку дозволені лише латинські малі літери, цифри та дефіси.', 'slug_available' => 'Ця адреса застосунку вільна.', 'slug_taken' => 'Ця адреса застосунку вже зайнята. Ми підготували вільний варіант.', 'price_unavailable' => 'Для вибраної валюти ціну ще не налаштовано.', 'business_confirmation_required' => 'Підтвердьте, що ви дієте як компанія або підприємець.', 'transcription_unavailable' => 'Голосове введення зараз не налаштовано.', 'transcription_failed' => 'Не вдалося розпізнати запис. Спробуйте ще раз або введіть текст.', 'description_refinement_failed' => 'Не вдалося відредагувати текст. Можна продовжити зі своїм формулюванням.'],
         ];
 
         return $messages[app()->getLocale()][$key] ?? $messages['en'][$key];

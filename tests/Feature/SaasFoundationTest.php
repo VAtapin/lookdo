@@ -340,23 +340,38 @@ class SaasFoundationTest extends TestCase
         config([
             'services.openai.key' => 'test-key',
             'services.openai.transcription_model' => 'gpt-4o-mini-transcribe',
+            'services.openai.text_model' => 'gpt-5.6-luna',
         ]);
-        Http::fake(['api.openai.com/*' => Http::response([
-            'text' => 'Я покупаю картины, иконы, серебро и старинные часы.',
-            'model' => 'gpt-4o-mini-transcribe',
-            'usage' => ['input_tokens' => 100, 'output_tokens' => 12],
-        ])]);
+        Http::fake(fn (HttpRequest $request) => str_contains($request->url(), '/audio/transcriptions')
+            ? Http::response([
+                'text' => 'Я, ну, покупаю картины, иконы, серебро и старинные часы, в общем.',
+                'model' => 'gpt-4o-mini-transcribe',
+                'usage' => ['input_tokens' => 100, 'output_tokens' => 12],
+            ])
+            : Http::response([
+                'output_text' => 'Покупаем у частных лиц картины, иконы, серебро и старинные часы.',
+                'model' => 'gpt-5.6-luna',
+                'usage' => ['input_tokens' => 45, 'output_tokens' => 18],
+            ]));
 
         $this->post('/api/register/transcribe', [
             'audio' => UploadedFile::fake()->create('business.webm', 80, 'audio/webm'),
             'locale' => 'ru',
-        ])->assertOk()->assertJsonPath('text', 'Я покупаю картины, иконы, серебро и старинные часы.');
+        ])->assertOk()
+            ->assertJsonPath('text', 'Покупаем у частных лиц картины, иконы, серебро и старинные часы.')
+            ->assertJsonPath('refined', true);
 
         $this->assertDatabaseHas('ai_usage_records', [
             'operation' => 'registration_business_transcription',
             'model' => 'gpt-4o-mini-transcribe',
             'input_tokens' => 100,
             'output_tokens' => 12,
+        ]);
+        $this->assertDatabaseHas('ai_usage_records', [
+            'operation' => 'registration_business_description_refinement',
+            'model' => 'gpt-5.6-luna',
+            'input_tokens' => 45,
+            'output_tokens' => 18,
         ]);
     }
 
@@ -1248,6 +1263,16 @@ class SaasFoundationTest extends TestCase
             ->assertSee('https://golden-wheel.lookdo.app/brand/tenants/golden-wheel/wide-logo.webp', false)
             ->assertSee('Handgefertigte Lenkräder aus der eigenen Werkstatt.', false)
             ->assertDontSee('lookdo-social-de.jpg', false);
+
+        $rawTranscript = 'Ich werde also alte und auch verschiedene neue Sachen kaufen, darunter Bücher, Zeitschriften und so weiter, und ich möchte den Leuten hier irgendwie die Möglichkeit geben, ihre Sachen an mich zu verkaufen.';
+        $tenant->profile->update(['content' => [
+            'branding' => ['description_translations' => ['de' => $rawTranscript]],
+            'app_configuration' => ['hero' => ['text' => ['de' => 'Wir kaufen ausgewählte alte und neue Bücher direkt von Privatpersonen und Bibliotheken.']]],
+        ]]);
+
+        $this->get('https://golden-wheel.lookdo.app/de')->assertOk()
+            ->assertSee('Wir kaufen ausgewählte alte und neue Bücher direkt von Privatpersonen und Bibliotheken.', false)
+            ->assertDontSee($rawTranscript, false);
     }
 
     public function test_unpaid_tenant_cannot_use_ai_images_or_add_a_custom_domain(): void

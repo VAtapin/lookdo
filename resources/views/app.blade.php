@@ -4,7 +4,7 @@
     @php
         $socialTenant = request()->attributes->get('tenant');
         if ($socialTenant) {
-            $socialTenant->loadMissing('profile');
+            $socialTenant->loadMissing(['profile', 'businessProfile.variation']);
         }
         $socialLocaleCode = app()->getLocale();
         $socialProfile = $socialTenant?->profile;
@@ -26,9 +26,41 @@
             'ru' => 'Помощник для мастера, который работает сам на себя. Клиенты отправляют фото или видео, а вы сразу отвечаете.',
             'uk' => 'Помічник для майстра, який працює сам на себе. Клієнти надсилають фото або відео, а ви одразу відповідаєте.',
         ];
-        $socialDescription = $localizedSocialValue($socialBranding['description_translations'] ?? null, $socialLocaleCode)
-            ?: $socialTenant?->business_description
-            ?: ($platformDescriptions[$socialLocaleCode] ?? $platformDescriptions['de']);
+        $socialDescription = $platformDescriptions[$socialLocaleCode] ?? $platformDescriptions['de'];
+        if ($socialTenant) {
+            $appConfiguration = (array) data_get($socialProfile?->content, 'app_configuration', []);
+            $brandingDescription = $localizedSocialValue($socialBranding['description_translations'] ?? null, $socialLocaleCode);
+            $heroDescription = $localizedSocialValue(
+                data_get($appConfiguration, 'hero.text') ?: data_get($appConfiguration, 'hero.subtitle'),
+                $socialLocaleCode,
+            );
+            $looksUnpolished = static function (?string $value): bool {
+                $text = Illuminate\Support\Str::squish(strip_tags((string) $value));
+
+                return $text === ''
+                    || mb_strlen($text) > 240
+                    || preg_match('/\b(ну|как бы|в общем|короче|типа|так сказать|you know|kind of|and so on|um+|uh+|also|irgendwie|und so weiter|sozusagen|ähm+)\b/iu', $text) === 1;
+            };
+            $selectedDescription = collect([$brandingDescription, $heroDescription])
+                ->first(fn ($candidate) => ! $looksUnpolished($candidate));
+            if (! $selectedDescription) {
+                $activity = $localizedSocialValue($socialTenant->businessProfile?->variation?->name, $socialLocaleCode);
+                $tenantFallbacks = [
+                    'de' => ':business: :activity. Senden Sie Fotos und eine kurze Beschreibung, um eine Antwort zu erhalten.',
+                    'en' => ':business: :activity. Send photos and a short description to receive a reply.',
+                    'ru' => ':business: :activity. Отправьте фотографии и краткое описание, чтобы получить ответ.',
+                    'uk' => ':business: :activity. Надішліть фотографії та короткий опис, щоб отримати відповідь.',
+                ];
+                $selectedDescription = strtr($tenantFallbacks[$socialLocaleCode] ?? $tenantFallbacks['de'], [
+                    ':business' => $socialTenant->name,
+                    ':activity' => $activity ?: $socialTenant->name,
+                ]);
+            }
+            $socialDescription = Illuminate\Support\Str::limit(
+                Illuminate\Support\Str::squish(strip_tags((string) $selectedDescription)),
+                220,
+            );
+        }
         $defaultSocialImages = [
             'de' => '/brand/lookdo-social-de.jpg',
             'en' => '/brand/lookdo-social-en.jpg',

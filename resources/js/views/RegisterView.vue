@@ -9,6 +9,7 @@ const router = useRouter();
 const step = ref(1);
 const busy = ref(false);
 const classifying = ref(false);
+const refining = ref(false);
 const recording = ref(false);
 const transcribing = ref(false);
 const microphoneSupported = ref(false);
@@ -25,6 +26,8 @@ let mediaRecorder: MediaRecorder | null = null;
 let microphoneStream: MediaStream | null = null;
 let recordingTimer: number | undefined;
 let audioChunks: Blob[] = [];
+let suppressDescriptionWatch = false;
+let lastRefinedDescription = '';
 
 const form = reactive({
     name: '', email: '', password: '', password_confirmation: '', business_name: '', slug: '', country: 'DE', locale: locale.value,
@@ -64,7 +67,10 @@ onBeforeUnmount(() => {
     microphoneStream?.getTracks().forEach(track => track.stop());
 });
 
-watch(() => form.locale, () => { if (!currencyEdited.value) applyDefaultCurrency(); });
+watch(() => form.locale, () => {
+    lastRefinedDescription = '';
+    if (!currencyEdited.value) applyDefaultCurrency();
+});
 watch(() => [form.email, form.slug, form.business_name], () => {
     availability.email = null;
     availability.slug = null;
@@ -72,6 +78,7 @@ watch(() => [form.email, form.slug, form.business_name], () => {
     availabilityTimer = window.setTimeout(() => checkAvailability(false), 650);
 });
 watch(() => [form.business_description, form.locale], () => {
+    if (suppressDescriptionWatch) return;
     form.template_confirmed = false;
     window.clearTimeout(classifyTimer);
     if (words.value < 4) return;
@@ -179,11 +186,41 @@ async function nextAccount() {
     step.value = 2;
 }
 
-function confirmActivity() {
+async function confirmActivity() {
     if (!form.variation_id) return;
     error.value = '';
+    await analyzeActivity(true);
+    if (!form.variation_id) return;
     form.template_confirmed = false;
     step.value = 3;
+}
+
+async function analyzeActivity(automatic = false) {
+    await refineActivityDescription();
+    await classify(automatic);
+}
+
+async function refineActivityDescription() {
+    const source = form.business_description.trim();
+    if (source.length < 3 || source === lastRefinedDescription) return;
+    refining.value = true;
+    try {
+        const result = await api<{ text: string }>('/register/refine-description', {
+            method: 'POST',
+            body: JSON.stringify({ description: source, locale: form.locale }),
+        });
+        const refined = result.text.trim();
+        if (!refined) return;
+        suppressDescriptionWatch = true;
+        form.business_description = refined;
+        lastRefinedDescription = refined;
+        await nextTick();
+    } catch {
+        // Registration remains available if the optional wording pass is temporarily unavailable.
+    } finally {
+        suppressDescriptionWatch = false;
+        refining.value = false;
+    }
 }
 
 function confirmTemplate() {
@@ -247,11 +284,13 @@ async function transcribeRecording() {
     transcribing.value = true;
     error.value = '';
     try {
-        const result = await api<{ text: string }>('/register/transcribe', { method: 'POST', body });
+        const result = await api<{ text: string; refined?: boolean }>('/register/transcribe', { method: 'POST', body });
         classification.value = null;
         form.classification_id = null;
         form.variation_id = null;
-        form.business_description = [form.business_description.trim(), result.text.trim()].filter(Boolean).join(' ');
+        const existingDescription = form.business_description.trim();
+        form.business_description = [existingDescription, result.text.trim()].filter(Boolean).join(' ');
+        if (result.refined && !existingDescription) lastRefinedDescription = result.text.trim();
     } catch (exception: any) {
         error.value = exception?.status === 429 ? tr('transcriptionRateLimited') : exception.message;
     } finally {
@@ -340,14 +379,14 @@ async function register() {
         </div><p v-if="error" class="alert error">{{ error }}</p><button class="button full" :disabled="availability.checking">{{ tr('continue') }} →</button>
       </form>
 
-      <form v-if="step === 2" @submit.prevent="classify(false)">
+      <form v-if="step === 2" @submit.prevent="analyzeActivity(false)">
         <p class="eyebrow">{{ tr('stepLabel') }} 02</p><h2>{{ tr('whatBusiness') }}</h2><p>{{ tr('describeWork') }}</p>
         <label>{{ tr('yourActivity') }}<div class="activity-input"><textarea v-model="form.business_description" rows="5" required :placeholder="tr('activityPlaceholder')"></textarea><button v-if="microphoneSupported" type="button" class="voice-button" :class="{ recording }" :disabled="transcribing" :aria-pressed="recording" @click="toggleRecording"><span aria-hidden="true">{{ recording ? '■' : '●' }}</span>{{ transcribing ? tr('transcribing') : recording ? tr('stopRecording') : tr('dictate') }}</button></div><small class="voice-hint">{{ tr('voiceHint') }}</small></label>
-        <div class="activity-analysis-state" :class="{ working: classifying }"><span></span>{{ classifying ? tr('analysing') : (words < 4 ? tr('activityAutoHint') : classification ? tr('templateFound') : tr('activityWaiting')) }}</div>
+        <div class="activity-analysis-state" :class="{ working: classifying || refining }"><span></span>{{ classifying || refining ? tr('analysing') : (words < 4 ? tr('activityAutoHint') : classification ? tr('templateFound') : tr('activityWaiting')) }}</div>
         <div v-if="candidates.length" class="candidate-list inline-candidates"><label v-for="candidate in candidates" :key="candidate.variation_id" :class="{ selected: form.variation_id === candidate.variation_id }"><input v-model="form.variation_id" type="radio" :value="candidate.variation_id"><img loading="lazy" decoding="async" :src="candidate.preview?.image || '/brand/service-renovation.webp'" alt=""><span><b>{{ candidate.variation }}</b><small>{{ candidate.category }}<template v-if="!candidate.fallback"> · {{ Math.round(candidate.score * 100) }}%</template></small></span></label></div>
         <div v-if="classification?.source === 'fallback'" class="alert fallback">{{ tr('noTemplate') }}</div>
         <p v-if="error" class="alert error">{{ error }}</p>
-        <div class="form-actions"><button type="button" class="button ghost" @click="step = 1">← {{ tr('back') }}</button><button type="submit" class="button ghost" :disabled="classifying">{{ tr('checkAgain') }}</button><button v-if="form.variation_id" type="button" class="button" @click="confirmActivity">{{ tr('showTemplate') }} →</button></div>
+        <div class="form-actions"><button type="button" class="button ghost" @click="step = 1">← {{ tr('back') }}</button><button type="submit" class="button ghost" :disabled="classifying || refining">{{ tr('checkAgain') }}</button><button v-if="form.variation_id" type="button" class="button" :disabled="classifying || refining" @click="confirmActivity">{{ tr('showTemplate') }} →</button></div>
       </form>
 
       <form v-if="step === 3" class="template-step" @submit.prevent="confirmTemplate">
