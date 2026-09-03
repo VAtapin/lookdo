@@ -123,8 +123,19 @@ const isBrows = computed(() => app.value?.template?.layout === "brows");
 const isBookPurchase = computed(
     () => app.value?.template?.variation_code === "purchase.books",
 );
+const usesHorizontalHeaderLogo = computed(
+    () =>
+        !app.value?.tenant?.logo &&
+        Boolean(app.value?.tenant?.branding?.horizontal_logo),
+);
+const headerLogo = computed(
+    () =>
+        app.value?.tenant?.logo ||
+        app.value?.tenant?.branding?.horizontal_logo ||
+        "/brand/lookdo-mark.webp",
+);
 const heroHeaderLabel = computed(() =>
-    isBookPurchase.value && app.value?.tenant?.branding?.horizontal_logo
+    isBookPurchase.value && usesHorizontalHeaderLogo.value
         ? app.value?.tenant?.name
         : app.value?.template?.hero?.eyebrow,
 );
@@ -926,45 +937,35 @@ const loginContext = {
                                     class="ta-brand"
                                     :class="{
                                         'has-horizontal-logo':
-                                            app.tenant.branding
-                                                ?.horizontal_logo,
+                                            usesHorizontalHeaderLogo,
                                     }"
                                     @click="go('home')"
                                 >
                                     <img
-                                        :src="
-                                            app.tenant.branding
-                                                ?.horizontal_logo ||
-                                            app.tenant.logo ||
-                                            '/brand/lookdo-mark.webp'
-                                        "
+                                        :src="headerLogo"
                                         :alt="app.tenant.name"
                                     /><span
-                                        v-if="
-                                            !app.tenant.branding
-                                                ?.horizontal_logo
-                                        "
+                                        v-if="!usesHorizontalHeaderLogo"
                                         >{{ app.tenant.name }}</span
                                     >
                                 </button>
                                 <div>
                                     <button
                                         v-if="hasMultipleLocales"
-                                        class="ta-header-action ta-language-trigger"
+                                        class="ta-language-trigger"
                                         @click="languageOpen = true"
                                     >
                                         {{ locale.toUpperCase() }}
                                     </button>
                                     <button
                                         v-if="hasContactMethods"
-                                        class="ta-header-action ta-contact-trigger"
+                                        class="ta-contact-trigger"
                                         :aria-label="copy.contacts"
                                         @click="contactOpen = !contactOpen"
                                     >
                                         <AppIcon name="phone" />
                                     </button>
                                     <button
-                                        class="ta-header-action"
                                         @click="
                                             contactOpen = false;
                                             menuOpen = true;
@@ -1164,24 +1165,15 @@ const loginContext = {
                                         class="ta-brand"
                                         :class="{
                                             'has-horizontal-logo':
-                                                app.tenant.branding
-                                                    ?.horizontal_logo,
+                                                usesHorizontalHeaderLogo,
                                         }"
                                         @click="go('home')"
                                     >
                                         <img
-                                            :src="
-                                                app.tenant.branding
-                                                    ?.horizontal_logo ||
-                                                app.tenant.logo ||
-                                                '/brand/lookdo-mark.webp'
-                                            "
+                                            :src="headerLogo"
                                             :alt="app.tenant.name"
                                         /><span
-                                            v-if="
-                                                !app.tenant.branding
-                                                    ?.horizontal_logo
-                                            "
+                                            v-if="!usesHorizontalHeaderLogo"
                                             >{{ app.tenant.name }}</span
                                         >
                                     </button>
@@ -1191,21 +1183,20 @@ const loginContext = {
                                     <div>
                                         <button
                                             v-if="hasMultipleLocales"
-                                            class="ta-header-action ta-language-trigger"
+                                            class="ta-language-trigger"
                                             @click="languageOpen = true"
                                         >
                                             {{ locale.toUpperCase() }}
                                         </button>
                                         <button
                                             v-if="hasContactMethods"
-                                            class="ta-header-action ta-contact-trigger"
+                                            class="ta-contact-trigger"
                                             :aria-label="copy.contacts"
                                             @click="contactOpen = !contactOpen"
                                         >
                                             <AppIcon name="phone" />
                                         </button>
                                         <button
-                                            class="ta-header-action"
                                             @click="
                                                 contactOpen = false;
                                                 menuOpen = true;
