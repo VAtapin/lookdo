@@ -12,6 +12,9 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ reload: []; complete: [] }>();
 const existing = props.account?.tenant?.profile?.branding || {};
+const generatedHero =
+    props.account?.tenant?.profile?.content?.app_configuration?.hero || {};
+const existingHeroCopy = existing.hero_copy || generatedHero;
 const availableLocales = computed(
     () =>
         props.account?.tenant?.profile?.enabled_locales ||
@@ -34,6 +37,12 @@ const form = reactive<any>({
     tagline: existing.tagline || "",
     description_translations: { ...(existing.description_translations || {}) },
     tagline_translations: { ...(existing.tagline_translations || {}) },
+    hero_copy: {
+        eyebrow: { ...(existingHeroCopy.eyebrow || {}) },
+        title: { ...(existingHeroCopy.title || {}) },
+        text: { ...(existingHeroCopy.text || {}) },
+        action: { ...(existingHeroCopy.action || {}) },
+    },
     service_modes: [...(existing.service_modes || ["workshop"])],
     phone: props.account?.tenant?.profile?.phone || "",
     vk_url: existing.vk_url || "",
@@ -62,6 +71,11 @@ const preparingAsset = ref<BrandingAsset | null>(null);
 const mainLocale = computed(
     () => props.account?.tenant?.locale || props.locale,
 );
+const heroLocale = ref(
+    availableLocales.value.includes(props.locale)
+        ? props.locale
+        : availableLocales.value[0] || mainLocale.value,
+);
 const localizedDescription = computed(
     () =>
         form.description_translations[props.locale] ||
@@ -76,6 +90,12 @@ const localizedTagline = computed(
         form.tagline ||
         props.account?.tenant?.name ||
         "",
+);
+const localizedHeroTitle = computed(
+    () => form.hero_copy.title[heroLocale.value] || localizedTagline.value,
+);
+const localizedHeroText = computed(
+    () => form.hero_copy.text[heroLocale.value] || localizedDescription.value,
 );
 const canConfirm = computed(() =>
     Boolean(
@@ -131,6 +151,7 @@ function applySavedBranding(result: any) {
         "style",
         "avoid",
         "tagline",
+        "hero_copy",
         "service_modes",
         "vk_url",
         "max_url",
@@ -340,6 +361,45 @@ function closePrompt() {
                         ><label
                             >{{ t("tagline")
                             }}<input v-model="form.tagline_translations[entry]"
+                        /></label>
+                    </div>
+                </fieldset>
+                <fieldset class="mw-hero-copy-editor">
+                    <legend>{{ t("heroTexts") }}</legend>
+                    <p>{{ t("heroTextsHint") }}</p>
+                    <div class="mw-language-tabs" role="tablist">
+                        <button
+                            v-for="entry in availableLocales"
+                            :key="entry"
+                            type="button"
+                            :class="{ active: heroLocale === entry }"
+                            @click="heroLocale = entry"
+                        >
+                            {{ localeLabels[entry] || entry.toUpperCase() }}
+                        </button>
+                    </div>
+                    <div class="mw-hero-copy-fields">
+                        <label
+                            >{{ t("heroEyebrow") }}<input
+                                v-model="form.hero_copy.eyebrow[heroLocale]"
+                                maxlength="100"
+                        /></label>
+                        <label
+                            >{{ t("heroTitle") }}<input
+                                v-model="form.hero_copy.title[heroLocale]"
+                                maxlength="220"
+                        /></label>
+                        <label
+                            >{{ t("heroText") }}<textarea
+                                v-model="form.hero_copy.text[heroLocale]"
+                                rows="3"
+                                maxlength="600"
+                            ></textarea
+                        ></label>
+                        <label
+                            >{{ t("heroAction") }}<input
+                                v-model="form.hero_copy.action[heroLocale]"
+                                maxlength="120"
                         /></label>
                     </div>
                 </fieldset>
@@ -583,9 +643,9 @@ function closePrompt() {
                 /><b v-if="!horizontalLogoUrl">{{ account.tenant.name }}</b>
             </header>
             <div>
-                <small>{{ t("preview") }}</small>
-                <h2>{{ localizedTagline }}</h2>
-                <p>{{ localizedDescription }}</p>
+                <small>{{ t("preview") }} · {{ localeLabels[heroLocale] }}</small>
+                <h2>{{ localizedHeroTitle }}</h2>
+                <p>{{ localizedHeroText }}</p>
             </div>
         </article>
         <p v-if="!canConfirm" class="mw-warning">{{ t("brandingRequired") }}</p>

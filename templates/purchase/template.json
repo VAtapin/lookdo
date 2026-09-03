@@ -103,6 +103,25 @@
     "text": {"de": "Die Angaben werden geprüft. Der Käufer meldet sich bei Ihnen.", "en": "The details will be reviewed and the buyer will contact you.", "ru": "Покупатель проверит информацию и свяжется с вами.", "uk": "Покупець перевірить інформацію та зв’яжеться з вами."}
   },
   "variation_overrides": {
+    "purchase.building-parts": {
+      "preview": {"image": "/brand/service-door.webp", "primary_color": "#d8a447", "secondary_color": "#111317"},
+      "hero": {
+        "eyebrow": {"de": "ALTE BAUTEILE", "en": "SALVAGED BUILDING PARTS", "ru": "СТАРЫЕ СТРОИТЕЛЬНЫЕ ДЕТАЛИ", "uk": "СТАРІ БУДІВЕЛЬНІ ДЕТАЛІ"},
+        "title": {"de": "Suchen Sie alte Fenster oder Türen?", "en": "Looking for old windows or doors?", "ru": "Ищете старые окна или двери?", "uk": "Шукаєте старі вікна або двері?"},
+        "text": {"de": "Senden Sie Fotos und Maße des gewünschten Bauteils. Wir prüfen, ob passende alte Fenster oder Türen verfügbar sind.", "en": "Send photos and dimensions of the item you need. We will check whether suitable old windows or doors are available.", "ru": "Отправьте фото и размеры нужной детали. Мы проверим, есть ли подходящие старые окна или двери.", "uk": "Надішліть фото та розміри потрібної деталі. Ми перевіримо, чи є відповідні старі вікна або двері."},
+        "subtitle": {"de": "Senden Sie Fotos und Maße des gewünschten Bauteils. Wir prüfen, ob passende alte Fenster oder Türen verfügbar sind.", "en": "Send photos and dimensions of the item you need. We will check whether suitable old windows or doors are available.", "ru": "Отправьте фото и размеры нужной детали. Мы проверим, есть ли подходящие старые окна или двери.", "uk": "Надішліть фото та розміри потрібної деталі. Ми перевіримо, чи є відповідні старі вікна або двері."},
+        "action": {"de": "Anfrage senden", "en": "Send a request", "ru": "Отправить заявку", "uk": "Надіслати запит"},
+        "image": "/brand/service-door.webp"
+      },
+      "media": {
+        "photos_min": 1,
+        "photos_max": 6,
+        "slots": [
+          {"key": "reference", "role": "reference", "title": {"de": "Gesuchtes Fenster oder Tür", "en": "Window or door needed", "ru": "Нужное окно или дверь", "uk": "Потрібне вікно або двері"}, "instruction": {"de": "Zeigen Sie ein Beispiel oder den Einbauort möglichst vollständig.", "en": "Show an example or the installation location in full.", "ru": "Покажите пример или место установки целиком.", "uk": "Покажіть приклад або місце встановлення повністю."}, "required": true},
+          {"key": "dimensions", "role": "identifier", "title": {"de": "Maße", "en": "Dimensions", "ru": "Размеры", "uk": "Розміри"}, "instruction": {"de": "Fotografieren Sie die Maße oder eine verständliche Skizze.", "en": "Photograph the measurements or a clear sketch.", "ru": "Сфотографируйте размеры или понятный эскиз.", "uk": "Сфотографуйте розміри або зрозумілий ескіз."}, "required": false}
+        ]
+      }
+    },
     "purchase.books": {
       "preview": {"image": "/brand/purchase-books.webp", "primary_color": "#a76731", "secondary_color": "#25211e"},
       "hero": {

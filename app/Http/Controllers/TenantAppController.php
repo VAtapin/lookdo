@@ -998,6 +998,20 @@ class TenantAppController extends Controller
         if ($variationCode === 'purchase.books') {
             $hero = array_replace($hero, $this->bookPurchaseHero($locale));
         }
+        $manualHero = (array) $this->localized(
+            data_get($tenant->profile?->content, 'branding.hero_copy', []),
+            $locale,
+        );
+        $manualHero = array_filter(
+            Arr::only($manualHero, ['eyebrow', 'title', 'text', 'action']),
+            fn ($value) => filled($value),
+        );
+        if ($manualHero !== []) {
+            $hero = array_replace($hero, $manualHero);
+            if (array_key_exists('text', $manualHero)) {
+                $hero['subtitle'] = $manualHero['text'];
+            }
+        }
         if (filled(data_get($tenant->profile?->content, 'branding.hero_image_path'))) {
             $hero['image'] = $this->assetUrl(data_get($tenant->profile?->content, 'branding.hero_image_path'));
         }

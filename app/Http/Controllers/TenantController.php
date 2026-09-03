@@ -179,6 +179,15 @@ class TenantController extends Controller
             'description_translations.*' => 'nullable|string|max:3000',
             'tagline_translations' => 'nullable|array',
             'tagline_translations.*' => 'nullable|string|max:300',
+            'hero_copy' => 'nullable|array:eyebrow,title,text,action',
+            'hero_copy.eyebrow' => 'nullable|array:de,en,ru,uk',
+            'hero_copy.eyebrow.*' => 'nullable|string|max:100',
+            'hero_copy.title' => 'nullable|array:de,en,ru,uk',
+            'hero_copy.title.*' => 'nullable|string|max:220',
+            'hero_copy.text' => 'nullable|array:de,en,ru,uk',
+            'hero_copy.text.*' => 'nullable|string|max:600',
+            'hero_copy.action' => 'nullable|array:de,en,ru,uk',
+            'hero_copy.action.*' => 'nullable|string|max:120',
             'source_locale' => ['nullable', Rule::in(['de', 'en', 'ru', 'uk'])],
             'service_modes' => 'nullable|array|min:1|max:2',
             'service_modes.*' => ['required', Rule::in(['workshop', 'on_site'])],
@@ -310,7 +319,7 @@ class TenantController extends Controller
         $budget->ensureAvailable($request->user()?->id);
         $instructions = match ($data['asset']) {
             'logo' => 'Write one editable image-generation prompt entirely in '.$language.' for a simple premium square business logo mark. It must remain legible as a tiny app icon, use no copyrighted marks, vehicle brand logos, photographs, mockups, text, letters or watermarks.',
-            default => 'Write one editable image-generation prompt entirely in '.$language.' for a premium vertical mobile-app hero photograph. Show the exact service in a realistic workplace, leave darker clean areas for interface text, and include no text, logos, vehicle brand marks, number plates, UI or watermarks.',
+            default => 'Write one editable image-generation prompt entirely in '.$language.' for a premium vertical mobile-app hero photograph. The business_description is authoritative: if category, variation or template conflicts with it, follow the concrete business activity and objects in business_description. Show that exact activity in a realistic workplace, leave darker clean areas for interface text, and include no text, logos, vehicle brand marks, number plates, UI or watermarks.',
         };
         $result = $openAi->structured($instructions.' Return JSON only.', json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 'tenant_branding_prompt', [
             'type' => 'object',

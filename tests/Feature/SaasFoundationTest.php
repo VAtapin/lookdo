@@ -261,6 +261,20 @@ class SaasFoundationTest extends TestCase
         $this->assertNotNull($response->json('candidates.0.variation_id'));
     }
 
+    public function test_selling_old_windows_and_doors_uses_the_salvaged_parts_purchase_flow(): void
+    {
+        $response = $this->postJson('/api/classify', [
+            'description' => 'Wir verkaufen alte Fenster und Türen aus einer Baustelle.',
+            'locale' => 'de',
+        ])->assertOk()
+            ->assertJsonPath('candidates.0.template_code', 'purchase.general');
+
+        $this->assertSame(
+            'purchase.building-parts',
+            BusinessVariation::findOrFail($response->json('candidates.0.variation_id'))->code,
+        );
+    }
+
     public function test_ai_can_only_choose_from_existing_classification_candidates(): void
     {
         $variation = BusinessVariation::where('code', 'automotive.general')->firstOrFail();

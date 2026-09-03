@@ -70,6 +70,7 @@ class DatabaseSeeder extends Seeder
             'purchase.books' => ['purchase', 100, ['de' => 'Bücher & Zeitschriften', 'en' => 'Books & magazines', 'ru' => 'Книги и журналы', 'uk' => 'Книги та журнали'], 'purchase.general'],
             'purchase.vehicles' => ['purchase', 90, ['de' => 'Fahrzeuge', 'en' => 'Vehicles', 'ru' => 'Автомобили', 'uk' => 'Автомобілі'], 'purchase.general'],
             'purchase.antiques' => ['purchase', 80, ['de' => 'Antiquitäten', 'en' => 'Antiques', 'ru' => 'Антиквариат', 'uk' => 'Антикваріат'], 'purchase.general'],
+            'purchase.building-parts' => ['purchase', 85, ['de' => 'Alte Fenster & Türen', 'en' => 'Salvaged windows & doors', 'ru' => 'Старые окна и двери', 'uk' => 'Старі вікна та двері'], 'purchase.general'],
             'general-services.general' => ['general-services', 1, ['de' => 'Universelle Anfrage', 'en' => 'Universal request', 'ru' => 'Универсальная заявка', 'uk' => 'Універсальна заявка']],
         ];
         $variations = [];
@@ -145,6 +146,7 @@ class DatabaseSeeder extends Seeder
             'purchase.books' => ['ru' => ['покупка книг', 'скупка книг', 'куплю книги', 'букинист', 'покупка журналов', 'продать книги', 'продать библиотеку'], 'uk' => ['купівля книг', 'скупка книг', 'продати книги'], 'de' => ['bücher ankauf', 'bücher verkaufen', 'bibliothek verkaufen'], 'en' => ['buy books', 'sell books', 'book buyer']],
             'purchase.vehicles' => ['ru' => ['покупка автомобилей', 'скупка авто', 'купим автомобиль', 'авто в любом состоянии', 'продать машину'], 'uk' => ['купівля автомобілів', 'скупка авто', 'продати авто'], 'de' => ['autoankauf', 'gebrauchtwagen ankauf', 'auto verkaufen'], 'en' => ['car buyer', 'we buy cars', 'sell a car']],
             'purchase.antiques' => ['ru' => ['покупка антиквариата', 'скупка антиквариата', 'куплю старинные вещи', 'продать антиквариат'], 'uk' => ['купівля антикваріату', 'скупка антикваріату'], 'de' => ['antiquitäten ankauf', 'antik ankauf'], 'en' => ['antiques buyer', 'sell antiques']],
+            'purchase.building-parts' => ['de' => ['alte fenster verkaufen', 'alte türen verkaufen', 'wir verkaufen alte fenster und türen', 'gebrauchte fenster und türen', 'historische bauteile verkaufen'], 'en' => ['sell old windows and doors', 'salvaged building parts'], 'ru' => ['продаем старые окна и двери', 'старые строительные детали'], 'uk' => ['продаємо старі вікна та двері', 'старі будівельні деталі']],
         ];
         foreach ($phraseSets as $variationCode => $locales) {
             $variation = $variations[$variationCode];
