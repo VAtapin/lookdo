@@ -137,7 +137,7 @@ onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));})
         <article class="ta-capture-instructions">
           <span class="ta-round-icon"><AppIcon name="camera" :size="36"/></span>
           <div><h2>{{app.template.hero?.title||copy.captureTitle}}</h2><p>{{app.template.hero?.subtitle||copy.captureList}}</p></div>
-          <div class="ta-wheel-map"><AppIcon name="image" :size="58"/><b v-for="(_,index) in slots.slice(0,4)" :key="index">{{index+1}}</b></div>
+          <div class="ta-wheel-map" :class="{'is-steering':app.template.layout==='steering'}"><AppIcon :name="app.template.layout==='steering'?'steering':'image'" :size="64"/><b v-for="(_,index) in slots.slice(0,4)" :key="index">{{index+1}}</b></div>
         </article>
         <button class="ta-live-camera" @click="choose(nextSlotIndex())">
           <img v-if="current" :src="current.url" alt="">
@@ -267,6 +267,46 @@ onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));})
 </template>
 
 <style scoped>
+.ta-wheel-map {
+  width: 116px;
+  height: 116px;
+  justify-self: center;
+  align-self: center;
+}
+
+.ta-wheel-map :deep(svg) {
+  display: block;
+}
+
+.ta-wheel-map.is-steering :deep(svg) {
+  color: var(--ta-gold-soft, #f2c977);
+  filter: drop-shadow(0 0 10px rgba(224, 170, 80, 0.18));
+}
+
+.ta-wheel-map b:nth-of-type(1) {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ta-wheel-map b:nth-of-type(2) {
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+}
+
+.ta-wheel-map b:nth-of-type(3) {
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+}
+
+.ta-wheel-map b:nth-of-type(4) {
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 .ta-add-photo-button {
   display: inline-flex;
   align-items: center;
