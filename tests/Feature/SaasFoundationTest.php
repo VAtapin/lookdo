@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\TenantAppController;
+use App\Jobs\GenerateTenantAppCustomization;
 use App\Jobs\SendSmsMessage;
 use App\Models\AiUsageRecord;
 use App\Models\BusinessClassification;
@@ -15,6 +17,8 @@ use App\Models\SystemSetting;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\BackupService;
+use App\Services\OpenAiBudgetService;
+use App\Services\OpenAiService;
 use App\Services\SmsGateway;
 use App\Services\SmsService;
 use App\Services\StripeService;
@@ -258,6 +262,7 @@ class SaasFoundationTest extends TestCase
 
     public function test_registration_creates_isolated_tenant_platform_domain_and_subscription(): void
     {
+        Queue::fake([GenerateTenantAppCustomization::class]);
         $variation = BusinessVariation::where('code', 'automotive.steering-wheel-upholstery')->firstOrFail();
         $classification = BusinessClassification::create(['original_text' => 'перетяжка рулей', 'normalized_text' => 'перетяжка рулей', 'category_id' => $variation->category_id, 'variation_id' => $variation->id, 'confidence' => 1, 'source' => 'exact']);
         $plan = Plan::where('code', 'start')->firstOrFail();
@@ -266,6 +271,7 @@ class SaasFoundationTest extends TestCase
             'business_name' => 'Leonid Deluxe', 'country' => 'DE', 'locale' => 'ru', 'business_description' => 'Перетяжка рулей',
             'classification_id' => $classification->id, 'variation_id' => $variation->id, 'plan_id' => $plan->id, 'billing_cycle' => 'monthly',
             'currency' => 'RUB',
+            'template_confirmed' => true,
             'confirm_business_customer' => true, 'accept_terms' => true, 'accept_privacy' => true,
         ])->assertCreated()
             ->assertJsonPath('tenant.slug', 'leonid-deluxe')
@@ -276,6 +282,8 @@ class SaasFoundationTest extends TestCase
         $this->assertDatabaseHas('tenant_business_profiles', ['tenant_id' => $tenant->id, 'variation_id' => $variation->id]);
         $this->assertDatabaseHas('legal_acceptances', ['tenant_id' => $tenant->id, 'user_id' => $tenant->users()->firstOrFail()->id]);
         $this->assertNotNull(DB::table('legal_acceptances')->where('tenant_id', $tenant->id)->value('business_customer_confirmed_at'));
+        $this->assertSame('pending', data_get($tenant->profile->content, 'ai_customization.status'));
+        Queue::assertPushed(GenerateTenantAppCustomization::class, fn ($job) => $job->tenantId === $tenant->id);
 
         $site = $this->getJson('http://leonid-deluxe.lookdo.app/api/tenant-site')
             ->assertOk()
@@ -294,6 +302,78 @@ class SaasFoundationTest extends TestCase
             'currency' => 'RUB',
         ])->assertUnprocessable();
         $this->assertSame(1, $tenant->subscriptions()->count());
+    }
+
+    public function test_registration_voice_description_is_transcribed_and_recorded_as_ai_usage(): void
+    {
+        config([
+            'services.openai.key' => 'test-key',
+            'services.openai.transcription_model' => 'gpt-4o-mini-transcribe',
+        ]);
+        Http::fake(['api.openai.com/*' => Http::response([
+            'text' => 'Я покупаю картины, иконы, серебро и старинные часы.',
+            'model' => 'gpt-4o-mini-transcribe',
+            'usage' => ['input_tokens' => 100, 'output_tokens' => 12],
+        ])]);
+
+        $this->post('/api/register/transcribe', [
+            'audio' => UploadedFile::fake()->create('business.webm', 80, 'audio/webm'),
+            'locale' => 'ru',
+        ])->assertOk()->assertJsonPath('text', 'Я покупаю картины, иконы, серебро и старинные часы.');
+
+        $this->assertDatabaseHas('ai_usage_records', [
+            'operation' => 'registration_business_transcription',
+            'model' => 'gpt-4o-mini-transcribe',
+            'input_tokens' => 100,
+            'output_tokens' => 12,
+        ]);
+    }
+
+    public function test_confirmed_registration_can_generate_a_safe_tenant_specific_template_layer(): void
+    {
+        config(['services.openai.key' => 'test-key', 'services.openai.text_model' => 'gpt-5.6-luna']);
+        $localized = fn (string $value): array => ['de' => $value, 'en' => $value, 'ru' => $value, 'uk' => $value];
+        Http::fake(['api.openai.com/*' => Http::response([
+            'output_text' => json_encode([
+                'specialization' => $localized('Иконы, серебро и часы'),
+                'hero' => ['eyebrow' => $localized('АНТИКВАРИАТ'), 'title' => $localized('Предложите предмет'), 'text' => $localized('Покажите детали'), 'action' => $localized('Предложить антиквариат')],
+                'submit_label' => $localized('Отправить на оценку'),
+                'success_title' => $localized('Предложение отправлено'),
+                'success_text' => $localized('Покупатель свяжется с вами'),
+                'condition_context' => $localized('иконы, серебро и старинные часы'),
+                'trust' => [['icon' => 'shield', 'label' => $localized('Бережная проверка')]],
+                'photo_slots' => [
+                    ['title' => $localized('Предмет целиком'), 'instruction' => $localized('Покажите весь предмет'), 'required' => true],
+                    ['title' => $localized('Клеймо'), 'instruction' => $localized('Снимите клеймо крупно'), 'required' => true],
+                ],
+                'fields' => [[
+                    'type' => 'text', 'label' => $localized('Материал'), 'placeholder' => $localized('Если известно'), 'required' => false, 'options' => [],
+                ]],
+                'starter_services' => [],
+            ], JSON_UNESCAPED_UNICODE),
+            'model' => 'gpt-5.6-luna',
+            'usage' => ['input_tokens' => 400, 'output_tokens' => 220],
+        ])]);
+        $variation = BusinessVariation::where('code', 'purchase.antiques')->firstOrFail();
+        $template = RequestTemplate::where('code', 'purchase.general')->firstOrFail();
+        $tenant = Tenant::create(['name' => 'Antik', 'slug' => 'antik-test', 'country' => 'DE', 'locale' => 'ru', 'business_description' => 'Покупаю иконы, серебро и старинные часы', 'status' => 'active']);
+        $owner = User::create(['name' => 'Owner', 'email' => 'antik@example.test', 'password' => 'SecurePass123', 'locale' => 'ru', 'is_active' => true]);
+        $tenant->users()->attach($owner, ['role' => 'owner']);
+        $tenant->profile()->create(['email' => $owner->email, 'content' => ['ai_customization' => ['status' => 'pending']]]);
+        $tenant->businessProfile()->create(['category_id' => $variation->category_id, 'variation_id' => $variation->id, 'request_template_id' => $template->id, 'original_description' => $tenant->business_description]);
+
+        (new GenerateTenantAppCustomization($tenant->id))->handle(app(OpenAiService::class), app(OpenAiBudgetService::class));
+
+        $content = $tenant->profile->fresh()->content;
+        $this->assertSame('ready', data_get($content, 'ai_customization.status'));
+        $this->assertSame('Предложить антиквариат', data_get($content, 'app_configuration.hero.action.ru'));
+        $this->assertSame('custom_photo_1', data_get($content, 'app_configuration.media.slots.0.key'));
+        $this->assertSame('custom_field_1', data_get($content, 'app_configuration.fields.0.key'));
+        $configurationMethod = new ReflectionMethod(TenantAppController::class, 'configuration');
+        $configuration = $configurationMethod->invoke(app(TenantAppController::class), $tenant->fresh());
+        $this->assertCount(2, $configuration['media']['slots']);
+        $this->assertCount(1, $configuration['fields']);
+        $this->assertDatabaseHas('ai_usage_records', ['tenant_id' => $tenant->id, 'operation' => 'tenant_registration_customization']);
     }
 
     public function test_registration_resolves_fallback_without_classification_or_variation_ids(): void

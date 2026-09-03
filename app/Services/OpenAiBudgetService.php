@@ -52,4 +52,19 @@ class OpenAiBudgetService
             'usage_date' => today(),
         ]);
     }
+
+    public function recordTranscription(string $operation, string $model, int $inputTokens, int $outputTokens): AiUsageRecord
+    {
+        $cost = ($inputTokens / 1_000_000 * (float) config('services.openai.transcription_input_cost_per_million'))
+            + ($outputTokens / 1_000_000 * (float) config('services.openai.transcription_output_cost_per_million'));
+
+        return AiUsageRecord::create([
+            'operation' => $operation,
+            'model' => $model,
+            'input_tokens' => $inputTokens,
+            'output_tokens' => $outputTokens,
+            'cost' => $cost,
+            'usage_date' => today(),
+        ]);
+    }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -57,6 +58,45 @@ class OpenAiService
             'strict' => true,
             'schema' => $schema,
         ]);
+    }
+
+    /** @return array{text:string,model:string,input_tokens:int,output_tokens:int} */
+    public function transcribe(UploadedFile $audio, ?string $language = null): array
+    {
+        if (! $this->configured()) {
+            throw new RuntimeException('OPENAI_API_KEY is not configured.');
+        }
+
+        $path = $audio->getRealPath();
+        $contents = is_string($path) ? file_get_contents($path) : false;
+        if (! is_string($contents) || $contents === '') {
+            throw new RuntimeException('The recorded audio could not be read.');
+        }
+
+        $payload = ['model' => config('services.openai.transcription_model')];
+        if (filled($language)) {
+            $payload['language'] = $language;
+        }
+        $response = Http::withToken(config('services.openai.key'))
+            ->timeout((int) config('services.openai.timeout'))
+            ->attach('file', $contents, $audio->getClientOriginalName() ?: 'business-description.webm')
+            ->post('https://api.openai.com/v1/audio/transcriptions', $payload);
+
+        if ($response->failed()) {
+            throw new RuntimeException((string) ($response->json('error.message') ?: 'OpenAI transcription failed.'));
+        }
+
+        $text = trim((string) $response->json('text', ''));
+        if ($text === '') {
+            throw new RuntimeException('OpenAI returned no transcription.');
+        }
+
+        return [
+            'text' => $text,
+            'model' => (string) ($response->json('model') ?: config('services.openai.transcription_model')),
+            'input_tokens' => (int) $response->json('usage.input_tokens', 0),
+            'output_tokens' => (int) $response->json('usage.output_tokens', 0),
+        ];
     }
 
     /** @return array{contents:string,model:string,format:string,quality:string} */

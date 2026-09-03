@@ -9,6 +9,9 @@ const router = useRouter();
 const step = ref(1);
 const busy = ref(false);
 const classifying = ref(false);
+const recording = ref(false);
+const transcribing = ref(false);
+const microphoneSupported = ref(false);
 const error = ref('');
 const platform = ref<any>({ plans: [] });
 const classification = ref<any>(null);
@@ -18,10 +21,15 @@ const availability = reactive<any>({ checking: false, email: null, slug: null })
 let availabilityTimer: number | undefined;
 let classifyTimer: number | undefined;
 let classificationRequest = 0;
+let mediaRecorder: MediaRecorder | null = null;
+let microphoneStream: MediaStream | null = null;
+let recordingTimer: number | undefined;
+let audioChunks: Blob[] = [];
 
 const form = reactive({
     name: '', email: '', password: '', password_confirmation: '', business_name: '', slug: '', country: 'DE', locale: locale.value,
     business_description: '', classification_id: null as number | null, variation_id: null as number | null,
+    template_confirmed: false,
     plan_id: Number(route.query.plan) || null as number | null, billing_cycle: 'monthly', currency: 'EUR', confirm_business_customer: false, accept_terms: false, accept_privacy: false,
 });
 
@@ -32,6 +40,7 @@ const previewStyle = computed(() => ({ '--preview-primary': preview.value.primar
 const words = computed(() => form.business_description.trim().split(/\s+/u).filter(Boolean).length);
 
 onMounted(async () => {
+    microphoneSupported.value = !!navigator.mediaDevices?.getUserMedia && typeof window.MediaRecorder !== 'undefined';
     platform.value = await api('/platform');
     if (!form.plan_id) form.plan_id = platform.value.plans[0]?.id;
     applyDefaultCurrency();
@@ -40,6 +49,12 @@ onMounted(async () => {
 onBeforeUnmount(() => {
     window.clearTimeout(availabilityTimer);
     window.clearTimeout(classifyTimer);
+    window.clearTimeout(recordingTimer);
+    if (mediaRecorder?.state === 'recording') {
+        mediaRecorder.onstop = null;
+        mediaRecorder.stop();
+    }
+    microphoneStream?.getTracks().forEach(track => track.stop());
 });
 
 watch(() => form.locale, () => { if (!currencyEdited.value) applyDefaultCurrency(); });
@@ -50,6 +65,7 @@ watch(() => [form.email, form.slug, form.business_name], () => {
     availabilityTimer = window.setTimeout(() => checkAvailability(false), 650);
 });
 watch(() => [form.business_description, form.locale], () => {
+    form.template_confirmed = false;
     window.clearTimeout(classifyTimer);
     if (words.value < 4) return;
     classifyTimer = window.setTimeout(() => classify(true), 750);
@@ -128,7 +144,72 @@ async function nextAccount() {
 function confirmActivity() {
     if (!form.variation_id) return;
     error.value = '';
+    form.template_confirmed = false;
     step.value = 3;
+}
+
+function confirmTemplate() {
+    form.template_confirmed = true;
+    step.value = 4;
+}
+
+async function toggleRecording() {
+    if (recording.value) {
+        mediaRecorder?.stop();
+        return;
+    }
+    if (!microphoneSupported.value) {
+        error.value = tr('microphoneUnavailable');
+        return;
+    }
+
+    error.value = '';
+    try {
+        microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const supportedType = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm']
+            .find(type => MediaRecorder.isTypeSupported(type));
+        mediaRecorder = new MediaRecorder(microphoneStream, supportedType ? { mimeType: supportedType } : undefined);
+        audioChunks = [];
+        mediaRecorder.ondataavailable = event => { if (event.data.size > 0) audioChunks.push(event.data); };
+        mediaRecorder.onstop = transcribeRecording;
+        mediaRecorder.start();
+        recording.value = true;
+        recordingTimer = window.setTimeout(() => {
+            if (mediaRecorder?.state === 'recording') mediaRecorder.stop();
+        }, 60_000);
+    } catch {
+        microphoneStream?.getTracks().forEach(track => track.stop());
+        microphoneStream = null;
+        error.value = tr('microphoneUnavailable');
+    }
+}
+
+async function transcribeRecording() {
+    window.clearTimeout(recordingTimer);
+    recording.value = false;
+    microphoneStream?.getTracks().forEach(track => track.stop());
+    microphoneStream = null;
+    if (!audioChunks.length) return;
+
+    const mime = mediaRecorder?.mimeType || audioChunks[0].type || 'audio/webm';
+    const extension = mime.includes('mp4') ? 'm4a' : mime.includes('ogg') ? 'ogg' : 'webm';
+    const body = new FormData();
+    body.append('audio', new File(audioChunks, `business-description.${extension}`, { type: mime }));
+    body.append('locale', form.locale);
+    transcribing.value = true;
+    try {
+        const result = await api<{ text: string }>('/register/transcribe', { method: 'POST', body });
+        classification.value = null;
+        form.classification_id = null;
+        form.variation_id = null;
+        form.business_description = [form.business_description.trim(), result.text.trim()].filter(Boolean).join(' ');
+    } catch (exception: any) {
+        error.value = exception.message;
+    } finally {
+        transcribing.value = false;
+        audioChunks = [];
+        mediaRecorder = null;
+    }
 }
 
 function price(plan: any): number | null {
@@ -198,7 +279,7 @@ async function register() {
 
       <form v-if="step === 2" @submit.prevent="classify(false)">
         <p class="eyebrow">{{ tr('stepLabel') }} 02</p><h2>{{ tr('whatBusiness') }}</h2><p>{{ tr('describeWork') }}</p>
-        <label>{{ tr('yourActivity') }}<textarea v-model="form.business_description" rows="5" required :placeholder="tr('activityPlaceholder')"></textarea></label>
+        <label>{{ tr('yourActivity') }}<div class="activity-input"><textarea v-model="form.business_description" rows="5" required :placeholder="tr('activityPlaceholder')"></textarea><button v-if="microphoneSupported" type="button" class="voice-button" :class="{ recording }" :disabled="transcribing" :aria-pressed="recording" @click="toggleRecording"><span aria-hidden="true">{{ recording ? '■' : '●' }}</span>{{ transcribing ? tr('transcribing') : recording ? tr('stopRecording') : tr('dictate') }}</button></div><small class="voice-hint">{{ tr('voiceHint') }}</small></label>
         <div class="activity-analysis-state" :class="{ working: classifying }"><span></span>{{ classifying ? tr('analysing') : (words < 4 ? tr('activityAutoHint') : classification ? tr('templateFound') : tr('activityWaiting')) }}</div>
         <div v-if="candidates.length" class="candidate-list inline-candidates"><label v-for="candidate in candidates" :key="candidate.variation_id" :class="{ selected: form.variation_id === candidate.variation_id }"><input v-model="form.variation_id" type="radio" :value="candidate.variation_id"><img loading="lazy" decoding="async" :src="candidate.preview?.image || '/brand/service-renovation.webp'" alt=""><span><b>{{ candidate.variation }}</b><small>{{ candidate.category }}<template v-if="!candidate.fallback"> · {{ Math.round(candidate.score * 100) }}%</template></small></span></label></div>
         <div v-if="classification?.source === 'fallback'" class="alert fallback">{{ tr('noTemplate') }}</div>
@@ -206,7 +287,7 @@ async function register() {
         <div class="form-actions"><button type="button" class="button ghost" @click="step = 1">← {{ tr('back') }}</button><button type="submit" class="button ghost" :disabled="classifying">{{ tr('checkAgain') }}</button><button v-if="form.variation_id" type="button" class="button" @click="confirmActivity">{{ tr('showTemplate') }} →</button></div>
       </form>
 
-      <form v-if="step === 3" @submit.prevent="step = 4">
+      <form v-if="step === 3" @submit.prevent="confirmTemplate">
         <p class="eyebrow">{{ tr('stepLabel') }} 03</p><h2>{{ tr('yourTemplateReady') }}</h2><p>{{ tr('templateChangesLive') }}</p>
         <div class="template-confirmation" :style="previewStyle"><img decoding="async" :src="preview.image" :alt="chosen?.variation"><div><small>{{ chosen?.category }}</small><h3>{{ chosen?.variation }}</h3><p>{{ tr('templateConfirmText') }}</p><code>{{ chosen?.template_code }}</code></div></div>
         <div class="form-actions"><button type="button" class="button ghost" @click="step = 2">← {{ tr('changeActivity') }}</button><button class="button">{{ tr('confirm') }} →</button></div>

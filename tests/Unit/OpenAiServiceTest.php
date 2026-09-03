@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Services\OpenAiService;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -54,6 +55,30 @@ class OpenAiServiceTest extends TestCase
 
         Http::assertSent(fn (Request $request): bool => $request['text']['format']['type'] === 'json_schema'
             && $request['text']['format']['name'] === 'answer'
+        );
+    }
+
+    public function test_audio_transcription_uses_the_dedicated_endpoint_and_language(): void
+    {
+        config(['services.openai.transcription_model' => 'gpt-4o-mini-transcribe']);
+        Http::fake(['api.openai.com/*' => Http::response([
+            'text' => 'Я покупаю старинные книги и журналы.',
+            'model' => 'gpt-4o-mini-transcribe',
+            'usage' => ['input_tokens' => 120, 'output_tokens' => 9],
+        ])]);
+
+        $result = app(OpenAiService::class)->transcribe(
+            UploadedFile::fake()->createWithContent('business.webm', 'recorded voice'),
+            'ru',
+        );
+
+        $this->assertSame('Я покупаю старинные книги и журналы.', $result['text']);
+        $this->assertSame(120, $result['input_tokens']);
+        Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.openai.com/v1/audio/transcriptions'
+            && $request->isMultipart()
+            && $request->hasFile('file', filename: 'business.webm')
+            && str_contains($request->body(), 'gpt-4o-mini-transcribe')
+            && str_contains($request->body(), 'ru')
         );
     }
 }

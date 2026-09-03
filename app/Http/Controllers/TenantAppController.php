@@ -560,10 +560,18 @@ class TenantAppController extends Controller
             }
         }
 
-        return array_replace_recursive(
-            $configuration,
-            (array) data_get($tenant->profile?->content, 'app_configuration', []),
-        );
+        $tenantConfiguration = (array) data_get($tenant->profile?->content, 'app_configuration', []);
+        $configuration = array_replace_recursive($configuration, $tenantConfiguration);
+        foreach (['fields', 'navigation', 'trust', 'starter_services', 'starter_portfolio', 'screens', 'actions', 'locales'] as $listKey) {
+            if (array_key_exists($listKey, $tenantConfiguration)) {
+                $configuration[$listKey] = $tenantConfiguration[$listKey];
+            }
+        }
+        if (array_key_exists('slots', (array) ($tenantConfiguration['media'] ?? []))) {
+            $configuration['media']['slots'] = $tenantConfiguration['media']['slots'];
+        }
+
+        return $configuration;
     }
 
     private function locale(Request $request, Tenant $tenant): string
