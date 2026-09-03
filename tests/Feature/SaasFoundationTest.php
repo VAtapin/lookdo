@@ -26,6 +26,7 @@ use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -286,7 +287,7 @@ class SaasFoundationTest extends TestCase
 
     public function test_registration_creates_isolated_tenant_platform_domain_and_subscription(): void
     {
-        Queue::fake([GenerateTenantAppCustomization::class]);
+        Bus::fake([GenerateTenantAppCustomization::class]);
         $variation = BusinessVariation::where('code', 'automotive.steering-wheel-upholstery')->firstOrFail();
         $classification = BusinessClassification::create(['original_text' => 'перетяжка рулей', 'normalized_text' => 'перетяжка рулей', 'category_id' => $variation->category_id, 'variation_id' => $variation->id, 'confidence' => 1, 'source' => 'exact']);
         $plan = Plan::where('code', 'start')->firstOrFail();
@@ -312,7 +313,7 @@ class SaasFoundationTest extends TestCase
         $this->assertNotEmpty(data_get($tenant->profile->content, 'branding.customers'));
         $this->assertNotEmpty(data_get($tenant->profile->content, 'branding.style'));
         $this->assertNotEmpty(data_get($tenant->profile->content, 'branding.avoid'));
-        Queue::assertPushed(GenerateTenantAppCustomization::class, fn ($job) => $job->tenantId === $tenant->id);
+        Bus::assertDispatchedAfterResponse(GenerateTenantAppCustomization::class, fn ($job) => $job->tenantId === $tenant->id);
 
         $site = $this->getJson('http://leonid-deluxe.lookdo.app/api/tenant-site')
             ->assertOk()

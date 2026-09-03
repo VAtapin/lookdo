@@ -173,7 +173,7 @@ class AuthController extends Controller
         $request->session()->regenerate();
         $audit->log('tenant.registered', $tenant, null, $tenant->toArray(), $tenant->id);
         if (! empty($data['template_confirmed'])) {
-            GenerateTenantAppCustomization::dispatch($tenant->id)->afterCommit();
+            GenerateTenantAppCustomization::dispatchAfterResponse($tenant->id);
         }
         $checkoutUrl = null;
         $paymentRequired = $subscription->status === 'incomplete';
