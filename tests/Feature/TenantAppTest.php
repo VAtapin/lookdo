@@ -595,6 +595,13 @@ class TenantAppTest extends TestCase
             ->assertJsonPath('services.0.name', 'Корекція та фарбування брів')
             ->assertJsonPath('services.0.price', '20.00');
 
+        $firstVideo = collect($response->json('portfolio'))
+            ->firstWhere('video', '/brand/tenants/ivanna-brows/portfolio/ivanna-work-video-01.mp4');
+        $this->assertSame(
+            '/brand/tenants/ivanna-brows/portfolio/ivanna-work-video-01-poster.jpg',
+            $firstVideo['image'] ?? null,
+        );
+
         $this->assertDatabaseHas('tenant_services', [
             'tenant_id' => $ivanna->id,
             'repeat_interval_days' => 28,

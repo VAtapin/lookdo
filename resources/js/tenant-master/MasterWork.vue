@@ -42,6 +42,8 @@ const work = reactive<any>({
     before: null,
     after: null,
 });
+let generatedVideoPoster: File | null = null;
+let videoPosterPromise: Promise<void> | null = null;
 const portfolioFilter = ref<"all" | "photos" | "videos">("all");
 const portfolioPage = ref(1);
 const portfolioPageSize = 12;
@@ -109,6 +111,96 @@ function portfolioMediaUrl(path: string | null | undefined) {
     return path.startsWith("/") || path.startsWith("http")
         ? path
         : `/storage/${path}`;
+}
+function videoPreviewSource(source: string): string {
+    if (!source || source.includes("#t=")) return source;
+
+    return `${source}#t=0.001`;
+}
+function waitForVideoEvent(
+    video: HTMLVideoElement,
+    event: "loadedmetadata" | "seeked",
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const cleanup = () => {
+            video.removeEventListener(event, complete);
+            video.removeEventListener("error", failed);
+        };
+        const complete = () => {
+            cleanup();
+            resolve();
+        };
+        const failed = () => {
+            cleanup();
+            reject(new Error("Unable to read the selected video."));
+        };
+
+        video.addEventListener(event, complete, { once: true });
+        video.addEventListener("error", failed, { once: true });
+    });
+}
+async function createVideoPoster(file: File): Promise<File | null> {
+    const objectUrl = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "metadata";
+
+    try {
+        const metadataReady = waitForVideoEvent(video, "loadedmetadata");
+        video.src = objectUrl;
+        video.load();
+        await metadataReady;
+
+        const captureAt = Number.isFinite(video.duration)
+            ? Math.min(0.25, Math.max(0, video.duration / 20))
+            : 0.05;
+        const frameReady = waitForVideoEvent(video, "seeked");
+        video.currentTime = captureAt;
+        await frameReady;
+
+        const scale = Math.min(
+            1,
+            1280 / Math.max(video.videoWidth, video.videoHeight),
+        );
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+        canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+        canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise<Blob | null>((resolve) =>
+            canvas.toBlob(resolve, "image/jpeg", 0.88),
+        );
+        if (!blob) return null;
+
+        return new File(
+            [blob],
+            `${file.name.replace(/\.[^.]+$/, "")}-poster.jpg`,
+            { type: "image/jpeg" },
+        );
+    } catch {
+        return null;
+    } finally {
+        video.removeAttribute("src");
+        video.load();
+        URL.revokeObjectURL(objectUrl);
+    }
+}
+function setWorkImage(file?: File) {
+    generatedVideoPoster = null;
+    work.image = file || null;
+}
+function setWorkVideo(file?: File) {
+    const canReplacePoster = !work.image || work.image === generatedVideoPoster;
+    work.video = file || null;
+    videoPosterPromise = null;
+    if (!file || !canReplacePoster) return;
+
+    videoPosterPromise = createVideoPoster(file).then((poster) => {
+        if (poster && work.video === file) {
+            generatedVideoPoster = poster;
+            work.image = poster;
+        }
+    });
 }
 const tabs = computed(() => [
     "portfolio",
@@ -188,6 +280,8 @@ async function load() {
     }
 }
 function resetWork() {
+    generatedVideoPoster = null;
+    videoPosterPromise = null;
     Object.assign(work, {
         id: null,
         title: "",
@@ -204,6 +298,8 @@ function resetWork() {
     });
 }
 function editWork(item: any) {
+    generatedVideoPoster = null;
+    videoPosterPromise = null;
     Object.assign(work, {
         id: item.id,
         title: localized(item.title),
@@ -221,6 +317,8 @@ function editWork(item: any) {
     window.scrollTo({ top: 0, behavior: "smooth" });
 }
 async function saveWork() {
+    await videoPosterPromise;
+    videoPosterPromise = null;
     const f = new FormData();
     if (work.id) f.append("_method", "PUT");
     f.append(`title[${props.locale}]`, work.title);
@@ -680,8 +778,15 @@ onMounted(async () => {
                         /><video
                             v-else-if="item.video_url || item.video_path"
                             :src="
-                                item.video_url ||
-                                portfolioMediaUrl(item.video_path)
+                                videoPreviewSource(
+                                    item.video_url ||
+                                        portfolioMediaUrl(item.video_path),
+                                )
+                            "
+                            :poster="
+                                item.image_url ||
+                                portfolioMediaUrl(item.image_path) ||
+                                undefined
                             "
                             controls
                             playsinline
@@ -759,9 +864,9 @@ onMounted(async () => {
                         type="file"
                         accept="image/*"
                         @change="
-                            work.image = (
-                                $event.target as HTMLInputElement
-                            ).files?.[0]
+                            setWorkImage(
+                                ($event.target as HTMLInputElement).files?.[0],
+                            )
                         " /></label
                 ><label v-if="hasVideo"
                     >{{ t("video")
@@ -769,9 +874,9 @@ onMounted(async () => {
                         type="file"
                         accept="video/mp4,video/webm,video/quicktime"
                         @change="
-                            work.video = (
-                                $event.target as HTMLInputElement
-                            ).files?.[0]
+                            setWorkVideo(
+                                ($event.target as HTMLInputElement).files?.[0],
+                            )
                         "
                     /><small>{{ t("portfolioVideoHint") }}</small></label
                 ><label v-if="work.video_url" class="mw-check"

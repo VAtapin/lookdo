@@ -59,7 +59,11 @@ const mediaFilter = ref<"mixed" | "photos" | "videos">("mixed");
 const portfolioPage = ref(1);
 const portfolioPageSize = ref(6);
 const lightbox = ref<{ src: string; alt: string } | null>(null);
-const videoLightbox = ref<{ src: string; title: string } | null>(null);
+const videoLightbox = ref<{
+    src: string;
+    title: string;
+    poster?: string;
+} | null>(null);
 const reviewOpen = ref(false);
 const reviewBusy = ref(false);
 const reviewNotice = ref("");
@@ -123,6 +127,11 @@ const isBrows = computed(() => app.value?.template?.layout === "brows");
 const isBookPurchase = computed(
     () => app.value?.template?.variation_code === "purchase.books",
 );
+function videoPreviewSource(source: string): string {
+    if (!source || source.includes("#t=")) return source;
+
+    return `${source}#t=0.001`;
+}
 const headerLogo = computed(
     () =>
         app.value?.tenant?.logo ||
@@ -1132,11 +1141,14 @@ const loginContext = {
                                             videoLightbox = {
                                                 src: item.video,
                                                 title: item.title,
+                                                poster: item.image,
                                             }
                                         "
                                     >
                                         <video
-                                            :src="item.video"
+                                            :src="videoPreviewSource(item.video)"
+                                            :poster="item.image || undefined"
+                                            muted
                                             playsinline
                                             preload="metadata"
                                         ></video>
@@ -1327,11 +1339,14 @@ const loginContext = {
                                             videoLightbox = {
                                                 src: item.video,
                                                 title: item.title,
+                                                poster: item.image,
                                             }
                                         "
                                     >
                                         <video
-                                            :src="item.video"
+                                            :src="videoPreviewSource(item.video)"
+                                            :poster="item.image || undefined"
+                                            muted
                                             playsinline
                                             preload="metadata"
                                         ></video>
@@ -1541,7 +1556,8 @@ const loginContext = {
                                     <video
                                         v-if="item.video"
                                         class="ta-portfolio-video"
-                                        :src="item.video"
+                                        :src="videoPreviewSource(item.video)"
+                                        :poster="item.image || undefined"
                                         controls
                                         playsinline
                                         preload="metadata"
@@ -1722,6 +1738,7 @@ const loginContext = {
                             <figure>
                                 <video
                                     :src="videoLightbox.src"
+                                    :poster="videoLightbox.poster"
                                     controls
                                     autoplay
                                     playsinline
