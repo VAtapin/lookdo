@@ -54,10 +54,11 @@ const horizontalLogoUrl = ref(
     props.account?.tenant?.profile?.horizontal_logo_url || "",
 );
 const heroUrl = ref(props.account?.tenant?.profile?.hero_image_url || "");
+type BrandingAsset = "logo" | "logo_horizontal" | "hero";
 const promptOpen = ref(false),
     prompt = ref(""),
-    promptAsset = ref<"logo" | "hero">("hero");
-const preparingAsset = ref<"logo" | "hero" | null>(null);
+    promptAsset = ref<BrandingAsset>("hero");
+const preparingAsset = ref<BrandingAsset | null>(null);
 const mainLocale = computed(
     () => props.account?.tenant?.locale || props.locale,
 );
@@ -120,6 +121,43 @@ function brandingPayload() {
     };
 }
 
+function applySavedBranding(result: any) {
+    const saved = result?.branding;
+    if (!saved) return;
+
+    for (const key of [
+        "services",
+        "customers",
+        "style",
+        "avoid",
+        "tagline",
+        "service_modes",
+        "vk_url",
+        "max_url",
+        "whatsapp_url",
+        "telegram_url",
+        "viber_url",
+        "instagram_url",
+        "facebook_url",
+        "website_url",
+        "working_hours",
+    ]) {
+        if (Object.prototype.hasOwnProperty.call(saved, key))
+            form[key] = saved[key];
+    }
+    if (saved.description_translations) {
+        form.description_translations = {
+            ...saved.description_translations,
+        };
+    }
+    if (saved.tagline_translations) {
+        form.tagline_translations = { ...saved.tagline_translations };
+    }
+    if (result?.tenant?.business_description) {
+        form.business_description = result.tenant.business_description;
+    }
+}
+
 function internationalDigits(value: string) {
     const trimmed = String(value || "").trim();
     const digits = trimmed.replace(/\D/g, "");
@@ -156,10 +194,11 @@ async function save(confirmed?: boolean) {
     try {
         const payload: any = brandingPayload();
         if (typeof confirmed === "boolean") payload.confirmed = confirmed;
-        await api(`/tenant/${props.tenantId}/branding`, {
+        const result: any = await api(`/tenant/${props.tenantId}/branding`, {
             method: "PUT",
             body: JSON.stringify(payload),
         });
+        applySavedBranding(result);
         success.value = props.t("saved");
         emit("reload");
         if (confirmed) emit("complete");
@@ -169,10 +208,7 @@ async function save(confirmed?: boolean) {
         busy.value = false;
     }
 }
-async function upload(
-    asset: "logo" | "logo_horizontal" | "hero",
-    event: Event,
-) {
+async function upload(asset: BrandingAsset, event: Event) {
     const input = event.target as HTMLInputElement,
         file = input.files?.[0];
     if (!file) return;
@@ -200,16 +236,17 @@ async function upload(
         input.value = "";
     }
 }
-async function prepare(asset: "logo" | "hero") {
+async function prepare(asset: BrandingAsset) {
     busy.value = true;
     preparingAsset.value = asset;
     error.value = "";
     success.value = "";
     try {
-        await api(`/tenant/${props.tenantId}/branding`, {
+        const saved: any = await api(`/tenant/${props.tenantId}/branding`, {
             method: "PUT",
             body: JSON.stringify(brandingPayload()),
         });
+        applySavedBranding(saved);
         const result: any = await api(
             `/tenant/${props.tenantId}/branding/prompt`,
             { method: "POST", body: JSON.stringify({ asset }) },
@@ -239,6 +276,8 @@ async function generate() {
             },
         );
         if (promptAsset.value === "logo") logoUrl.value = result.url;
+        else if (promptAsset.value === "logo_horizontal")
+            horizontalLogoUrl.value = result.url;
         else heroUrl.value = result.url;
         promptOpen.value = false;
         success.value = props.t("generated");
@@ -449,12 +488,21 @@ function closePrompt() {
                 </article>
                 <article class="mw-panel mw-brand-assets">
                     <h2>{{ t("horizontalLogo") }}</h2>
-                    <div class="mw-hero-preview mw-horizontal-logo-preview">
+                    <div
+                        class="mw-hero-preview mw-horizontal-logo-preview"
+                        :class="{
+                            'mw-asset-preparing':
+                                preparingAsset === 'logo_horizontal',
+                        }"
+                    >
                         <img
                             v-if="horizontalLogoUrl"
                             :src="horizontalLogoUrl"
                             alt=""
-                        /><LineIcon v-else name="photo" />
+                        /><LineIcon v-else name="photo" /><span
+                            v-if="preparingAsset === 'logo_horizontal'"
+                            ><i></i>{{ t("preparingPrompt") }}</span
+                        >
                     </div>
                     <div class="mw-asset-actions">
                         <label class="mw-secondary"
@@ -463,8 +511,20 @@ function closePrompt() {
                                 hidden
                                 type="file"
                                 accept="image/jpeg,image/png,image/webp"
-                                @change="upload('logo_horizontal', $event)"
-                        /></label>
+                                @change="
+                                    upload('logo_horizontal', $event)
+                                " /></label
+                        ><button
+                            class="mw-primary"
+                            :disabled="busy"
+                            @click="prepare('logo_horizontal')"
+                        >
+                            {{
+                                preparingAsset === "logo_horizontal"
+                                    ? t("preparingPrompt")
+                                    : t("generateAi")
+                            }}
+                        </button>
                     </div>
                 </article>
                 <article class="mw-panel mw-brand-assets">

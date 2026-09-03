@@ -281,7 +281,7 @@ class TenantController extends Controller
     {
         $this->authorizeTenant($request, $tenant);
         $this->requireActiveSubscription($tenant);
-        $data = $request->validate(['asset' => ['required', Rule::in(['logo', 'hero'])]]);
+        $data = $request->validate(['asset' => ['required', Rule::in(['logo', 'logo_horizontal', 'hero'])]]);
         $tenant->load(['profile', 'businessProfile.category', 'businessProfile.variation', 'businessProfile.template']);
         $branding = (array) data_get($tenant->profile?->content, 'branding', []);
         $language = match ($tenant->locale) {
@@ -300,9 +300,11 @@ class TenantController extends Controller
             'template' => $tenant->businessProfile?->template?->code,
         ];
         $budget->ensureAvailable($request->user()?->id);
-        $instructions = $data['asset'] === 'logo'
-            ? 'Write one editable image-generation prompt entirely in '.$language.' for a simple premium square business logo mark. It must remain legible as a tiny app icon, use no copyrighted marks, vehicle brand logos, photographs, mockups, text, letters or watermarks.'
-            : 'Write one editable image-generation prompt entirely in '.$language.' for a premium vertical mobile-app hero photograph. Show the exact service in a realistic workplace, leave darker clean areas for interface text, and include no text, logos, vehicle brand marks, number plates, UI or watermarks.';
+        $instructions = match ($data['asset']) {
+            'logo' => 'Write one editable image-generation prompt entirely in '.$language.' for a simple premium square business logo mark. It must remain legible as a tiny app icon, use no copyrighted marks, vehicle brand logos, photographs, mockups, text, letters or watermarks.',
+            'logo_horizontal' => 'Write one editable image-generation prompt entirely in '.$language.' for a premium horizontal business logo lockup for a compact app header. Use a simple symbol and a clean wordmark with the exact business name, keep generous spacing and strong legibility at small size, and require a transparent or plain background. Include no photographs, mockups, slogans, watermarks, copyrighted marks or vehicle brand logos.',
+            default => 'Write one editable image-generation prompt entirely in '.$language.' for a premium vertical mobile-app hero photograph. Show the exact service in a realistic workplace, leave darker clean areas for interface text, and include no text, logos, vehicle brand marks, number plates, UI or watermarks.',
+        };
         $result = $openAi->structured($instructions.' Return JSON only.', json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 'tenant_branding_prompt', [
             'type' => 'object',
             'properties' => ['prompt' => ['type' => 'string']],
@@ -321,13 +323,18 @@ class TenantController extends Controller
     {
         $this->authorizeTenant($request, $tenant);
         $this->requireActiveSubscription($tenant);
-        $data = $request->validate(['asset' => ['required', Rule::in(['logo', 'hero'])], 'prompt' => 'required|string|min:40|max:4000']);
+        $data = $request->validate(['asset' => ['required', Rule::in(['logo', 'logo_horizontal', 'hero'])], 'prompt' => 'required|string|min:40|max:4000']);
         $profile = $tenant->profile()->firstOrCreate();
         $reservation = null;
         try {
             $budget->ensureAvailable($request->user()?->id);
             $reservation = $imageGenerations->reserve($tenant);
-            $result = $openAi->image($data['prompt'], 'medium', $data['asset'] === 'logo' ? '1024x1024' : '1024x1536');
+            $size = match ($data['asset']) {
+                'logo' => '1024x1024',
+                'logo_horizontal' => '1536x1024',
+                default => '1024x1536',
+            };
+            $result = $openAi->image($data['prompt'], 'medium', $size);
         } catch (Throwable $exception) {
             if ($reservation) {
                 $imageGenerations->release($tenant, $reservation);
@@ -341,12 +348,24 @@ class TenantController extends Controller
         }
         $content = (array) $profile->content;
         $branding = (array) ($content['branding'] ?? []);
-        $old = $data['asset'] === 'logo' ? $profile->logo_path : ($branding['hero_image_path'] ?? null);
-        $path = $images->storeBytes($result['contents'], 'tenant-app/'.$tenant->id.'/branding', $result['format'], 'public', $data['asset'] === 'logo' ? 1024 : 2048, $data['asset'] === 'logo' ? 1024 : 1600);
+        $old = match ($data['asset']) {
+            'logo' => $profile->logo_path,
+            'logo_horizontal' => $branding['horizontal_logo_path'] ?? null,
+            default => $branding['hero_image_path'] ?? null,
+        };
+        [$maxWidth, $maxHeight] = match ($data['asset']) {
+            'logo' => [1024, 1024],
+            'logo_horizontal' => [2048, 720],
+            default => [2048, 1600],
+        };
+        $path = $images->storeBytes($result['contents'], 'tenant-app/'.$tenant->id.'/branding', $result['format'], 'public', $maxWidth, $maxHeight);
         $this->replaceTenantAsset($old, $path, $tenant->id);
         if ($data['asset'] === 'logo') {
             $profile->logo_path = $path;
             $branding['logo_source'] = 'ai';
+        } elseif ($data['asset'] === 'logo_horizontal') {
+            $branding['horizontal_logo_path'] = $path;
+            $branding['horizontal_logo_source'] = 'ai';
         } else {
             $branding['hero_image_path'] = $path;
             $branding['hero_source'] = 'ai';

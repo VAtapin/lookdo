@@ -1327,6 +1327,46 @@ class SaasFoundationTest extends TestCase
             && $request['output_format'] === 'webp');
     }
 
+    public function test_tenant_can_prepare_and_generate_a_horizontal_header_logo(): void
+    {
+        Storage::fake('public');
+        config(['services.openai.key' => 'test-key', 'services.openai.image_model' => 'gpt-image-2']);
+        $reviewedPrompt = 'Создайте широкий логотип для шапки приложения с точным названием Golden Books, простым знаком книги и чистым светлым фоном без макета.';
+        Http::fake(function (HttpRequest $request) use ($reviewedPrompt) {
+            if ($request->url() === 'https://api.openai.com/v1/responses') {
+                return Http::response(['output_text' => json_encode(['prompt' => $reviewedPrompt]), 'model' => 'gpt-5.6-luna', 'usage' => ['input_tokens' => 80, 'output_tokens' => 30]]);
+            }
+
+            return Http::response(['data' => [['b64_json' => base64_encode('generated-horizontal-logo')]]]);
+        });
+        $owner = User::factory()->create();
+        $tenant = Tenant::create(['name' => 'Golden Books', 'slug' => 'golden-books', 'country' => 'DE', 'locale' => 'ru', 'status' => 'active', 'business_description' => 'Покупаем старые книги и журналы.']);
+        $tenant->users()->attach($owner, ['role' => 'owner']);
+        $plan = Plan::where('code', 'start')->firstOrFail();
+        $tenant->subscriptions()->create(['plan_id' => $plan->id, 'provider' => 'stripe', 'status' => 'active', 'billing_cycle' => 'monthly', 'currency' => 'EUR', 'unit_amount' => 19, 'started_at' => now()]);
+
+        $prompt = $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/branding/prompt', ['asset' => 'logo_horizontal'])
+            ->assertOk()
+            ->assertJsonPath('asset', 'logo_horizontal')
+            ->assertJsonPath('prompt', $reviewedPrompt);
+
+        $generated = $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/branding/generate', [
+            'asset' => 'logo_horizontal',
+            'prompt' => $prompt->json('prompt'),
+        ])->assertCreated()
+            ->assertJsonPath('asset', 'logo_horizontal')
+            ->assertJsonPath('branding.horizontal_logo_source', 'ai');
+
+        Storage::disk('public')->assertExists($generated->json('path'));
+        $this->assertSame($generated->json('path'), data_get($tenant->profile()->firstOrFail()->content, 'branding.horizontal_logo_path'));
+        Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://api.openai.com/v1/responses'
+            && $request['input'] !== null
+            && str_contains((string) $request['instructions'], 'horizontal business logo'));
+        Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://api.openai.com/v1/images/generations'
+            && $request['size'] === '1536x1024'
+            && $request['prompt'] === $reviewedPrompt);
+    }
+
     public function test_image_limit_requires_credit_and_stripe_webhook_adds_it_once(): void
     {
         Storage::fake('public');
