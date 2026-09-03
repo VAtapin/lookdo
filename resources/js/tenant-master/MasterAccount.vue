@@ -17,9 +17,7 @@ const busy = ref(false),
     error = ref(""),
     domain = ref(""),
     cycle = ref("monthly"),
-    currency = ref(
-        props.locale === "ru" ? "RUB" : props.locale === "uk" ? "UAH" : "EUR",
-    );
+    currency = ref("EUR");
 const profile = reactive<any>({}),
     accountForm = reactive({
         name: "",
@@ -75,6 +73,30 @@ const hasPush = computed(() =>
     Boolean(
         props.workspace?.push?.enabled && props.workspace?.push?.public_key,
     ),
+);
+const currentSubscription = computed(
+    () => props.account?.tenant?.current_subscription || null,
+);
+const currentPlanId = computed(() =>
+    Number(
+        currentSubscription.value?.plan_id ||
+            currentSubscription.value?.plan?.id ||
+            0,
+    ),
+);
+watch(
+    () => [props.tenantId, currentSubscription.value?.id],
+    () => {
+        currency.value =
+            currentSubscription.value?.currency ||
+            (props.locale === "ru"
+                ? "RUB"
+                : props.locale === "uk"
+                  ? "UAH"
+                  : "EUR");
+        cycle.value = currentSubscription.value?.billing_cycle || "monthly";
+    },
+    { immediate: true },
 );
 const moreItems = computed(() => [
     ["account", "user"],
@@ -442,7 +464,65 @@ async function deleteOwnAccount() {
         busy.value = false;
     }
 }
-const planName = (p: any) => p?.name?.[props.locale] || p?.name?.de || p?.code;
+const localizedPlanText = (value: any, fallback = "") => {
+    if (typeof value === "string") return value;
+    return value?.[props.locale] || value?.de || value?.en || fallback;
+};
+const planName = (plan: any) => localizedPlanText(plan?.name, plan?.code || "");
+const planDescription = (plan: any) => localizedPlanText(plan?.description, "");
+const isCurrentPlan = (plan: any) => Number(plan?.id) === currentPlanId.value;
+const planPrice = (plan: any) => {
+    const configured = plan?.prices?.[currency.value]?.[cycle.value];
+    if (configured !== null && configured !== undefined && configured !== "")
+        return Number(configured);
+    if (String(plan?.currency).toUpperCase() === currency.value) {
+        const legacy =
+            cycle.value === "yearly" ? plan?.price_yearly : plan?.price_monthly;
+        return legacy === null || legacy === undefined ? null : Number(legacy);
+    }
+    return null;
+};
+const formatPlanPrice = (plan: any) => {
+    const value = planPrice(plan);
+    if (value === null || Number.isNaN(value))
+        return props.t("priceUnavailable");
+    const numberLocale =
+        props.locale === "ru"
+            ? "ru-RU"
+            : props.locale === "uk"
+              ? "uk-UA"
+              : props.locale === "de"
+                ? "de-DE"
+                : "en-GB";
+    return new Intl.NumberFormat(numberLocale, {
+        style: "currency",
+        currency: currency.value,
+        maximumFractionDigits: value % 1 ? 2 : 0,
+    }).format(value);
+};
+const planFeatures = (plan: any) => {
+    const important = new Set([
+        "requests",
+        "storage",
+        "staff",
+        "languages",
+        "video",
+        "custom_domain",
+        "retention",
+        "ai",
+    ]);
+    return (plan?.features || []).filter((feature: any) =>
+        important.has(feature.key),
+    );
+};
+const checkoutLabel = (plan: any) => {
+    if (isCurrentPlan(plan)) {
+        return props.account?.access?.paid
+            ? props.t("currentPlan")
+            : props.t("paySelectedPlan");
+    }
+    return props.t("chooseAndPay");
+};
 </script>
 <template>
     <section class="mw-stack">
@@ -820,38 +900,39 @@ const planName = (p: any) => p?.name?.[props.locale] || p?.name?.de || p?.code;
             <p v-else class="mw-warning">{{ t("domainUnavailable") }}</p>
         </div>
         <div v-if="section === 'billing'" class="mw-stack">
-            <article class="mw-panel">
-                <p class="mw-kicker">{{ t("billing") }}</p>
-                <h2>
-                    {{
-                        planName(account.tenant.current_subscription?.plan) ||
-                        "—"
-                    }}
-                </h2>
-                <p>
-                    {{ t(account.access.state) }} ·
-                    {{ account.access.days_remaining || 0 }} {{ t("days") }}
-                </p>
+            <article class="mw-panel mw-billing-summary">
+                <div>
+                    <p class="mw-kicker">{{ t("selectedAtRegistration") }}</p>
+                    <h2>{{ planName(currentSubscription?.plan) || "—" }}</h2>
+                    <p>
+                        {{ t(account.access.state) }} ·
+                        {{ account.access.days_remaining || 0 }}
+                        {{ t("days") }}
+                    </p>
+                </div>
                 <button
-                    v-if="
-                        account.tenant.current_subscription
-                            ?.provider_customer_id
-                    "
+                    v-if="currentSubscription?.provider_customer_id"
                     class="mw-primary"
                     :disabled="busy"
                     @click="openBillingPortal"
                 >
                     {{ t("manageSubscription") }}
                 </button>
-                <div class="mw-inline">
-                    <select v-model="currency">
-                        <option>EUR</option>
-                        <option>RUB</option>
-                        <option>UAH</option></select
-                    ><select v-model="cycle">
-                        <option value="monthly">{{ t("monthly") }}</option>
-                        <option value="yearly">{{ t("yearly") }}</option>
-                    </select>
+                <div class="mw-billing-controls">
+                    <label
+                        ><span>{{ t("paymentCurrency") }}</span
+                        ><select v-model="currency">
+                            <option value="EUR">EUR — €</option>
+                            <option value="RUB">RUB — ₽</option>
+                            <option value="UAH">UAH — ₴</option>
+                        </select></label
+                    ><label
+                        ><span>{{ t("paymentPeriod") }}</span
+                        ><select v-model="cycle">
+                            <option value="monthly">{{ t("monthly") }}</option>
+                            <option value="yearly">{{ t("yearly") }}</option>
+                        </select></label
+                    >
                 </div>
             </article>
             <article class="mw-panel">
@@ -867,9 +948,9 @@ const planName = (p: any) => p?.name?.[props.locale] || p?.name?.de || p?.code;
                         ><small
                             >{{ invoice.amount_total }} {{ invoice.currency }} ·
                             {{
-                                new Date(
-                                    invoice.issue_date,
-                                ).toLocaleDateString(locale)
+                                new Date(invoice.issue_date).toLocaleDateString(
+                                    locale,
+                                )
                             }}
                             · {{ t(`invoice_${invoice.status}`) }}</small
                         ></span
@@ -920,15 +1001,59 @@ const planName = (p: any) => p?.name?.[props.locale] || p?.name?.de || p?.code;
                     </button>
                 </div>
             </article>
+            <header class="mw-plan-choice-head">
+                <div>
+                    <p class="mw-kicker">{{ t("choosePlan") }}</p>
+                    <h2>{{ t("choosePlanTitle") }}</h2>
+                    <p>{{ t("choosePlanIntro") }}</p>
+                </div>
+            </header>
             <div class="mw-plan-grid">
-                <article v-for="plan in plans" :key="plan.id">
+                <article
+                    v-for="plan in plans"
+                    :key="plan.id"
+                    :class="{
+                        'is-current': isCurrentPlan(plan),
+                        'is-recommended': plan.badge,
+                    }"
+                >
                     <img v-if="plan.image_url" :src="plan.image_url" />
+                    <div class="mw-plan-badges">
+                        <span v-if="isCurrentPlan(plan)" class="current">{{
+                            t("yourSelection")
+                        }}</span>
+                        <span v-if="plan.badge">{{ plan.badge }}</span>
+                    </div>
                     <h2>{{ planName(plan) }}</h2>
-                    <p>
-                        {{ plan.description?.[locale] || plan.description?.de }}
+                    <p class="mw-plan-description">
+                        {{ planDescription(plan) }}
                     </p>
-                    <button class="mw-primary" @click="checkout(plan.id)">
-                        {{ t("billing") }}
+                    <div class="mw-plan-price">
+                        <strong>{{ formatPlanPrice(plan) }}</strong>
+                        <span>{{
+                            t(cycle === "yearly" ? "perYear" : "perMonth")
+                        }}</span>
+                    </div>
+                    <ul class="mw-plan-features">
+                        <li
+                            v-for="feature in planFeatures(plan)"
+                            :key="feature.key"
+                            :class="{ disabled: !feature.included }"
+                        >
+                            <span>{{ feature.included ? "✓" : "—" }}</span
+                            >{{ feature.label }}
+                        </li>
+                    </ul>
+                    <button
+                        class="mw-primary"
+                        :disabled="
+                            busy ||
+                            planPrice(plan) === null ||
+                            (isCurrentPlan(plan) && account.access.paid)
+                        "
+                        @click="checkout(plan.id)"
+                    >
+                        {{ checkoutLabel(plan) }}
                     </button>
                 </article>
             </div>
