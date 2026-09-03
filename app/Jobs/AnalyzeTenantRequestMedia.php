@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\TenantRequest;
+use App\Services\BookPurchasePricingService;
 use App\Services\OpenAiBudgetService;
 use App\Services\OpenAiService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -20,7 +21,7 @@ class AnalyzeTenantRequestMedia implements ShouldQueue
 
     public function __construct(public int $tenantRequestId) {}
 
-    public function handle(OpenAiService $openAi, OpenAiBudgetService $budget): void
+    public function handle(OpenAiService $openAi, OpenAiBudgetService $budget, BookPurchasePricingService $pricing): void
     {
         if (! $openAi->configured()) {
             return;
@@ -64,6 +65,7 @@ class AnalyzeTenantRequestMedia implements ShouldQueue
         $isBookPurchase = $variationCode === 'purchase.books';
         $properties = $isBookPurchase ? [
             'comment' => ['type' => 'string'],
+            'condition_grade' => ['type' => 'string', 'enum' => ['poor', 'fair', 'good', 'very_good', 'unknown']],
             'recommended_purchase_price' => ['type' => 'string'],
             'price_basis' => ['type' => 'string'],
         ] : ['comment' => ['type' => 'string']];
@@ -71,9 +73,9 @@ class AnalyzeTenantRequestMedia implements ShouldQueue
         $budget->ensureAvailable();
         $result = $openAi->structuredWithImages(
             $isBookPurchase
-                ? 'You assist a professional antiquarian book buyer. Return a practical, moderately detailed buying note in '.$locale.'. Use 3 to 5 compact sentences, maximum 600 characters. Cover visible condition of binding, spine and pages, important strengths or defects, and only the most relevant point that still needs checking. Do not repeat title, author, ISBN, publisher, year, edition, description, page references or catalogue data already displayed elsewhere. Do not mention Google Books, catalogues, technical identification methods, AI, internal recommendations, valuation disclaimers or guarantees. Recommend a deliberately low defensible purchase price and explain its basis in one short phrase. Never invent authenticity, hidden damage, completeness, rarity or market sales.'
+                ? 'You assist a professional antiquarian book buyer. Return a practical, moderately detailed buying note in '.$locale.'. Use 3 to 5 compact sentences, maximum 600 characters. Cover visible condition of binding, spine and pages, important strengths or defects, and only the most relevant point that still needs checking. Do not repeat title, author, ISBN, publisher, year, edition, description, page references or catalogue data already displayed elsewhere. Do not mention Google Books, catalogues, technical identification methods, AI, internal recommendations, valuation disclaimers or guarantees. If purchase_price_anchor is present, copy it exactly as recommended_purchase_price and only explain its visible-condition basis. Otherwise recommend a deliberately low defensible purchase price. Never invent authenticity, hidden damage, completeness, rarity or market sales.'
                 : 'You are an assistant to a professional handling '.$context.'. Inspect only what is actually visible in the customer photos. Write a short practical condition note of 2 to 4 sentences for the professional in '.$locale.'. Mention visible condition, relevant defects or identifying details, and what important photo or fact is missing. Do not estimate a price, guarantee authenticity, diagnose hidden damage, or invent facts.',
-            json_encode(['request' => $request->summary, 'submitted_fields' => $submitted, 'catalog' => $existingAssessment['catalog'] ?? [], 'prefilled_price' => $existingAssessment['recommended_purchase_price'] ?? null, 'photo_slots' => $request->media->where('type', 'image')->pluck('slot_key')->values()->all()], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            json_encode(['request' => $request->summary, 'submitted_fields' => $submitted, 'catalog' => $existingAssessment['catalog'] ?? [], 'purchase_price_anchor' => $existingAssessment['recommended_purchase_price'] ?? null, 'photo_slots' => $request->media->where('type', 'image')->pluck('slot_key')->values()->all()], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             'tenant_media_condition_assessment',
             [
                 'type' => 'object',
@@ -84,6 +86,22 @@ class AnalyzeTenantRequestMedia implements ShouldQueue
             $images,
         );
         $decoded = json_decode($result['text'], true, flags: JSON_THROW_ON_ERROR);
+        if ($isBookPurchase) {
+            $conditionGrade = (string) ($existingAssessment['condition_grade'] ?? $decoded['condition_grade'] ?? 'unknown');
+            $rawPrice = filled($existingAssessment['recommended_purchase_price'] ?? null)
+                ? (string) $existingAssessment['recommended_purchase_price']
+                : (string) ($decoded['recommended_purchase_price'] ?? '');
+            [$proposedAmount, $currency] = $pricing->parsePrice($rawPrice);
+            $stablePrice = $pricing->stabilize(
+                $request->tenant,
+                (string) ($submitted['isbn'] ?? ''),
+                $proposedAmount > 0 ? $proposedAmount : .50,
+                $currency,
+                $conditionGrade,
+            );
+            $decoded['recommended_purchase_price'] = $pricing->format($stablePrice['amount'], $stablePrice['currency']);
+            $decoded['condition_grade'] = $conditionGrade;
+        }
         $comment = $isBookPurchase
             ? $this->bookAssessment($decoded, $locale)
             : Str::limit($this->singleLine((string) ($decoded['comment'] ?? '')), 500);
@@ -95,6 +113,15 @@ class AnalyzeTenantRequestMedia implements ShouldQueue
             ['field_key' => 'ai_condition_assessment'],
             ['value' => array_merge($existingAssessment, $decoded, ['value' => $comment, 'display_value' => $comment, 'model' => $result['model'], 'analyzed_at' => now()->toIso8601String(), 'status' => 'complete'])],
         );
+        if ($isBookPurchase) {
+            $pricing->remember(
+                $request,
+                (string) ($submitted['isbn'] ?? ''),
+                (string) $decoded['recommended_purchase_price'],
+                (string) ($decoded['condition_grade'] ?? 'unknown'),
+                ['analysis' => 'background'],
+            );
+        }
         $budget->record('tenant_media_condition_assessment', $result['model'], $result['input_tokens'], $result['output_tokens'], tenantId: $request->tenant_id);
     }
 

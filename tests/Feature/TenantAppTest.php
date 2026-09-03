@@ -11,6 +11,7 @@ use App\Models\Tenant;
 use App\Models\TenantAppointment;
 use App\Models\TenantMessage;
 use App\Models\User;
+use App\Services\BookPurchasePricingService;
 use App\Services\OpenAiBudgetService;
 use App\Services\OpenAiService;
 use App\Services\TenantPresetService;
@@ -298,17 +299,17 @@ class TenantAppTest extends TestCase
         config(['services.openai.key' => 'test-key', 'services.openai.text_model' => 'gpt-5.6-luna']);
         Http::fake(['api.openai.com/*' => Http::response([
             'model' => 'gpt-5.6-luna',
-            'output_text' => '{"comment":"Внутренняя рекомендация по покупке, не оценка и не гарантия. Издание идентифицируется по каталожной записи Google Books. Переплёт заметно потёрт; корешок виден не полностью. Нужны фото ISBN и страниц с дефектами."}',
+            'output_text' => '{"comment":"Внутренняя рекомендация по покупке, не оценка и не гарантия. Издание идентифицируется по каталожной записи Google Books. Переплёт заметно потёрт; корешок виден не полностью. Нужны фото ISBN и страниц с дефектами.","condition_grade":"fair","recommended_purchase_price":"2.50 EUR","price_basis":"видимый износ переплёта"}',
             'usage' => ['input_tokens' => 200, 'output_tokens' => 35],
         ])]);
 
         app(AnalyzeTenantRequestMedia::class, ['tenantRequestId' => $tenantRequest->id])
-            ->handle(app(OpenAiService::class), app(OpenAiBudgetService::class));
+            ->handle(app(OpenAiService::class), app(OpenAiBudgetService::class), app(BookPurchasePricingService::class));
 
         $this->assertDatabaseHas('tenant_request_values', ['request_id' => $tenantRequest->id, 'field_key' => 'ai_condition_assessment']);
         $this->assertDatabaseHas('ai_usage_records', ['tenant_id' => $tenant->id, 'operation' => 'tenant_media_condition_assessment']);
         $assessment = $tenantRequest->values()->where('field_key', 'ai_condition_assessment')->firstOrFail()->value;
-        $this->assertSame('• Переплёт заметно потёрт; корешок виден не полностью. Нужны фото ISBN и страниц с дефектами.', $assessment['display_value']);
+        $this->assertSame("• Переплёт заметно потёрт; корешок виден не полностью. Нужны фото ISBN и страниц с дефектами.\n• Закупка: 2.50 EUR — видимый износ переплёта", $assessment['display_value']);
         $this->assertLessThanOrEqual(650, mb_strlen($assessment['display_value']));
     }
 

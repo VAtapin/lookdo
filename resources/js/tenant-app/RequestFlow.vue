@@ -127,6 +127,8 @@ async function assistForm(automatic=false){
       form.fields._ai_assessment=values._ai_assessment||'';
       form.fields._book_catalog=values._book_catalog||{};
       form.fields._recommended_purchase_price=values._recommended_purchase_price||'';
+      form.fields._book_condition_grade=values._book_condition_grade||'unknown';
+      form.fields._book_price_anchored=Boolean(values._book_price_anchored);
     }
   }catch(e:any){error.value=props.copy.aiAssistError;isbnStatus.value='idle';}finally{
     assisting.value=false;

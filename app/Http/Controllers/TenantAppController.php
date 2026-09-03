@@ -15,6 +15,7 @@ use App\Models\TenantRequest;
 use App\Models\TenantRequestValue;
 use App\Models\TenantService;
 use App\Services\BookCatalogService;
+use App\Services\BookPurchasePricingService;
 use App\Services\EntitlementService;
 use App\Services\ImageStorageService;
 use App\Services\OpenAiBudgetService;
@@ -80,7 +81,7 @@ class TenantAppController extends Controller
         ]);
     }
 
-    public function assistRequest(Request $request, OpenAiService $openAi, OpenAiBudgetService $budget, BookCatalogService $books): JsonResponse
+    public function assistRequest(Request $request, OpenAiService $openAi, OpenAiBudgetService $budget, BookCatalogService $books, BookPurchasePricingService $pricing): JsonResponse
     {
         $tenant = $this->tenant($request);
         $this->ensureAvailable($request, $tenant);
@@ -164,7 +165,14 @@ class TenantAppController extends Controller
                 $suggestedPrice = max(.50, round((float) $catalog['reference_price'] * $factor, 2));
                 $currency = (string) ($catalog['reference_currency'] ?? $currency);
             }
-            $price = number_format($suggestedPrice > 0 ? $suggestedPrice : .50, 2, '.', '').' '.$currency;
+            $stabilizedPrice = $pricing->stabilize(
+                $tenant,
+                $isbn,
+                $suggestedPrice > 0 ? $suggestedPrice : .50,
+                $currency,
+                (string) ($values['condition_grade'] ?? 'unknown'),
+            );
+            $price = $pricing->format($stabilizedPrice['amount'], $stabilizedPrice['currency']);
             $masterComment = $this->bookAssessment(
                 (string) ($values['master_comment'] ?? $values['condition'] ?? ''),
                 $price,
@@ -173,6 +181,8 @@ class TenantAppController extends Controller
             $values['_ai_assessment'] = $masterComment;
             $values['_book_catalog'] = $catalog;
             $values['_recommended_purchase_price'] = $price;
+            $values['_book_condition_grade'] = (string) ($values['condition_grade'] ?? 'unknown');
+            $values['_book_price_anchored'] = $stabilizedPrice['anchored'];
 
             return response()->json([
                 'values' => $values,
@@ -188,7 +198,7 @@ class TenantAppController extends Controller
         return response()->json(['values' => $values]);
     }
 
-    public function createRequest(Request $request, ImageStorageService $images, BookCatalogService $books): JsonResponse
+    public function createRequest(Request $request, ImageStorageService $images, BookCatalogService $books, BookPurchasePricingService $pricing): JsonResponse
     {
         $tenant = $this->tenant($request);
         $this->ensureAvailable($request, $tenant);
@@ -223,7 +233,8 @@ class TenantAppController extends Controller
         $prefillAssessment = $isBookPurchase ? Str::limit(trim((string) ($fields['_ai_assessment'] ?? '')), 650) : '';
         $bookCatalog = $isBookPurchase && is_array($fields['_book_catalog'] ?? null) ? $fields['_book_catalog'] : [];
         $recommendedPurchasePrice = $isBookPurchase ? trim((string) ($fields['_recommended_purchase_price'] ?? '')) : '';
-        unset($fields['_ai_assessment'], $fields['_book_catalog'], $fields['_recommended_purchase_price']);
+        $bookConditionGrade = $isBookPurchase ? trim((string) ($fields['_book_condition_grade'] ?? 'unknown')) : 'unknown';
+        unset($fields['_ai_assessment'], $fields['_book_catalog'], $fields['_recommended_purchase_price'], $fields['_book_condition_grade'], $fields['_book_price_anchored']);
         if ($isBookPurchase) {
             $fields['isbn_absent'] = $isbnAbsent;
         }
@@ -266,6 +277,7 @@ class TenantAppController extends Controller
                         'value' => $prefillAssessment,
                         'catalog' => $bookCatalog,
                         'recommended_purchase_price' => $recommendedPurchasePrice,
+                        'condition_grade' => $bookConditionGrade,
                         'analyzed_at' => now()->toIso8601String(),
                         'status' => 'prefilled',
                     ],
@@ -296,6 +308,16 @@ class TenantAppController extends Controller
 
             return $appRequest;
         });
+
+        if ($isBookPurchase && ! $isbnAbsent && $recommendedPurchasePrice !== '') {
+            $pricing->remember(
+                $tenantRequest,
+                (string) ($fields['isbn'] ?? ''),
+                $recommendedPurchasePrice,
+                $bookConditionGrade,
+                ['catalog_reference_price' => $bookCatalog['reference_price'] ?? null],
+            );
+        }
 
         AnalyzeTenantRequestMedia::dispatch($tenantRequest->id)->afterCommit();
         $this->notifyMaster($tenant, 'new_request', '/app/requests', 'request-'.$tenantRequest->id);

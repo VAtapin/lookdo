@@ -29,6 +29,7 @@ class TenantBackupService
         'tenant_client_tokens',
         'tenant_requests',
         'tenant_request_values',
+        'tenant_book_valuations',
         'tenant_resources',
         'tenant_appointments',
         'tenant_media',
