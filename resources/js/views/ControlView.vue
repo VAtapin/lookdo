@@ -119,6 +119,7 @@ const {
     variationForm,
     templateForm,
     overrideForm,
+    smsOverrideForm,
 } = createControlState();
 function toast(message: string) {
     noticeText.value = message;
@@ -166,9 +167,12 @@ async function load() {
                     : url,
             );
         if (["tenants", "ai", "templates"].includes(section.value)) {
-            const [plans, taxonomy] = await Promise.all([
+            const [plans, taxonomy, catalog] = await Promise.all([
                 api<any[]>("/control/plans"),
                 api<any>("/control/taxonomy"),
+                section.value === "tenants"
+                    ? api<any>("/control/plan-entitlements")
+                    : Promise.resolve(null),
             ]);
             lookups.value = {
                 plans,
@@ -177,6 +181,7 @@ async function load() {
                     (category: any) => category.variations,
                 ),
             };
+            if (catalog) entitlementCatalog.value = catalog;
         }
     } catch (exception: any) {
         error.value = exception.message;
@@ -332,6 +337,45 @@ const entitlementGroups = computed(() =>
         }),
     ),
 );
+const selectedOverrideDefinition = computed<any>(() =>
+    overrideForm.key
+        ? entitlementCatalog.value.definitions?.[overrideForm.key] || null
+        : null,
+);
+function tenantHasOverride(key: string) {
+    return Object.prototype.hasOwnProperty.call(
+        selectedTenant.value?.entitlement_overrides || {},
+        key,
+    );
+}
+function effectiveTenantEntitlement(key: string, fallback: string | number) {
+    return selectedTenant.value?.entitlements?.[key] ?? fallback;
+}
+function hydrateTenantEntitlementForms() {
+    const enabled = effectiveTenantEntitlement("sms_enabled", "0");
+    const limit = Number(
+        effectiveTenantEntitlement("sms_monthly_limit", "0"),
+    );
+    smsOverrideForm.enabled = [true, 1, "1", "true"].includes(enabled);
+    smsOverrideForm.monthly_limit = Number.isFinite(limit) && limit > 0
+        ? limit
+        : 50;
+    overrideForm.key = "";
+    overrideForm.value = "";
+}
+function selectOverride() {
+    if (!overrideForm.key) {
+        overrideForm.value = "";
+        return;
+    }
+    const definition = selectedOverrideDefinition.value;
+    overrideForm.value = String(
+        effectiveTenantEntitlement(
+            overrideForm.key,
+            definition?.default ?? (definition?.type === "boolean" ? 0 : ""),
+        ),
+    );
+}
 function changePage(page: number) {
     filters.page = Math.max(1, Math.min(page, pager.value.last));
 }
@@ -758,6 +802,7 @@ async function openTenant(item: any) {
         selectedTenant.value = await api(`/control/tenants/${item.id}`);
         customTenantDomain.value = "";
         manualAccessDays.value = 14;
+        hydrateTenantEntitlementForms();
     } catch (exception: any) {
         error.value = exception.message;
         selectedTenant.value = null;
@@ -919,10 +964,12 @@ function openPaymentReceipt(payment: any) {
     window.open(`/api/control/subscriptions/${selectedSubscription.value.id}/payments/${payment.id}/receipt`, "_blank", "noopener,noreferrer");
 }
 async function refreshSelectedTenant() {
-    if (selectedTenant.value?.id)
+    if (selectedTenant.value?.id) {
         selectedTenant.value = await api(
             `/control/tenants/${selectedTenant.value.id}`,
         );
+        hydrateTenantEntitlementForms();
+    }
 }
 async function updateTenant(payload: any) {
     busy.value = true;
@@ -934,6 +981,7 @@ async function updateTenant(payload: any) {
         selectedTenant.value = await api(
             `/control/tenants/${selectedTenant.value.id}`,
         );
+        hydrateTenantEntitlementForms();
         await load();
         toast("Kunde wurde aktualisiert.");
     } finally {
@@ -968,11 +1016,82 @@ async function grantTenantAccess() {
     }
 }
 async function saveOverride() {
-    await api(`/control/tenants/${selectedTenant.value.id}/entitlement`, {
-        method: "PUT",
-        body: JSON.stringify(overrideForm),
-    });
-    toast("Leistung wurde gespeichert.");
+    if (!overrideForm.key) return;
+    busy.value = true;
+    error.value = "";
+    try {
+        await api(`/control/tenants/${selectedTenant.value.id}/entitlement`, {
+            method: "PUT",
+            body: JSON.stringify(overrideForm),
+        });
+        await refreshSelectedTenant();
+        toast("Individuelle Leistung wurde gespeichert.");
+    } catch (exception: any) {
+        error.value = exception.message;
+    } finally {
+        busy.value = false;
+    }
+}
+async function saveSmsOverrides() {
+    busy.value = true;
+    error.value = "";
+    try {
+        const monthlyLimit = Math.max(
+            1,
+            Math.min(10000, Math.round(Number(smsOverrideForm.monthly_limit))),
+        );
+        smsOverrideForm.monthly_limit = monthlyLimit;
+        await api(`/control/tenants/${selectedTenant.value.id}/entitlement`, {
+            method: "PUT",
+            body: JSON.stringify({
+                overrides: [
+                    {
+                        key: "sms_enabled",
+                        value: smsOverrideForm.enabled ? "1" : "0",
+                    },
+                    {
+                        key: "sms_monthly_limit",
+                        value: String(monthlyLimit),
+                    },
+                ],
+            }),
+        });
+        await refreshSelectedTenant();
+        toast("SMS-Einstellungen wurden gespeichert.");
+    } catch (exception: any) {
+        error.value = exception.message;
+    } finally {
+        busy.value = false;
+    }
+}
+async function clearOverrides(keys: string[], message: string) {
+    busy.value = true;
+    error.value = "";
+    try {
+        await api(`/control/tenants/${selectedTenant.value.id}/entitlement`, {
+            method: "DELETE",
+            body: JSON.stringify({ keys }),
+        });
+        await refreshSelectedTenant();
+        toast(message);
+    } catch (exception: any) {
+        error.value = exception.message;
+    } finally {
+        busy.value = false;
+    }
+}
+async function resetSmsOverrides() {
+    await clearOverrides(
+        ["sms_enabled", "sms_monthly_limit"],
+        "Für SMS gilt wieder der Tarifstandard.",
+    );
+}
+async function resetSelectedOverride() {
+    if (!overrideForm.key) return;
+    await clearOverrides(
+        [overrideForm.key],
+        "Für diese Leistung gilt wieder der Tarifstandard.",
+    );
 }
 async function impersonate() {
     await api(`/control/tenants/${selectedTenant.value.id}/impersonate`, {
@@ -1310,6 +1429,14 @@ const controlContext = {
     addTenantDomain,
     overrideForm,
     saveOverride,
+    smsOverrideForm,
+    saveSmsOverrides,
+    resetSmsOverrides,
+    entitlementGroups,
+    selectedOverrideDefinition,
+    selectOverride,
+    tenantHasOverride,
+    resetSelectedOverride,
     deleteTenantPermanently,
     tenantForm,
     createTenant,
@@ -1325,7 +1452,6 @@ const controlContext = {
     translatePlan,
     planLocales,
     planLocale,
-    entitlementGroups,
     phraseForm,
     choosePhraseVariation,
     savePhrase,

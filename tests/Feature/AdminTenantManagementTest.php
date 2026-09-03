@@ -173,6 +173,51 @@ class AdminTenantManagementTest extends TestCase
             ->assertJsonPath('tenant_id', $tenant->id);
     }
 
+    public function test_super_admin_can_manage_customer_sms_entitlements_without_technical_fields(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        [$tenant] = $this->tenantWithOwner();
+        $tenant->subscriptions()->create([
+            'plan_id' => Plan::where('code', 'start')->value('id'),
+            'provider' => 'stripe',
+            'status' => 'active',
+            'started_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->putJson("/api/control/tenants/{$tenant->id}/entitlement", [
+                'overrides' => [
+                    ['key' => 'sms_enabled', 'value' => '1'],
+                    ['key' => 'sms_monthly_limit', 'value' => '50'],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('overrides.sms_enabled', '1')
+            ->assertJsonPath('overrides.sms_monthly_limit', '50');
+
+        $this->actingAs($admin)
+            ->getJson("/api/control/tenants/{$tenant->id}")
+            ->assertOk()
+            ->assertJsonPath('entitlements.sms_enabled', '1')
+            ->assertJsonPath('entitlements.sms_monthly_limit', '50')
+            ->assertJsonPath('entitlement_overrides.sms_enabled', '1');
+
+        $this->actingAs($admin)
+            ->deleteJson("/api/control/tenants/{$tenant->id}/entitlement", [
+                'keys' => ['sms_enabled', 'sms_monthly_limit'],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseMissing('tenant_entitlement_overrides', [
+            'tenant_id' => $tenant->id,
+            'key' => 'sms_enabled',
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'tenant_id' => $tenant->id,
+            'action' => 'tenant.entitlement.cleared',
+        ]);
+    }
+
     /** @return array{Tenant, User} */
     private function tenantWithOwner(): array
     {

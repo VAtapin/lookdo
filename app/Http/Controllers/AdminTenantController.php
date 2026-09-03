@@ -10,6 +10,7 @@ use App\Models\TenantDomain;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\DomainService;
+use App\Services\EntitlementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -93,13 +94,21 @@ class AdminTenantController extends Controller
         return response()->json($tenant->load(['users', 'currentSubscription.plan', 'businessProfile.variation']), 201);
     }
 
-    public function show(Tenant $tenant): JsonResponse
+    public function show(Tenant $tenant, EntitlementService $entitlements): JsonResponse
     {
-        return response()->json($tenant->load([
+        $tenant->load([
             'users' => fn ($query) => $query->wherePivot('role', 'owner')->select('users.id', 'users.name', 'users.email', 'users.is_active', 'users.last_login_at'),
-            'profile', 'domains', 'currentSubscription.plan', 'currentSubscription.payments', 'subscriptions.plan', 'subscriptions.payments',
+            'profile', 'domains', 'currentSubscription.plan.entitlements', 'currentSubscription.payments', 'subscriptions.plan', 'subscriptions.payments',
             'businessProfile.category', 'businessProfile.variation', 'businessProfile.template',
-        ]));
+        ]);
+
+        return response()->json([
+            ...$tenant->toArray(),
+            'entitlements' => $entitlements->all($tenant),
+            'entitlement_overrides' => DB::table('tenant_entitlement_overrides')
+                ->where('tenant_id', $tenant->id)
+                ->pluck('value', 'key'),
+        ]);
     }
 
     public function update(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
@@ -151,9 +160,50 @@ class AdminTenantController extends Controller
 
     public function setOverride(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
     {
-        $data = $request->validate(['key' => 'required|string|max:100', 'value' => 'nullable|string|max:10000']);
-        DB::table('tenant_entitlement_overrides')->updateOrInsert(['tenant_id' => $tenant->id, 'key' => $data['key']], ['value' => $data['value'], 'created_at' => now(), 'updated_at' => now()]);
-        $audit->log('tenant.entitlement.updated', $tenant, null, $data, $tenant->id);
+        $data = $request->validate([
+            'key' => 'required_without:overrides|string|max:100',
+            'value' => 'nullable|string|max:10000',
+            'overrides' => 'required_without:key|array|min:1|max:50',
+            'overrides.*.key' => 'required|string|max:100',
+            'overrides.*.value' => 'nullable|string|max:10000',
+        ]);
+        $items = isset($data['overrides'])
+            ? $data['overrides']
+            : [['key' => $data['key'], 'value' => $data['value'] ?? null]];
+
+        DB::transaction(function () use ($tenant, $items): void {
+            foreach ($items as $item) {
+                DB::table('tenant_entitlement_overrides')->updateOrInsert(
+                    ['tenant_id' => $tenant->id, 'key' => $item['key']],
+                    ['value' => $item['value'] ?? null, 'created_at' => now(), 'updated_at' => now()],
+                );
+            }
+        });
+        $audit->log('tenant.entitlement.updated', $tenant, null, ['overrides' => $items], $tenant->id);
+
+        return response()->json([
+            'ok' => true,
+            'overrides' => DB::table('tenant_entitlement_overrides')->where('tenant_id', $tenant->id)->pluck('value', 'key'),
+        ]);
+    }
+
+    public function clearOverrides(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
+    {
+        $data = $request->validate([
+            'keys' => 'required|array|min:1|max:50',
+            'keys.*' => 'required|string|max:100',
+        ]);
+        $before = DB::table('tenant_entitlement_overrides')
+            ->where('tenant_id', $tenant->id)
+            ->whereIn('key', $data['keys'])
+            ->pluck('value', 'key')
+            ->all();
+
+        DB::table('tenant_entitlement_overrides')
+            ->where('tenant_id', $tenant->id)
+            ->whereIn('key', $data['keys'])
+            ->delete();
+        $audit->log('tenant.entitlement.cleared', $tenant, $before, ['keys' => $data['keys']], $tenant->id);
 
         return response()->json(['ok' => true]);
     }

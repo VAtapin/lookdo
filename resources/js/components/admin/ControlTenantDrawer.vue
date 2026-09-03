@@ -21,8 +21,27 @@ const {
     addTenantDomain,
     overrideForm,
     saveOverride,
+    smsOverrideForm,
+    saveSmsOverrides,
+    resetSmsOverrides,
+    entitlementGroups,
+    selectedOverrideDefinition,
+    selectOverride,
+    tenantHasOverride,
+    resetSelectedOverride,
     deleteTenantPermanently,
 } = props.ctx;
+
+function setOverrideBoolean(event: Event) {
+    overrideForm.value = (event.target as HTMLInputElement).checked ? "1" : "0";
+}
+
+function visibleOverrideItems(items: any[]) {
+    return items.filter(
+        (item: any) =>
+            !["sms_enabled", "sms_monthly_limit"].includes(item.key),
+    );
+}
 </script>
 
 <template>
@@ -253,12 +272,164 @@ const {
         </section>
 
         <section class="tenant-drawer-section">
-            <h3>Leistung überschreiben</h3>
-            <input v-model="overrideForm.key" placeholder="Schlüssel" />
-            <input v-model="overrideForm.value" placeholder="Wert" />
-            <button class="button ghost small" @click="saveOverride">
-                Speichern
-            </button>
+            <h3>Individuelle Tarifleistungen</h3>
+            <p class="tenant-entitlement-intro">
+                Individuelle Freigaben gelten nur für diesen Kunden und haben
+                Vorrang vor seinem Tarif.
+            </p>
+
+            <article class="tenant-sms-override">
+                <header>
+                    <div>
+                        <b>SMS für diesen Kunden</b>
+                        <small
+                            >Versand freigeben und ein festes Monatslimit
+                            setzen.</small
+                        >
+                    </div>
+                    <span
+                        :class="{
+                            active:
+                                tenantHasOverride('sms_enabled') ||
+                                tenantHasOverride('sms_monthly_limit'),
+                        }"
+                    >{{
+                        tenantHasOverride("sms_enabled") ||
+                        tenantHasOverride("sms_monthly_limit")
+                            ? "Individuell"
+                            : "Tarifstandard"
+                    }}</span>
+                </header>
+                <div class="tenant-sms-fields">
+                    <label class="settings-toggle">
+                        <input
+                            v-model="smsOverrideForm.enabled"
+                            type="checkbox"
+                        />
+                        <span>
+                            <b>SMS-Versand aktivieren</b>
+                            <small
+                                >Erlaubt wichtige SMS an Endkunden dieses
+                                Kundenkontos.</small
+                            >
+                        </span>
+                    </label>
+                    <label>
+                        Monatliches SMS-Limit
+                        <input
+                            v-model.number="smsOverrideForm.monthly_limit"
+                            type="number"
+                            min="1"
+                            max="10000"
+                            inputmode="numeric"
+                        />
+                        <small
+                            >Nach Erreichen des Limits werden keine weiteren
+                            SMS versendet.</small
+                        >
+                    </label>
+                </div>
+                <div class="tenant-entitlement-actions">
+                    <button
+                        type="button"
+                        class="button small"
+                        :disabled="busy"
+                        @click="saveSmsOverrides"
+                    >
+                        SMS-Einstellungen speichern
+                    </button>
+                    <button
+                        v-if="
+                            tenantHasOverride('sms_enabled') ||
+                            tenantHasOverride('sms_monthly_limit')
+                        "
+                        type="button"
+                        class="button ghost small"
+                        :disabled="busy"
+                        @click="resetSmsOverrides"
+                    >
+                        Tarifstandard verwenden
+                    </button>
+                </div>
+            </article>
+
+            <div class="tenant-other-override">
+                <label>
+                    Weitere Tarifleistung
+                    <select
+                        v-model="overrideForm.key"
+                        @change="selectOverride"
+                    >
+                        <option value="">Leistung auswählen …</option>
+                        <optgroup
+                            v-for="group in entitlementGroups"
+                            :key="group.key"
+                            :label="group.label"
+                        >
+                            <option
+                                v-for="item in visibleOverrideItems(
+                                    group.items,
+                                )"
+                                :key="item.key"
+                                :value="item.key"
+                            >
+                                {{ item.label }}
+                            </option>
+                        </optgroup>
+                    </select>
+                </label>
+                <template v-if="selectedOverrideDefinition">
+                    <label
+                        v-if="selectedOverrideDefinition.type === 'boolean'"
+                        class="settings-toggle tenant-generic-toggle"
+                    >
+                        <input
+                            type="checkbox"
+                            :checked="overrideForm.value === '1'"
+                            @change="setOverrideBoolean"
+                        />
+                        <span>
+                            <b>{{ selectedOverrideDefinition.label }}</b>
+                            <small
+                                >Für diesen Kunden individuell ein- oder
+                                ausschalten.</small
+                            >
+                        </span>
+                    </label>
+                    <label v-else>
+                        {{ selectedOverrideDefinition.label }}
+                        <input
+                            v-model="overrideForm.value"
+                            type="number"
+                            :min="selectedOverrideDefinition.min"
+                            :max="selectedOverrideDefinition.max"
+                            inputmode="numeric"
+                        />
+                        <small v-if="selectedOverrideDefinition.help">{{
+                            selectedOverrideDefinition.help
+                        }}</small>
+                    </label>
+                    <div class="tenant-entitlement-actions">
+                        <button
+                            type="button"
+                            class="button ghost small"
+                            :disabled="busy"
+                            @click="saveOverride"
+                        >
+                            Individuell speichern
+                        </button>
+                        <button
+                            v-if="tenantHasOverride(overrideForm.key)"
+                            type="button"
+                            class="button ghost small"
+                            :disabled="busy"
+                            @click="resetSelectedOverride"
+                        >
+                            Tarifstandard verwenden
+                        </button>
+                    </div>
+                </template>
+            </div>
         </section>
 
         <section class="tenant-drawer-section tenant-danger-zone">

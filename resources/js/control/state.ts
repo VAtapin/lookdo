@@ -86,6 +86,7 @@ export function createControlState() {
         sort_order: 50,
     });
     const overrideForm = reactive({ key: "", value: "" });
+    const smsOverrideForm = reactive({ enabled: false, monthly_limit: 50 });
 
     return {
         filters,
@@ -101,5 +102,6 @@ export function createControlState() {
         variationForm,
         templateForm,
         overrideForm,
+        smsOverrideForm,
     };
 }

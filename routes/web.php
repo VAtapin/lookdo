@@ -151,6 +151,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::delete('/tenants/{tenant}/domains/{domain}', [AdminTenantController::class, 'deleteDomain']);
             Route::post('/tenants/{tenant}/grant-access', [AdminTenantController::class, 'grantAccess']);
             Route::put('/tenants/{tenant}/entitlement', [AdminTenantController::class, 'setOverride']);
+            Route::delete('/tenants/{tenant}/entitlement', [AdminTenantController::class, 'clearOverrides']);
             Route::post('/tenants/{tenant}/impersonate', [AdminTenantController::class, 'impersonate']);
             Route::get('/administrators', [AdminController::class, 'administrators']);
             Route::post('/administrators', [AdminController::class, 'storeAdministrator']);
