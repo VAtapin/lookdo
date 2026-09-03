@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\AnalyzeTenantRequestMedia;
+use App\Jobs\SendPlatformAdminNewRequestNotification;
 use App\Jobs\SendTenantMasterPush;
 use App\Models\Tenant;
 use App\Models\TenantAppointment;
@@ -121,7 +122,7 @@ class TenantAppController extends Controller
         ])->all();
         $budget->ensureAvailable();
         $instructions = $isBookPurchase
-            ? 'Analyze the uploaded book photos immediately for a professional book buyer. OCR an ISBN-10 or ISBN-13 exactly when visible, including its check digit. Fill every reliably inferable form field, including visible binding, spine, page condition, completeness, stains, inscriptions, signatures and defects. The master_comment is a separate concise decision note: maximum 3 short sentences and 320 characters, only visible condition, the most important risk and what still needs checking. Do not repeat title, author, ISBN, publisher, year, edition, page references, listing description or other form data in master_comment. Recommend a deliberately conservative low purchase price; it is an internal suggestion, not a guaranteed valuation. Never invent an ISBN or claim a defect that is not visible. Use empty strings for unknown text fields. If the user states that no ISBN exists, leave ISBN empty and assess from the other photos.'
+            ? 'Analyze the uploaded book photos immediately for a professional book buyer. OCR an ISBN-10 or ISBN-13 exactly when visible, including its check digit. Fill every reliably inferable form field, including visible binding, spine, page condition, completeness, stains, inscriptions, signatures and defects. The master_comment is a separate practical note of 3 to 5 compact sentences and no more than 600 characters: visible condition of binding, spine and pages, important strengths or defects, and the most relevant point still needing a check. Do not repeat title, author, ISBN, publisher, year, edition, page references, listing description or other form data in master_comment. Never mention Google Books, catalogues, technical identification methods, AI, internal recommendations, valuation disclaimers or guarantees. Recommend a deliberately conservative low purchase price. Never invent an ISBN or claim a defect that is not visible. Use empty strings for unknown text fields. If the user states that no ISBN exists, leave ISBN empty and assess from the other photos.'
             : 'Help a customer fill a request for '.($this->localized(data_get($configuration, 'condition_assessment.context', 'a local specialist'), $locale)).'. Read visible identifiers such as ISBN, VIN, maker marks and labels carefully. Preserve facts, never invent missing bibliographic, vehicle, provenance or condition details, and use empty strings for unknown facts. Return concise values in '.$locale.'.';
         $input = json_encode(['customer_note' => (string) ($data['text'] ?? ''), 'fields' => $fieldContext, 'current_values' => $currentFields, 'photo_slots' => $mediaSlots, 'isbn_absent' => $isbnAbsent], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         $schema = ['type' => 'object', 'additionalProperties' => false, 'properties' => $properties, 'required' => array_keys($properties)];
@@ -298,6 +299,7 @@ class TenantAppController extends Controller
 
         AnalyzeTenantRequestMedia::dispatch($tenantRequest->id)->afterCommit();
         $this->notifyMaster($tenant, 'new_request', '/app/requests', 'request-'.$tenantRequest->id);
+        SendPlatformAdminNewRequestNotification::dispatch($tenant->id, $tenantRequest->id)->afterResponse();
 
         return response()->json(['token' => $rawToken, 'request' => $this->requestPayload($tenantRequest->fresh(['media', 'messages'])), 'success' => $this->localized(data_get($this->configuration($tenant), 'success', []), $locale)], 201);
     }
@@ -972,7 +974,14 @@ class TenantAppController extends Controller
 
     private function bookAssessment(string $comment, string $price, string $locale): string
     {
-        $comment = Str::limit(trim((string) preg_replace('/\s+/u', ' ', $comment)), 420);
+        $comment = preg_replace([
+            '/(?:Внутренняя рекомендация|Внутрішня рекомендація)[^.?!]*(?:[.?!]|$)/iu',
+            '/(?:не оценка и не гарантия|не оцінка і не гарантія)[^.?!]*(?:[.?!]|$)/iu',
+            '/[^.?!]*(?:Google Books|каталожн(?:ой|ої) запис)[^.?!]*(?:[.?!]|$)/iu',
+            '/(?:Internal recommendation|Not an appraisal or guarantee)[^.?!]*(?:[.?!]|$)/iu',
+            '/[^.?!]*Google Books[^.?!]*(?:[.?!]|$)/iu',
+        ], ' ', $comment) ?? $comment;
+        $comment = Str::limit(trim((string) preg_replace('/\s+/u', ' ', $comment)), 600);
         $priceLabel = match ($locale) {
             'ru' => 'Закупка',
             'uk' => 'Закупівля',

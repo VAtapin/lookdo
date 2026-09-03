@@ -298,7 +298,7 @@ class TenantAppTest extends TestCase
         config(['services.openai.key' => 'test-key', 'services.openai.text_model' => 'gpt-5.6-luna']);
         Http::fake(['api.openai.com/*' => Http::response([
             'model' => 'gpt-5.6-luna',
-            'output_text' => '{"comment":"Переплёт заметно потёрт; корешок виден не полностью. Нужны фото ISBN и страниц с дефектами."}',
+            'output_text' => '{"comment":"Внутренняя рекомендация по покупке, не оценка и не гарантия. Издание идентифицируется по каталожной записи Google Books. Переплёт заметно потёрт; корешок виден не полностью. Нужны фото ISBN и страниц с дефектами."}',
             'usage' => ['input_tokens' => 200, 'output_tokens' => 35],
         ])]);
 

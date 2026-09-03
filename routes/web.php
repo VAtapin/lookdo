@@ -199,6 +199,8 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::get('/classifications', [AdminController::class, 'classifications']);
             Route::get('/settings', [AdminController::class, 'settings']);
             Route::put('/settings', [AdminController::class, 'saveSettings']);
+            Route::post('/push-subscriptions', [AdminController::class, 'subscribePush'])->middleware('throttle:10,1');
+            Route::delete('/push-subscriptions', [AdminController::class, 'unsubscribePush'])->middleware('throttle:10,1');
             Route::put('/pages/{page}', [AdminController::class, 'savePage']);
             Route::post('/pages/translate', [AdminController::class, 'translatePage'])->middleware('throttle:20,1');
             Route::post('/content-media', [AdminController::class, 'uploadContentMedia']);

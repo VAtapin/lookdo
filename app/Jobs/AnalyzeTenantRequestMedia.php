@@ -71,7 +71,7 @@ class AnalyzeTenantRequestMedia implements ShouldQueue
         $budget->ensureAvailable();
         $result = $openAi->structuredWithImages(
             $isBookPurchase
-                ? 'You assist a professional antiquarian book buyer. Return a very short practical buying note in '.$locale.'. The comment must contain only: visible physical condition, the single most important defect, and what must still be checked. Maximum 3 short sentences and 420 characters. Do not repeat title, author, ISBN, publisher, year, edition, description, page references or any other submitted/catalogue data already displayed elsewhere. Recommend a deliberately low defensible purchase price and explain its basis in one short phrase. Never invent authenticity, hidden damage, completeness, rarity or market sales.'
+                ? 'You assist a professional antiquarian book buyer. Return a practical, moderately detailed buying note in '.$locale.'. Use 3 to 5 compact sentences, maximum 600 characters. Cover visible condition of binding, spine and pages, important strengths or defects, and only the most relevant point that still needs checking. Do not repeat title, author, ISBN, publisher, year, edition, description, page references or catalogue data already displayed elsewhere. Do not mention Google Books, catalogues, technical identification methods, AI, internal recommendations, valuation disclaimers or guarantees. Recommend a deliberately low defensible purchase price and explain its basis in one short phrase. Never invent authenticity, hidden damage, completeness, rarity or market sales.'
                 : 'You are an assistant to a professional handling '.$context.'. Inspect only what is actually visible in the customer photos. Write a short practical condition note of 2 to 4 sentences for the professional in '.$locale.'. Mention visible condition, relevant defects or identifying details, and what important photo or fact is missing. Do not estimate a price, guarantee authenticity, diagnose hidden damage, or invent facts.',
             json_encode(['request' => $request->summary, 'submitted_fields' => $submitted, 'catalog' => $existingAssessment['catalog'] ?? [], 'prefilled_price' => $existingAssessment['recommended_purchase_price'] ?? null, 'photo_slots' => $request->media->where('type', 'image')->pluck('slot_key')->values()->all()], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             'tenant_media_condition_assessment',
@@ -110,7 +110,7 @@ class AnalyzeTenantRequestMedia implements ShouldQueue
     /** @param array<string, mixed> $assessment */
     private function bookAssessment(array $assessment, string $locale): string
     {
-        $comment = Str::limit($this->singleLine((string) ($assessment['comment'] ?? '')), 420);
+        $comment = Str::limit($this->cleanBookComment((string) ($assessment['comment'] ?? '')), 600);
         $price = Str::limit($this->singleLine((string) ($assessment['recommended_purchase_price'] ?? '')), 40);
         $basis = Str::limit($this->singleLine((string) ($assessment['price_basis'] ?? '')), 140);
         $priceLabel = match ($locale) {
@@ -129,5 +129,18 @@ class AnalyzeTenantRequestMedia implements ShouldQueue
     private function singleLine(string $value): string
     {
         return trim((string) preg_replace('/\s+/u', ' ', $value));
+    }
+
+    private function cleanBookComment(string $value): string
+    {
+        $value = preg_replace([
+            '/(?:Внутренняя рекомендация|Внутрішня рекомендація)[^.?!]*(?:[.?!]|$)/iu',
+            '/(?:не оценка и не гарантия|не оцінка і не гарантія)[^.?!]*(?:[.?!]|$)/iu',
+            '/[^.?!]*(?:Google Books|каталожн(?:ой|ої) запис)[^.?!]*(?:[.?!]|$)/iu',
+            '/(?:Internal recommendation|Not an appraisal or guarantee)[^.?!]*(?:[.?!]|$)/iu',
+            '/[^.?!]*Google Books[^.?!]*(?:[.?!]|$)/iu',
+        ], ' ', $value) ?? $value;
+
+        return $this->singleLine($value);
     }
 }

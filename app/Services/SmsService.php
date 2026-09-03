@@ -85,6 +85,54 @@ class SmsService
         return $record;
     }
 
+    public function queuePlatformImportant(Tenant $sourceTenant, string $recipient, string $message, string $idempotencyKey): SmsMessage
+    {
+        if (! $this->gateway->configured()) {
+            throw new DomainException('SMS integration is not configured.');
+        }
+
+        $recipient = $this->normalizeRecipient($sourceTenant, $recipient);
+        $message = trim($message);
+        if ($message === '' || mb_strlen($message) > 1000) {
+            throw new DomainException('SMS text must contain between 1 and 1000 characters.');
+        }
+        $limit = max(1, (int) SystemSetting::read('admin_notification_sms_monthly_limit', 100));
+
+        $record = DB::transaction(function () use ($sourceTenant, $recipient, $message, $idempotencyKey, $limit): SmsMessage {
+            SystemSetting::query()->where('key', 'admin_notification_sms_monthly_limit')->lockForUpdate()->first();
+            $existing = SmsMessage::query()->where('idempotency_key', $idempotencyKey)->first();
+            if ($existing) {
+                return $existing;
+            }
+            $used = SmsMessage::query()
+                ->where('event_type', 'admin_request_received')
+                ->where('created_at', '>=', now()->startOfMonth())
+                ->whereNotIn('status', ['failed', 'rejected'])
+                ->count();
+            if ($used >= $limit) {
+                throw new DomainException('The platform admin monthly SMS limit has been reached.');
+            }
+
+            return SmsMessage::create([
+                'tenant_id' => $sourceTenant->id,
+                'uuid' => (string) Str::uuid(),
+                'provider' => $this->gateway->provider(),
+                'event_type' => 'admin_request_received',
+                'recipient' => $recipient,
+                'recipient_hash' => hash('sha256', $recipient),
+                'message' => $message,
+                'idempotency_key' => $idempotencyKey,
+                'status' => 'queued',
+            ]);
+        });
+
+        if ($record->wasRecentlyCreated) {
+            DB::afterCommit(fn () => SendSmsMessage::dispatch($record->id));
+        }
+
+        return $record;
+    }
+
     public function localizedMessage(Tenant $tenant, string $locale, string $eventType): string
     {
         $locale = in_array($locale, ['de', 'en', 'ru', 'uk'], true) ? $locale : 'de';

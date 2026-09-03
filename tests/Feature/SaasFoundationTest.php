@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\TenantAppController;
 use App\Jobs\GenerateTenantAppCustomization;
 use App\Jobs\SendSmsMessage;
+use App\Models\AdminPushSubscription;
 use App\Models\AiUsageRecord;
 use App\Models\BusinessClassification;
 use App\Models\BusinessPhrase;
@@ -1085,6 +1086,44 @@ class SaasFoundationTest extends TestCase
         $this->assertSame('seven-api-secret', SystemSetting::readSecret('sms_seven_api_key'));
         $this->assertSame('seven-signing-secret', SystemSetting::readSecret('sms_seven_signing_key'));
         $this->assertNotSame('seven-api-secret', SystemSetting::where('key', 'sms_seven_api_key')->firstOrFail()->value);
+    }
+
+    public function test_super_admin_can_configure_platform_notification_channels(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $settings = $this->actingAs($admin)->getJson('/api/control/settings')->assertOk()
+            ->assertJsonPath('settings.admin_notifications.push', false)
+            ->assertJsonPath('settings.admin_notification_sms_monthly_limit', 100)
+            ->json('settings');
+        $settings['admin_notifications'] = ['push' => true, 'email' => true, 'sms' => false];
+        $settings['admin_notification_email'] = 'alerts@lookdo.test';
+        $settings['admin_notification_phone'] = '+4915112345678';
+        $settings['admin_notification_sms_monthly_limit'] = 25;
+
+        $this->actingAs($admin)->putJson('/api/control/settings', ['settings' => $settings])
+            ->assertOk()
+            ->assertJsonPath('settings.admin_notifications.push', true)
+            ->assertJsonPath('settings.admin_notifications.email', true)
+            ->assertJsonPath('settings.admin_notification_email', 'alerts@lookdo.test')
+            ->assertJsonPath('settings.admin_notification_sms_monthly_limit', 25);
+
+        $this->assertSame(['push' => true, 'email' => true, 'sms' => false], SystemSetting::read('admin_notifications'));
+        $this->assertDatabaseCount((new AdminPushSubscription)->getTable(), 0);
+    }
+
+    public function test_platform_admin_sms_does_not_use_the_customer_plan_limit(): void
+    {
+        Queue::fake();
+        SystemSetting::updateOrCreate(['key' => 'integrations'], ['value' => ['stripe' => true, 'openai' => true, 'sms' => true]]);
+        SystemSetting::updateOrCreate(['key' => 'admin_notification_sms_monthly_limit'], ['value' => 5]);
+        SystemSetting::writeSecret('sms_seven_api_key', 'test-api-key');
+        $tenant = Tenant::create(['name' => 'Admin Alert Source', 'slug' => 'admin-alert-source', 'country' => 'DE', 'locale' => 'de', 'status' => 'active']);
+
+        $sms = app(SmsService::class)->queuePlatformImportant($tenant, '0151 12345678', 'Neue Kundenanfrage', 'admin-request-77');
+
+        $this->assertSame('admin_request_received', $sms->event_type);
+        $this->assertSame('+4915112345678', $sms->recipient);
+        Queue::assertPushed(SendSmsMessage::class, 1);
     }
 
     public function test_sms_service_enforces_plan_limit_and_records_provider_cost(): void

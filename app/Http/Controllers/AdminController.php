@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AdminPushSubscription;
 use App\Models\AiUsageRecord;
 use App\Models\AuditLog;
 use App\Models\BusinessCategory;
@@ -25,6 +26,7 @@ use App\Services\OpenAiOrganizationUsageService;
 use App\Services\OpenAiService;
 use App\Services\StripeService;
 use App\Services\TenantBackupService;
+use App\Services\TenantWebPushService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -524,8 +526,15 @@ class AdminController extends Controller
 
     public function settings(): JsonResponse
     {
+        $settings = array_merge([
+            'admin_notifications' => ['push' => false, 'email' => false, 'sms' => false],
+            'admin_notification_email' => (string) (auth()->user()?->email ?? ''),
+            'admin_notification_phone' => '',
+            'admin_notification_sms_monthly_limit' => 100,
+        ], SystemSetting::where('is_secret', false)->where('key', '!=', 'legal_dispute_statement')->pluck('value', 'key')->all());
+
         return response()->json([
-            'settings' => SystemSetting::where('is_secret', false)->where('key', '!=', 'legal_dispute_statement')->pluck('value', 'key'),
+            'settings' => $settings,
             'pages' => PlatformPage::orderBy('key')->get(),
             'templates' => RequestTemplate::where('enabled', true)->orderByDesc('sort_order')->get(['id', 'code', 'name']),
             'sms' => [
@@ -539,6 +548,11 @@ class AdminController extends Controller
                 'project_id' => (string) SystemSetting::read('openai_project_id', ''),
                 'usage_dashboard_url' => 'https://platform.openai.com/usage',
                 'admin_keys_url' => 'https://platform.openai.com/settings/organization/admin-keys',
+            ],
+            'notifications' => [
+                'push_configured' => app(TenantWebPushService::class)->configured(),
+                'push_public_key' => app(TenantWebPushService::class)->configured() ? (string) config('services.webpush.vapid_public_key') : '',
+                'push_subscriptions' => AdminPushSubscription::query()->where('user_id', auth()->id())->count(),
             ],
         ]);
     }
@@ -577,6 +591,13 @@ class AdminController extends Controller
             'settings.sms_events.master_replied' => 'required|boolean',
             'settings.sms_events.work_ready' => 'required|boolean',
             'settings.sms_events.agreement_reminder' => 'required|boolean',
+            'settings.admin_notifications' => 'required|array:push,email,sms',
+            'settings.admin_notifications.push' => 'required|boolean',
+            'settings.admin_notifications.email' => 'required|boolean',
+            'settings.admin_notifications.sms' => 'required|boolean',
+            'settings.admin_notification_email' => 'nullable|email|max:255',
+            'settings.admin_notification_phone' => 'nullable|string|max:80',
+            'settings.admin_notification_sms_monthly_limit' => 'required|integer|min:1|max:10000',
             'settings.sms_seven_api_key' => 'nullable|string|max:1024',
             'settings.sms_seven_signing_key' => 'nullable|string|max:1024',
             'settings.sms_clear_api_key' => 'nullable|boolean',
@@ -597,6 +618,7 @@ class AdminController extends Controller
             'platform_name', 'support_email', 'default_locale', 'default_request_template_code',
             'trial_days_default', 'upload_base_limit_mb', 'social_share_image_url', 'social_share_images', 'demo_video_source', 'demo_video_url', 'registration_enabled', 'maintenance',
             'enabled_locales', 'integrations', 'sms_provider', 'sms_sender', 'sms_events', 'legal_operator_name', 'legal_operator_address',
+            'admin_notifications', 'admin_notification_email', 'admin_notification_phone', 'admin_notification_sms_monthly_limit',
             'openai_project_id',
             'legal_representative', 'legal_email', 'legal_phone', 'legal_register', 'legal_vat_id',
         ];
@@ -611,6 +633,15 @@ class AdminController extends Controller
         $clearsSmsApiKey = (bool) data_get($data, 'settings.sms_clear_api_key', false);
         if ($smsEnabled && ($clearsSmsApiKey || ($newSmsApiKey === '' && blank(SystemSetting::readSecret('sms_seven_api_key'))))) {
             throw ValidationException::withMessages(['settings.sms_seven_api_key' => 'Zum Aktivieren des SMS-Versands ist ein seven.io API-Key erforderlich.']);
+        }
+        if (data_get($data, 'settings.admin_notifications.email') && blank(data_get($data, 'settings.admin_notification_email'))) {
+            throw ValidationException::withMessages(['settings.admin_notification_email' => 'Für E-Mail-Benachrichtigungen ist eine Empfängeradresse erforderlich.']);
+        }
+        if (data_get($data, 'settings.admin_notifications.sms') && blank(data_get($data, 'settings.admin_notification_phone'))) {
+            throw ValidationException::withMessages(['settings.admin_notification_phone' => 'Für SMS-Benachrichtigungen ist eine Mobilnummer erforderlich.']);
+        }
+        if (data_get($data, 'settings.admin_notifications.sms') && ! $smsEnabled) {
+            throw ValidationException::withMessages(['settings.admin_notifications.sms' => 'Aktivieren Sie zuerst das globale SMS-Gateway.']);
         }
 
         DB::transaction(function () use ($data, $allowed, $audit): void {
@@ -636,6 +667,48 @@ class AdminController extends Controller
         });
 
         return $this->settings();
+    }
+
+    public function subscribePush(Request $request, AuditService $audit): JsonResponse
+    {
+        abort_unless(app(TenantWebPushService::class)->configured(), 422, 'Web Push ist auf dem Server nicht konfiguriert.');
+        $data = $request->validate([
+            'endpoint' => 'required|url|max:2000',
+            'keys.p256dh' => 'required|string|max:1000',
+            'keys.auth' => 'required|string|max:500',
+        ]);
+        $subscription = AdminPushSubscription::query()->updateOrCreate(
+            ['endpoint_hash' => hash('sha256', $data['endpoint'])],
+            [
+                'user_id' => $request->user()->id,
+                'endpoint' => $data['endpoint'],
+                'public_key' => $data['keys']['p256dh'],
+                'auth_token' => $data['keys']['auth'],
+            ],
+        );
+        $audit->log('admin.push.enabled', $subscription, null, ['user_id' => $request->user()->id]);
+
+        return response()->json([
+            'subscribed' => true,
+            'subscriptions' => AdminPushSubscription::query()->where('user_id', $request->user()->id)->count(),
+        ]);
+    }
+
+    public function unsubscribePush(Request $request, AuditService $audit): JsonResponse
+    {
+        $data = $request->validate(['endpoint' => 'required|url|max:2000']);
+        $deleted = AdminPushSubscription::query()
+            ->where('user_id', $request->user()->id)
+            ->where('endpoint_hash', hash('sha256', $data['endpoint']))
+            ->delete();
+        if ($deleted) {
+            $audit->log('admin.push.disabled', $request->user(), ['user_id' => $request->user()->id], null);
+        }
+
+        return response()->json([
+            'subscribed' => false,
+            'subscriptions' => AdminPushSubscription::query()->where('user_id', $request->user()->id)->count(),
+        ]);
     }
 
     public function testOpenAiUsage(OpenAiOrganizationUsageService $usage): JsonResponse

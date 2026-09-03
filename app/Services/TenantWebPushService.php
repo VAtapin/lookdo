@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AdminPushSubscription;
 use App\Models\Tenant;
 use App\Models\TenantCustomer;
 use App\Models\TenantPushSubscription;
@@ -70,7 +71,20 @@ class TenantWebPushService
     }
 
     /**
-     * @param  Collection<int, TenantPushSubscription>  $subscriptions
+     * @param  array{title:string,body:string,url?:string,icon?:string,badge?:string,tag?:string,action?:string}  $payload
+     * @return array{sent:int,failed:int,expired:int,skipped:bool}
+     */
+    public function sendToPlatformAdministrators(array $payload): array
+    {
+        $subscriptions = AdminPushSubscription::query()
+            ->whereHas('user', fn ($query) => $query->where('is_super_admin', true)->where('is_active', true))
+            ->get();
+
+        return $this->send($subscriptions, $payload, ['audience' => 'platform-admin']);
+    }
+
+    /**
+     * @param  Collection<int, TenantPushSubscription|AdminPushSubscription>  $subscriptions
      * @param  array{title:string,body:string,url?:string,icon?:string,badge?:string,tag?:string,action?:string}  $payload
      * @param  array<string, int|string|null>  $context
      * @return array{sent:int,failed:int,expired:int,skipped:bool}
@@ -118,7 +132,7 @@ class TenantWebPushService
             $result['failed']++;
             Log::warning('Tenant web push delivery failed.', $context + [
                 'user_id' => $record?->user_id,
-                'customer_id' => $record?->customer_id,
+                'customer_id' => $record instanceof TenantPushSubscription ? $record->customer_id : null,
                 'endpoint_hash' => $record?->endpoint_hash,
                 'reason' => $report->getReason(),
             ]);

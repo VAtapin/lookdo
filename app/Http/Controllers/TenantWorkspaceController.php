@@ -169,7 +169,7 @@ class TenantWorkspaceController extends Controller
     public function conversations(Request $request, Tenant $tenant): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
-        $items = $tenant->appRequests()->whereHas('messages')->with(['customer', 'messages' => fn ($q) => $q->latest()])->latest('updated_at')->get()->map(fn ($r) => [
+        $items = $tenant->appRequests()->whereHas('messages')->with(['customer', 'media', 'values', 'template', 'messages' => fn ($q) => $q->latest()])->latest('updated_at')->get()->map(fn ($r) => [
             'request' => $this->requestItem($r, true), 'customer' => $r->customer, 'last_message' => $r->messages->first(), 'unread' => $r->messages->where('sender_type', 'customer')->whereNull('read_at')->count(),
         ]);
 
@@ -412,11 +412,11 @@ class TenantWorkspaceController extends Controller
         }
 
         if (filled($value['display_value'] ?? null)) {
-            return Str::limit(trim((string) $value['display_value']), 650);
+            return Str::limit($this->cleanBookAssessment((string) $value['display_value']), 760);
         }
 
         $comment = (string) ($value['comment'] ?? $value['condition'] ?? $value['value'] ?? '');
-        $comment = Str::limit(trim((string) preg_replace('/\s+/u', ' ', $comment)), 420);
+        $comment = Str::limit($this->cleanBookAssessment($comment), 600);
         $price = Str::limit(trim((string) ($value['recommended_purchase_price'] ?? '')), 40);
         $basis = Str::limit(trim((string) preg_replace('/\s+/u', ' ', (string) ($value['price_basis'] ?? ''))), 140);
         $priceLabel = match ($locale) {
@@ -431,6 +431,19 @@ class TenantWorkspaceController extends Controller
         ])));
 
         return $result === '' ? null : $result;
+    }
+
+    private function cleanBookAssessment(string $value): string
+    {
+        $value = preg_replace([
+            '/(?:Внутренняя рекомендация|Внутрішня рекомендація)[^.?!]*(?:[.?!]|$)/iu',
+            '/(?:не оценка и не гарантия|не оцінка і не гарантія)[^.?!]*(?:[.?!]|$)/iu',
+            '/[^.?!]*(?:Google Books|каталожн(?:ой|ої) запис)[^.?!]*(?:[.?!]|$)/iu',
+            '/(?:Internal recommendation|Not an appraisal or guarantee)[^.?!]*(?:[.?!]|$)/iu',
+            '/[^.?!]*Google Books[^.?!]*(?:[.?!]|$)/iu',
+        ], ' ', $value) ?? $value;
+
+        return trim((string) preg_replace('/\s+/u', ' ', $value));
     }
 
     private function requestDetails(TenantRequest $tenantRequest): array
