@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AdminModal from "./AdminModal.vue";
+
 const props = defineProps<{ ctx: any }>();
 const {
     selectedTenant,
@@ -24,16 +26,19 @@ const {
 </script>
 
 <template>
-    <aside v-if="selectedTenant" class="drawer tenant-drawer">
-        <button class="drawer-close" @click="selectedTenant = null">×</button>
-        <p class="eyebrow">KUNDE #{{ selectedTenant.id }}</p>
-        <h2>{{ selectedTenant.name }}</h2>
-        <p>
-            {{
-                selectedTenant.primary_domain?.domain ||
-                selectedTenant.slug + ".lookdo.app"
-            }}
-        </p>
+    <AdminModal
+        v-if="selectedTenant"
+        :title="`Kunde #${selectedTenant.id} · ${selectedTenant.name}`"
+        wide
+        @close="selectedTenant = null"
+    >
+        <div class="tenant-dialog">
+            <p class="tenant-dialog-domain">
+                {{
+                    selectedTenant.primary_domain?.domain ||
+                    selectedTenant.slug + ".lookdo.app"
+                }}
+            </p>
 
         <section class="tenant-drawer-section">
             <h3>Kunde und Inhaber</h3>
@@ -270,5 +275,6 @@ const {
                 Kunden endgültig löschen
             </button>
         </section>
-    </aside>
+        </div>
+    </AdminModal>
 </template>

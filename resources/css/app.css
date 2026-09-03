@@ -88,6 +88,7 @@ body{background:#fff}
 @media(max-width:760px){.demo-video-backdrop{padding:12px}.demo-video-modal{border-radius:14px}.social-image-settings{grid-template-columns:1fr;padding:15px}.social-image-settings img,.social-image-placeholder{grid-row:auto}.social-image-actions{display:grid}.tenant-next-steps>div{grid-template-columns:1fr}}
 .tenant-drawer{width:min(560px,100vw)}
 .tenant-drawer-section{display:grid;gap:13px;padding:20px 0;border-top:1px solid #444952}
+.tenant-dialog{display:grid;gap:0}.tenant-dialog-domain{margin:0 0 18px;color:var(--admin-muted)}.tenant-dialog input,.tenant-dialog select{color:#fff;background:#22252b;border-color:#484d56}.tenant-dialog .tenant-drawer-section:first-of-type{margin-top:0}.tenant-dialog .drawer-actions{flex-wrap:wrap;margin-bottom:8px}
 .tenant-drawer-section:first-of-type{margin-top:22px}
 .tenant-drawer-section h3{margin:0;font-size:18px}
 .tenant-danger-zone{padding:17px;border:1px solid rgba(213,77,88,.45);border-radius:12px;background:rgba(169,60,72,.08)}.tenant-danger-zone h3{color:#ffb0b6}.tenant-danger-zone p{margin:0;color:#b9bdc5;font-size:12px;line-height:1.55}.tenant-danger-zone .button{justify-self:start}
