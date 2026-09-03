@@ -110,6 +110,11 @@ class AuthController extends Controller
         ], [
             'email.unique' => $this->registrationMessage('email_taken'),
             'email.email' => $this->registrationMessage('email_invalid'),
+            'password.required' => $this->registrationMessage('password_required'),
+            'password.confirmed' => $this->registrationMessage('password_mismatch'),
+            'password.password.min' => $this->registrationMessage('password_too_short'),
+            'password.password.letters' => $this->registrationMessage('password_needs_letter'),
+            'password.password.numbers' => $this->registrationMessage('password_needs_number'),
             'slug.unique' => $this->registrationMessage('slug_taken'),
             'slug.regex' => $this->registrationMessage('slug_invalid'),
             'slug.not_in' => $this->registrationMessage('slug_taken'),
@@ -285,6 +290,41 @@ class AuthController extends Controller
 
     private function registrationMessage(string $key): string
     {
+        $passwordMessages = [
+            'de' => [
+                'password_required' => 'Bitte geben Sie ein Passwort ein.',
+                'password_mismatch' => 'Die Passwörter stimmen nicht überein.',
+                'password_too_short' => 'Das Passwort muss mindestens 10 Zeichen enthalten.',
+                'password_needs_letter' => 'Das Passwort muss mindestens einen Buchstaben enthalten.',
+                'password_needs_number' => 'Das Passwort muss mindestens eine Zahl enthalten.',
+            ],
+            'en' => [
+                'password_required' => 'Enter a password.',
+                'password_mismatch' => 'The passwords do not match.',
+                'password_too_short' => 'The password must contain at least 10 characters.',
+                'password_needs_letter' => 'The password must contain at least one letter.',
+                'password_needs_number' => 'The password must contain at least one number.',
+            ],
+            'ru' => [
+                'password_required' => 'Введите пароль.',
+                'password_mismatch' => 'Пароли не совпадают.',
+                'password_too_short' => 'Пароль должен содержать не менее 10 символов.',
+                'password_needs_letter' => 'Пароль должен содержать хотя бы одну букву.',
+                'password_needs_number' => 'Пароль должен содержать хотя бы одну цифру.',
+            ],
+            'uk' => [
+                'password_required' => 'Введіть пароль.',
+                'password_mismatch' => 'Паролі не збігаються.',
+                'password_too_short' => 'Пароль має містити щонайменше 10 символів.',
+                'password_needs_letter' => 'Пароль має містити щонайменше одну літеру.',
+                'password_needs_number' => 'Пароль має містити щонайменше одну цифру.',
+            ],
+        ];
+        $selectedLocale = app()->getLocale();
+        if (isset($passwordMessages[$selectedLocale][$key]) || isset($passwordMessages['en'][$key])) {
+            return $passwordMessages[$selectedLocale][$key] ?? $passwordMessages['en'][$key];
+        }
+
         $messages = [
             'de' => ['email_invalid' => 'Bitte geben Sie eine gültige E-Mail-Adresse ein.', 'email_available' => 'Diese E-Mail-Adresse kann verwendet werden.', 'email_taken' => 'Diese E-Mail-Adresse ist bereits registriert. Bitte melden Sie sich an oder verwenden Sie eine andere Adresse.', 'slug_invalid' => 'Die App-Adresse darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten.', 'slug_available' => 'Diese App-Adresse ist verfügbar.', 'slug_taken' => 'Diese App-Adresse ist bereits vergeben. Wir haben eine freie Alternative vorbereitet.', 'price_unavailable' => 'Für diese Währung ist noch kein Preis hinterlegt.', 'business_confirmation_required' => 'Bitte bestätigen Sie, dass Sie als Unternehmen oder selbstständige Person handeln.', 'transcription_unavailable' => 'Die Spracheingabe ist derzeit nicht eingerichtet.', 'transcription_failed' => 'Die Aufnahme konnte nicht erkannt werden. Bitte versuchen Sie es erneut oder geben Sie den Text ein.'],
             'en' => ['email_invalid' => 'Enter a valid email address.', 'email_available' => 'This email address is available.', 'email_taken' => 'This email address is already registered. Sign in or use another address.', 'slug_invalid' => 'The app address may contain lowercase letters, numbers and hyphens only.', 'slug_available' => 'This app address is available.', 'slug_taken' => 'This app address is already taken. We prepared an available alternative.', 'price_unavailable' => 'No price has been configured for this currency yet.', 'business_confirmation_required' => 'Confirm that you are acting as a business or self-employed professional.', 'transcription_unavailable' => 'Voice input is not configured right now.', 'transcription_failed' => 'The recording could not be transcribed. Try again or enter the text.'],

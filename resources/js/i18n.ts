@@ -46,6 +46,31 @@ Object.assign(messages.uk, {
 });
 
 Object.assign(messages.ru, {
+    accountFieldsRequired:'Заполните имя, email, пароль, повтор пароля и название бизнеса.',
+    passwordRuleLength:'не менее 10 символов', passwordRuleLetter:'минимум одна буква', passwordRuleNumber:'минимум одна цифра',
+    passwordTooShort:'Пароль должен содержать не менее 10 символов.', passwordNeedsLetter:'Добавьте в пароль хотя бы одну букву.', passwordNeedsNumber:'Добавьте в пароль хотя бы одну цифру.',
+    passwordMismatch:'Пароли не совпадают.', passwordsMatch:'Пароли совпадают.',
+});
+Object.assign(messages.de, {
+    accountFieldsRequired:'Bitte Name, E-Mail, Passwort, Passwortbestätigung und Betriebsname ausfüllen.',
+    passwordRuleLength:'mindestens 10 Zeichen', passwordRuleLetter:'mindestens ein Buchstabe', passwordRuleNumber:'mindestens eine Zahl',
+    passwordTooShort:'Das Passwort muss mindestens 10 Zeichen enthalten.', passwordNeedsLetter:'Das Passwort muss mindestens einen Buchstaben enthalten.', passwordNeedsNumber:'Das Passwort muss mindestens eine Zahl enthalten.',
+    passwordMismatch:'Die Passwörter stimmen nicht überein.', passwordsMatch:'Die Passwörter stimmen überein.',
+});
+Object.assign(messages.en, {
+    accountFieldsRequired:'Enter your name, email, password, password confirmation, and business name.',
+    passwordRuleLength:'at least 10 characters', passwordRuleLetter:'at least one letter', passwordRuleNumber:'at least one number',
+    passwordTooShort:'The password must contain at least 10 characters.', passwordNeedsLetter:'Add at least one letter to the password.', passwordNeedsNumber:'Add at least one number to the password.',
+    passwordMismatch:'The passwords do not match.', passwordsMatch:'The passwords match.',
+});
+Object.assign(messages.uk, {
+    accountFieldsRequired:'Заповніть ім’я, email, пароль, повтор пароля та назву бізнесу.',
+    passwordRuleLength:'щонайменше 10 символів', passwordRuleLetter:'щонайменше одна літера', passwordRuleNumber:'щонайменше одна цифра',
+    passwordTooShort:'Пароль має містити щонайменше 10 символів.', passwordNeedsLetter:'Додайте до пароля щонайменше одну літеру.', passwordNeedsNumber:'Додайте до пароля щонайменше одну цифру.',
+    passwordMismatch:'Паролі не збігаються.', passwordsMatch:'Паролі збігаються.',
+});
+
+Object.assign(messages.ru, {
     poweredBy:'Работает на LOOKDO', tenantAppPreparing:'Приложение бизнеса доступно по собственному адресу', tenantAppPreparingText:'Приём заявок и рабочие разделы будут подключены на следующем этапе.',
     active:'Активно', paymentRequired:'Тариф ещё не оплачен', paymentRequiredText:'Оплатите выбранный тариф, чтобы активировать подписку и приложение.', payNow:'Оплатить тариф', openApp:'Открыть приложение',
     setupNext:'Что нужно сделать дальше', profileStep:'Заполнить профиль', domainStep:'Проверить адрес', paymentStep:'Оплатить подписку', done:'Готово', paid:'Оплачено', unpaid:'Не оплачено',

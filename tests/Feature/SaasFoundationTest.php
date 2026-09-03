@@ -120,6 +120,30 @@ class SaasFoundationTest extends TestCase
         $this->assertFalse(Tenant::where('slug', $suggested)->exists());
     }
 
+    public function test_registration_password_errors_are_localized_and_never_expose_translation_keys(): void
+    {
+        $plan = Plan::where('code', 'start')->firstOrFail();
+
+        $this->withHeader('X-Locale', 'ru')->postJson('/api/register', [
+            'name' => 'Новый мастер',
+            'email' => 'new-master@example.test',
+            'password' => 'ТолькоБуквы',
+            'password_confirmation' => 'ТолькоБуквы',
+            'business_name' => 'Новый бизнес',
+            'country' => 'DE',
+            'locale' => 'ru',
+            'business_description' => 'Ремонт и обслуживание автомобилей',
+            'plan_id' => $plan->id,
+            'billing_cycle' => 'monthly',
+            'currency' => 'RUB',
+            'confirm_business_customer' => true,
+            'accept_terms' => true,
+            'accept_privacy' => true,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['password'])
+            ->assertJsonPath('errors.password.0', 'Пароль должен содержать хотя бы одну цифру.');
+    }
+
     public function test_four_language_catalog_contains_booking_first_brow_template(): void
     {
         $this->withHeader('X-Locale', 'uk')->getJson('/api/platform')

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api';
 import { locale, tr } from '../i18n';
@@ -38,6 +38,13 @@ const chosen = computed(() => candidates.value.find((candidate: any) => candidat
 const preview = computed(() => chosen.value?.preview || platform.value.default_template?.preview || { image: '/brand/service-renovation.webp', primary_color: '#ff6b00', secondary_color: '#25282e' });
 const previewStyle = computed(() => ({ '--preview-primary': preview.value.primary_color, '--preview-secondary': preview.value.secondary_color }));
 const words = computed(() => form.business_description.trim().split(/\s+/u).filter(Boolean).length);
+const passwordChecks = computed(() => ({
+    length: form.password.length >= 10,
+    letter: /\p{L}/u.test(form.password),
+    number: /\p{N}/u.test(form.password),
+}));
+const passwordValid = computed(() => Object.values(passwordChecks.value).every(Boolean));
+const passwordsMatch = computed(() => !!form.password_confirmation && form.password === form.password_confirmation);
 
 onMounted(async () => {
     microphoneSupported.value = !!navigator.mediaDevices?.getUserMedia && typeof window.MediaRecorder !== 'undefined';
@@ -131,11 +138,42 @@ async function classify(automatic = false) {
     }
 }
 
-async function nextAccount() {
-    if (!form.name || !form.email || form.password.length < 10 || form.password !== form.password_confirmation || !form.business_name) {
-        error.value = tr('completeFields');
-        return;
+function focusAccountField(field: 'name' | 'email' | 'password' | 'password-confirmation' | 'business-name') {
+    nextTick(() => document.getElementById(`register-${field}`)?.focus());
+}
+
+function validateAccount(): boolean {
+    if (!form.name || !form.email || !form.business_name || !form.password || !form.password_confirmation) {
+        error.value = tr('accountFieldsRequired');
+        focusAccountField(!form.name ? 'name' : !form.email ? 'email' : !form.password ? 'password' : !form.password_confirmation ? 'password-confirmation' : 'business-name');
+        return false;
     }
+    if (!passwordChecks.value.length) {
+        error.value = tr('passwordTooShort');
+        focusAccountField('password');
+        return false;
+    }
+    if (!passwordChecks.value.letter) {
+        error.value = tr('passwordNeedsLetter');
+        focusAccountField('password');
+        return false;
+    }
+    if (!passwordChecks.value.number) {
+        error.value = tr('passwordNeedsNumber');
+        focusAccountField('password');
+        return false;
+    }
+    if (!passwordsMatch.value) {
+        error.value = tr('passwordMismatch');
+        focusAccountField('password-confirmation');
+        return false;
+    }
+
+    return true;
+}
+
+async function nextAccount() {
+    if (!validateAccount()) return;
     error.value = '';
     if (!await checkAvailability(true)) return;
     step.value = 2;
@@ -231,6 +269,10 @@ function yearlySaving(plan: any): number {
 }
 
 async function register() {
+    if (!validateAccount()) {
+        step.value = 1;
+        return;
+    }
     busy.value = true;
     error.value = '';
     try {
@@ -240,6 +282,16 @@ async function register() {
         else router.push('/app');
     } catch (exception: any) {
         error.value = exception.message;
+        const fields = Object.keys(exception?.payload?.errors || {});
+        const accountFields = ['name', 'email', 'password', 'password_confirmation', 'business_name', 'slug', 'country', 'locale'];
+        if (fields.some(field => accountFields.includes(field))) {
+            step.value = 1;
+            const first = fields.find(field => accountFields.includes(field));
+            const target = first === 'password_confirmation' ? 'password-confirmation' : first === 'business_name' ? 'business-name' : first;
+            if (['name', 'email', 'password', 'password-confirmation', 'business-name'].includes(target || '')) {
+                focusAccountField(target as 'name' | 'email' | 'password' | 'password-confirmation' | 'business-name');
+            }
+        }
     } finally {
         busy.value = false;
     }
@@ -268,10 +320,10 @@ async function register() {
       <form v-if="step === 1" @submit.prevent="nextAccount">
         <p class="eyebrow">{{ tr('stepLabel') }} 01</p><h2>{{ tr('accountBusiness') }}</h2>
         <div class="form-grid">
-          <label>{{ tr('name') }}<input v-model="form.name" required autocomplete="name"></label>
-          <label class="availability-field">{{ tr('email') }}<input v-model="form.email" required type="email" autocomplete="email" @blur="checkAvailability(false)"><small class="field-status" :class="form.email && availability.email ? (availability.email.available ? 'field-ok' : 'field-error') : ''" aria-live="polite">{{ form.email && availability.email ? availability.email.message : ' ' }}</small></label>
-          <label>{{ tr('password') }}<input v-model="form.password" required type="password" autocomplete="new-password"></label><label>{{ tr('repeatPassword') }}<input v-model="form.password_confirmation" required type="password" autocomplete="new-password"></label>
-          <label class="wide">{{ tr('businessName') }}<input v-model="form.business_name" required></label><label>{{ tr('country') }}<select v-model="form.country"><option value="DE">Deutschland</option><option value="AT">Österreich</option><option value="CH">Schweiz</option><option value="UA">Україна</option><option value="RU">Россия</option><option value="GB">United Kingdom</option></select></label>
+          <label>{{ tr('name') }}<input id="register-name" v-model="form.name" required autocomplete="name"></label>
+          <label class="availability-field">{{ tr('email') }}<input id="register-email" v-model="form.email" required type="email" autocomplete="email" @blur="checkAvailability(false)"><small class="field-status" :class="form.email && availability.email ? (availability.email.available ? 'field-ok' : 'field-error') : ''" aria-live="polite">{{ form.email && availability.email ? availability.email.message : ' ' }}</small></label>
+          <label>{{ tr('password') }}<input id="register-password" v-model="form.password" required minlength="10" type="password" autocomplete="new-password" :aria-invalid="!!form.password && !passwordValid" aria-describedby="register-password-rules"><small id="register-password-rules" class="password-rules"><span :class="{ met: passwordChecks.length }">{{ passwordChecks.length ? '✓' : '○' }} {{ tr('passwordRuleLength') }}</span><span :class="{ met: passwordChecks.letter }">{{ passwordChecks.letter ? '✓' : '○' }} {{ tr('passwordRuleLetter') }}</span><span :class="{ met: passwordChecks.number }">{{ passwordChecks.number ? '✓' : '○' }} {{ tr('passwordRuleNumber') }}</span></small></label><label>{{ tr('repeatPassword') }}<input id="register-password-confirmation" v-model="form.password_confirmation" required minlength="10" type="password" autocomplete="new-password" :aria-invalid="!!form.password_confirmation && !passwordsMatch"><small v-if="form.password_confirmation" class="field-status" :class="passwordsMatch ? 'field-ok' : 'field-error'" aria-live="polite">{{ passwordsMatch ? tr('passwordsMatch') : tr('passwordMismatch') }}</small><small v-else class="field-status"> </small></label>
+          <label class="wide">{{ tr('businessName') }}<input id="register-business-name" v-model="form.business_name" required></label><label>{{ tr('country') }}<select v-model="form.country"><option value="DE">Deutschland</option><option value="AT">Österreich</option><option value="CH">Schweiz</option><option value="UA">Україна</option><option value="RU">Россия</option><option value="GB">United Kingdom</option></select></label>
           <label>{{ tr('language') }}<select v-model="form.locale"><option value="de">Deutsch</option><option value="en">English</option><option value="ru">Русский</option><option value="uk">Українська</option></select></label>
           <label class="wide">{{ tr('appAddress') }}<div class="slug-check-row"><div class="slug-input"><input v-model="form.slug" maxlength="63" placeholder="mein-betrieb" @input="slugEdited = true; cleanSlug()"><span>.lookdo.app</span></div><button type="button" class="button small ghost" :disabled="availability.checking" @click="checkAvailability(false)">{{ availability.checking ? '…' : tr('check') }}</button></div><small v-if="availability.slug" :class="availability.slug.available ? 'field-ok' : 'field-error'">{{ availability.slug.message }} <button v-if="!availability.slug.available && availability.slug.suggested" type="button" class="inline-action" @click="useSuggestedSlug">{{ availability.slug.suggested }} →</button></small><small v-else>{{ tr('appAddressHelp') }}</small></label>
         </div><p v-if="error" class="alert error">{{ error }}</p><button class="button full" :disabled="availability.checking">{{ tr('continue') }} →</button>
@@ -303,3 +355,17 @@ async function register() {
     </div></main>
   </div>
 </template>
+
+<style scoped>
+.password-rules {
+    display: grid;
+    gap: 4px;
+    color: #8a8b90;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.password-rules span.met {
+    color: var(--success);
+}
+</style>
