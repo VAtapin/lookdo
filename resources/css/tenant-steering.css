@@ -178,10 +178,10 @@
 }
 
 .theme-steering .ta-hero-header .ta-brand {
-    width: min(100%, 220px);
+    width: auto;
     max-width: 100%;
     min-width: 0;
-    overflow: visible;
+    overflow: hidden;
 }
 
 .theme-steering .ta-hero-header .ta-brand.has-horizontal-logo img {

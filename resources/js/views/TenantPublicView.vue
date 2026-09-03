@@ -123,11 +123,13 @@ const isBrows = computed(() => app.value?.template?.layout === "brows");
 const isBookPurchase = computed(
     () => app.value?.template?.variation_code === "purchase.books",
 );
-const heroHeaderLabel = computed(() =>
-    isBookPurchase.value && app.value?.tenant?.branding?.horizontal_logo
-        ? app.value?.tenant?.name
-        : app.value?.template?.hero?.eyebrow,
+const headerLogo = computed(
+    () =>
+        app.value?.tenant?.logo ||
+        app.value?.tenant?.branding?.horizontal_logo ||
+        "/brand/lookdo-mark.webp",
 );
+const heroHeaderLabel = computed(() => app.value?.template?.hero?.eyebrow);
 const bookHomeCopy = computed(() => {
     const values: Record<
         TenantLocale,
@@ -922,30 +924,12 @@ const loginContext = {
                             class="ta-home-screen ta-brows-home"
                         >
                             <header class="ta-brows-header">
-                                <button
-                                    class="ta-brand"
-                                    :class="{
-                                        'has-horizontal-logo':
-                                            app.tenant.branding
-                                                ?.horizontal_logo,
-                                    }"
-                                    @click="go('home')"
-                                >
+                                <button class="ta-brand" @click="go('home')">
                                     <img
-                                        :src="
-                                            app.tenant.branding
-                                                ?.horizontal_logo ||
-                                            app.tenant.logo ||
-                                            '/brand/lookdo-mark.webp'
-                                        "
+                                        class="ta-public-header-logo"
+                                        :src="headerLogo"
                                         :alt="app.tenant.name"
-                                    /><span
-                                        v-if="
-                                            !app.tenant.branding
-                                                ?.horizontal_logo
-                                        "
-                                        >{{ app.tenant.name }}</span
-                                    >
+                                    /><span>{{ app.tenant.name }}</span>
                                 </button>
                                 <div>
                                     <button
@@ -1162,28 +1146,13 @@ const loginContext = {
                                 <header class="ta-hero-header">
                                     <button
                                         class="ta-brand"
-                                        :class="{
-                                            'has-horizontal-logo':
-                                                app.tenant.branding
-                                                    ?.horizontal_logo,
-                                        }"
                                         @click="go('home')"
                                     >
                                         <img
-                                            :src="
-                                                app.tenant.branding
-                                                    ?.horizontal_logo ||
-                                                app.tenant.logo ||
-                                                '/brand/lookdo-mark.webp'
-                                            "
+                                            class="ta-public-header-logo"
+                                            :src="headerLogo"
                                             :alt="app.tenant.name"
-                                        /><span
-                                            v-if="
-                                                !app.tenant.branding
-                                                    ?.horizontal_logo
-                                            "
-                                            >{{ app.tenant.name }}</span
-                                        >
+                                        /><span>{{ app.tenant.name }}</span>
                                     </button>
                                     <span class="ta-service-name">{{
                                         heroHeaderLabel
