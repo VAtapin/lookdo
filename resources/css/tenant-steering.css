@@ -171,6 +171,108 @@
     }
 }
 
+/* Stable public hero chrome: contained branding, equal action buttons and a compact CTA. */
+.theme-steering .ta-hero-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.theme-steering .ta-hero-header .ta-brand {
+    width: min(100%, 220px);
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.theme-steering .ta-hero-header .ta-brand.has-horizontal-logo img {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    height: 58px;
+    object-fit: contain;
+    object-position: left center;
+    flex-shrink: 1;
+}
+
+.theme-steering .ta-hero-header > div {
+    justify-self: end;
+}
+
+.theme-steering .ta-hero-header > div > button,
+.theme-steering .ta-hero-header > div > a,
+.theme-steering .ta-hero-header .ta-language-trigger {
+    border-color: rgba(224, 170, 80, .62);
+    background: rgba(10, 11, 12, .78);
+    color: var(--ta-gold-soft);
+    opacity: 1;
+}
+
+.theme-steering .ta-hero-content > .ta-hero-action {
+    width: fit-content;
+    min-width: 0;
+    max-width: min(100%, 310px);
+    min-height: 46px;
+    padding: 0 20px;
+    margin-inline: auto;
+    border-radius: 10px;
+    text-transform: none;
+    font-size: 14px;
+}
+
+/* Editorial book-buying variation: direct promise, readable copy and a warmer image treatment. */
+.theme-books .ta-hero-books .ta-hero-shade {
+    background: linear-gradient(90deg, rgba(3, 4, 5, .9) 0, rgba(3, 4, 5, .46) 58%, rgba(3, 4, 5, .18) 100%), linear-gradient(180deg, rgba(0, 0, 0, .18) 10%, rgba(0, 0, 0, .08) 42%, #040506 100%);
+}
+
+.theme-books .ta-hero-books .ta-hero-content {
+    text-align: left;
+}
+
+.theme-books .ta-hero-books .ta-hero-eyebrow {
+    margin: 0 0 10px;
+    color: var(--ta-gold-soft);
+}
+
+.theme-books .ta-hero-books .ta-hero-content h1 {
+    max-width: 620px;
+    margin: 0 0 13px;
+    font-family: inherit;
+    font-size: clamp(32px, 6vw, 54px);
+    line-height: 1.02;
+    text-transform: none;
+}
+
+.theme-books .ta-hero-books .ta-hero-content p {
+    max-width: 570px;
+    margin: 0 0 22px;
+    color: #e4e0d8;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+@media (max-width: 699px) {
+    .theme-steering .ta-hero-header {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .theme-steering .ta-hero-header .ta-brand {
+        width: min(100%, 150px);
+    }
+
+    .theme-books .ta-hero-books .ta-hero-content {
+        padding-top: 225px;
+    }
+
+    .theme-books .ta-hero-books .ta-hero-content h1 {
+        max-width: 330px;
+        font-size: 32px;
+    }
+
+    .theme-books .ta-hero-books .ta-hero-content p {
+        font-size: 13px;
+    }
+}
+
 @media (min-width: 1500px) and (min-height: 800px) {
     .theme-steering .tenant-app-shell {
         height: calc(100dvh - 56px);

@@ -35,6 +35,7 @@
 .ta-brows-hero p{max-width:560px;margin:0 auto 20px;color:rgba(255,255,255,.86);font-size:14px;line-height:1.5}
 .theme-brows .ta-primary{min-height:56px;border:0;border-radius:17px;background:var(--ta-brow-primary);color:#fff;box-shadow:0 14px 28px color-mix(in srgb,var(--ta-brow-primary) 25%,transparent)}
 .ta-brows-hero .ta-primary{width:100%;max-width:520px;margin:auto}
+.ta-brows-hero .ta-primary.ta-hero-action{width:fit-content;min-width:0;max-width:min(100%,310px);min-height:46px;padding-inline:20px}
 .theme-brows .ta-section{background:var(--ta-brow-surface)}
 .theme-brows .ta-section-head h2{color:var(--ta-brow-ink)}
 .theme-brows .ta-section-head button{color:var(--ta-brow-primary)}

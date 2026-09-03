@@ -988,9 +988,17 @@ class TenantAppController extends Controller
     {
         $template = $tenant->businessProfile?->template;
         $templateCode = $template?->code ?: 'general-services.general';
+        $variationCode = (string) ($tenant->businessProfile?->variation?->code ?? '');
         $media = (array) ($configuration['media'] ?? []);
         $slots = $this->localizedSlots((array) ($media['slots'] ?? $configuration['media_slots'] ?? []), $locale);
         $fields = $this->localizedFields((array) ($configuration['fields'] ?? []), $locale);
+        $hero = (array) $this->localized($configuration['hero'] ?? [], $locale);
+        if ($variationCode === 'purchase.books') {
+            $hero = array_replace($hero, $this->bookPurchaseHero($locale));
+        }
+        if (filled(data_get($tenant->profile?->content, 'branding.hero_image_path'))) {
+            $hero['image'] = $this->assetUrl(data_get($tenant->profile?->content, 'branding.hero_image_path'));
+        }
         $capabilities = array_replace(
             ['request' => true, 'portfolio' => true, 'reviews' => true],
             (array) ($configuration['capabilities'] ?? []),
@@ -1002,15 +1010,10 @@ class TenantAppController extends Controller
 
         return [
             'id' => $template?->id, 'code' => $templateCode, 'name' => $template?->localized('name', $locale),
-            'variation_code' => $tenant->businessProfile?->variation?->code,
+            'variation_code' => $variationCode,
             'engine' => $configuration['engine'] ?? 'request', 'layout' => $configuration['layout'] ?? 'general', 'navigation' => $this->normalizedNavigation($templateCode, $configuration),
             'theme' => $configuration['theme'] ?? [],
-            'hero' => array_replace(
-                (array) $this->localized($configuration['hero'] ?? [], $locale),
-                filled(data_get($tenant->profile?->content, 'branding.hero_image_path'))
-                    ? ['image' => $this->assetUrl(data_get($tenant->profile?->content, 'branding.hero_image_path'))]
-                    : [],
-            ), 'trust' => array_map(fn ($item) => $this->localized($item, $locale), $configuration['trust'] ?? []),
+            'hero' => $hero, 'trust' => array_map(fn ($item) => $this->localized($item, $locale), $configuration['trust'] ?? []),
             'media_slots' => $slots, 'media' => ['photos_min' => (int) ($media['photos_min'] ?? 1), 'photos_max' => (int) ($media['photos_max'] ?? max(1, count($slots)))], 'video' => $media['video'] ?? $configuration['video'] ?? [], 'fields' => $fields,
             'ai_assistant' => $this->localized($configuration['ai_assistant'] ?? [], $locale),
             'submit' => $this->localized($configuration['submit'] ?? ['label' => $configuration['submit_label'] ?? null], $locale),
@@ -1033,6 +1036,20 @@ class TenantAppController extends Controller
             'locales' => $this->enabledLocales($tenant, $configuration),
             'capabilities' => $capabilities,
         ];
+    }
+
+    /** @return array{eyebrow: string, title: string, text: string, subtitle: string, action: string} */
+    private function bookPurchaseHero(string $locale): array
+    {
+        $copy = [
+            'de' => ['BÜCHERANKAUF', 'Bücher verkaufen – einfach und direkt', 'Fotografieren Sie Cover und ISBN. Wir erkennen die Ausgabe, prüfen den Zustand und melden uns zum Ankauf.', 'Bücher anbieten'],
+            'en' => ['BOOK BUYING', 'Sell your books without the back-and-forth', 'Photograph the cover and ISBN. We identify the edition, review its condition, and reply about buying it.', 'Offer books'],
+            'ru' => ['ПОКУПКА КНИГ', 'Продайте книги без долгой переписки', 'Сфотографируйте обложку и ISBN. Мы определим издание, оценим состояние и ответим по покупке.', 'Предложить книги'],
+            'uk' => ['КУПІВЛЯ КНИГ', 'Продайте книги без зайвого листування', 'Сфотографуйте обкладинку та ISBN. Ми визначимо видання, оцінимо стан і відповімо щодо купівлі.', 'Запропонувати книги'],
+        ];
+        [$eyebrow, $title, $text, $action] = $copy[$locale] ?? $copy['de'];
+
+        return compact('eyebrow', 'title', 'text', 'action') + ['subtitle' => $text];
     }
 
     /** @return list<string> */

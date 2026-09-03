@@ -120,6 +120,14 @@ const actionScreen = computed(() =>
 );
 const isSteering = computed(() => app.value?.template?.layout === "steering");
 const isBrows = computed(() => app.value?.template?.layout === "brows");
+const isBookPurchase = computed(
+    () => app.value?.template?.variation_code === "purchase.books",
+);
+const heroHeaderLabel = computed(() =>
+    isBookPurchase.value
+        ? app.value?.tenant?.name
+        : app.value?.template?.hero?.eyebrow,
+);
 const theme = computed(() => ({
     "--ta-primary": isSteering.value
         ? "#e2ad55"
@@ -803,7 +811,11 @@ const loginContext = {
 <template>
     <div
         class="tenant-app-viewport"
-        :class="{ 'theme-steering': isSteering, 'theme-brows': isBrows }"
+        :class="{
+            'theme-steering': isSteering,
+            'theme-brows': isBrows,
+            'theme-books': isBookPurchase,
+        }"
         :style="theme"
     >
         <div v-if="loading" class="ta-splash">
@@ -936,14 +948,11 @@ const loginContext = {
                                         app.template.hero.eyebrow
                                     }}</small>
                                     <h1>
-                                        {{
-                                            app.tenant.branding?.tagline ||
-                                            app.template.hero.title
-                                        }}
+                                        {{ app.template.hero.title }}
                                     </h1>
                                     <p>{{ app.template.hero.text }}</p>
                                     <button
-                                        class="ta-primary"
+                                        class="ta-primary ta-hero-action"
                                         @click="go('book')"
                                     >
                                         <AppIcon name="calendar" />{{
@@ -1067,6 +1076,7 @@ const loginContext = {
                             <article
                                 v-if="homeBlockVisible('hero')"
                                 class="ta-hero"
+                                :class="{ 'ta-hero-books': isBookPurchase }"
                                 :style="homeBlockStyle('hero', 0)"
                             >
                                 <img
@@ -1105,7 +1115,7 @@ const loginContext = {
                                         >
                                     </button>
                                     <span class="ta-service-name">{{
-                                        app.template.hero.eyebrow
+                                        heroHeaderLabel
                                     }}</span>
                                     <div>
                                         <button
@@ -1140,16 +1150,13 @@ const loginContext = {
                                     </div>
                                 </header>
                                 <div class="ta-hero-content">
-                                    <h1>{{ app.template.hero.eyebrow }}</h1>
-                                    <p class="gold">
-                                        {{
-                                            app.tenant.branding?.tagline ||
-                                            app.template.hero.title
-                                        }}
-                                    </p>
+                                    <small class="ta-hero-eyebrow">{{
+                                        app.template.hero.eyebrow
+                                    }}</small>
+                                    <h1>{{ app.template.hero.title }}</h1>
                                     <p>{{ app.template.hero.text }}</p>
                                     <button
-                                        class="ta-gold-button"
+                                        class="ta-gold-button ta-hero-action"
                                         @click="go(actionScreen)"
                                     >
                                         <AppIcon

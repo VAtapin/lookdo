@@ -106,8 +106,11 @@
     "purchase.books": {
       "preview": {"image": "/brand/purchase-books.webp", "primary_color": "#a76731", "secondary_color": "#25211e"},
       "hero": {
-        "title": {"de": "Bücher einfach anbieten", "en": "Offer books easily", "ru": "Предложите книги на продажу", "uk": "Запропонуйте книги на продаж"},
-        "subtitle": {"de": "Cover und ISBN-Seite fotografieren – die KI übernimmt bekannte Angaben.", "en": "Photograph the cover and ISBN page; AI fills known details.", "ru": "Сфотографируйте обложку и страницу с ISBN — известные данные заполнит ИИ.", "uk": "Сфотографуйте обкладинку та сторінку з ISBN — відомі дані заповнить ШІ."},
+        "eyebrow": {"de": "BÜCHERANKAUF", "en": "BOOK BUYING", "ru": "ПОКУПКА КНИГ", "uk": "КУПІВЛЯ КНИГ"},
+        "title": {"de": "Bücher verkaufen – einfach und direkt", "en": "Sell your books without the back-and-forth", "ru": "Продайте книги без долгой переписки", "uk": "Продайте книги без зайвого листування"},
+        "text": {"de": "Fotografieren Sie Cover und ISBN. Wir erkennen die Ausgabe, prüfen den Zustand und melden uns zum Ankauf.", "en": "Photograph the cover and ISBN. We identify the edition, review its condition, and reply about buying it.", "ru": "Сфотографируйте обложку и ISBN. Мы определим издание, оценим состояние и ответим по покупке.", "uk": "Сфотографуйте обкладинку та ISBN. Ми визначимо видання, оцінимо стан і відповімо щодо купівлі."},
+        "subtitle": {"de": "Fotografieren Sie Cover und ISBN. Wir erkennen die Ausgabe, prüfen den Zustand und melden uns zum Ankauf.", "en": "Photograph the cover and ISBN. We identify the edition, review its condition, and reply about buying it.", "ru": "Сфотографируйте обложку и ISBN. Мы определим издание, оценим состояние и ответим по покупке.", "uk": "Сфотографуйте обкладинку та ISBN. Ми визначимо видання, оцінимо стан і відповімо щодо купівлі."},
+        "action": {"de": "Bücher anbieten", "en": "Offer books", "ru": "Предложить книги", "uk": "Запропонувати книги"},
         "image": "/brand/purchase-books.webp"
       },
       "media": {
