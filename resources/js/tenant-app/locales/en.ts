@@ -106,6 +106,13 @@ export default {
     aiAssistButton: "Fill the form",
     aiAssisting: "Filling…",
     aiAssistError: "Automatic form filling failed. You can continue manually.",
+    noIsbn: "This book has no ISBN",
+    noIsbnHint: "Older editions without an ISBN will be assessed from the photos.",
+    noIsbnSelected: "No ISBN — the book will be assessed from the photos only.",
+    bookAnalyzing: "AI is reading the ISBN, checking catalogues, and assessing condition…",
+    bookFound: "ISBN recognized. Book details were found and filled automatically.",
+    bookNotFound: "The ISBN is readable, but the book was not found in the catalogues. Visible details were filled from the photos.",
+    isbnUnreadable: "The ISBN could not be read. Take a clearer photo or enter it manually.",
     later: "Not now",
     noActivity: "No requests or bookings yet",
     noActivityText:

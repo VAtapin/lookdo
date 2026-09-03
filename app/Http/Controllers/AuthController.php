@@ -142,7 +142,14 @@ class AuthController extends Controller
             $user = User::create(['name' => $data['name'], 'email' => $data['email'], 'password' => $data['password'], 'locale' => $data['locale'], 'is_active' => true]);
             $tenant = Tenant::create(['name' => $data['business_name'], 'slug' => $slug, 'country' => strtoupper($data['country']), 'locale' => $data['locale'], 'business_description' => $data['business_description'], 'status' => 'active']);
             $tenant->users()->attach($user, ['role' => 'owner']);
-            $profileContent = ! empty($data['template_confirmed']) ? ['ai_customization' => ['status' => 'pending', 'requested_at' => now()->toIso8601String()]] : [];
+            $profileContent = ! empty($data['template_confirmed']) ? [
+                'ai_customization' => ['status' => 'pending', 'requested_at' => now()->toIso8601String()],
+                'branding' => $this->initialBranding(
+                    $data['business_name'],
+                    $data['business_description'],
+                    $data['locale'],
+                ),
+            ] : [];
             $tenant->profile()->create(['contact_name' => $data['name'], 'email' => $data['email'], 'content' => $profileContent]);
             $domain = $tenant->domains()->create(['domain' => $slug.'.'.config('tenancy.platform_domain'), 'type' => 'platform', 'is_primary' => true, 'status' => 'active', 'verified_at' => now(), 'ssl_status' => 'active', 'ssl_issued_at' => now()]);
             $tenant->update(['primary_domain_id' => $domain->id]);
@@ -286,6 +293,48 @@ class AuthController extends Controller
         $base = Str::slug(Str::ascii($value)) ?: 'business';
 
         return substr(trim($base, '-'), 0, 50);
+    }
+
+    /** @return array<string, mixed> */
+    private function initialBranding(string $businessName, string $description, string $locale): array
+    {
+        $defaults = [
+            'de' => [
+                'customers' => 'Kundinnen und Kunden, die diese Leistungen suchen.',
+                'style' => 'Professionell, verständlich und vertrauenswürdig.',
+                'avoid' => 'Unpassende Bilder, irreführende Details und unrealistische Versprechen.',
+            ],
+            'en' => [
+                'customers' => 'Customers looking for these services.',
+                'style' => 'Professional, clear and trustworthy.',
+                'avoid' => 'Irrelevant images, misleading details and unrealistic promises.',
+            ],
+            'ru' => [
+                'customers' => 'Клиенты, которым нужны эти услуги.',
+                'style' => 'Профессиональный, понятный и вызывающий доверие стиль.',
+                'avoid' => 'Нерелевантные изображения, вводящие в заблуждение детали и нереалистичные обещания.',
+            ],
+            'uk' => [
+                'customers' => 'Клієнти, яким потрібні ці послуги.',
+                'style' => 'Професійний, зрозумілий стиль, що викликає довіру.',
+                'avoid' => 'Недоречні зображення, оманливі деталі та нереалістичні обіцянки.',
+            ],
+        ];
+        $copy = $defaults[$locale] ?? $defaults['en'];
+        $seed = [
+            'description_translations' => [$locale => $description],
+            'tagline_translations' => [$locale => $businessName],
+            'tagline' => $businessName,
+            'services' => $description,
+            'customers' => $copy['customers'],
+            'style' => $copy['style'],
+            'avoid' => $copy['avoid'],
+        ];
+
+        return array_merge($seed, [
+            'registration_seed' => $seed,
+            'generated_from_registration' => false,
+        ]);
     }
 
     private function registrationMessage(string $key): string

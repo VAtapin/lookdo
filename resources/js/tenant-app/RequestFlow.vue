@@ -18,8 +18,12 @@ const result=ref<any>(null);
 const notifying=ref(false);
 const notificationStatus=ref('');
 const assisting=ref(false);
+const assistancePending=ref(false);
 const assistantText=ref('');
 const aiAssistantOpen=ref(false);
+const isbnAbsent=ref(false);
+const isbnStatus=ref<'idle'|'analyzing'|'found'|'unreadable'|'not_found'|'absent'>('idle');
+let isbnLookupTimer:number|undefined;
 const form=reactive<any>({name:'',phone:'',email:'',summary:'',preferred_channel:'push',fields:{}});
 
 const configuredSlots=computed<any[]>(()=>props.app.template.media_slots||[]);
@@ -34,15 +38,16 @@ const canNotify=computed(()=>Boolean(props.app.push?.enabled&&props.app.push?.pu
 const address=computed(()=>[props.app.tenant.contact.street,[props.app.tenant.contact.postal_code,props.app.tenant.contact.city].filter(Boolean).join(' ')].filter(Boolean).join(', '));
 const contactName=computed(()=>props.app.tenant.contact.name||props.app.tenant.name);
 const fields=computed<any[]>(()=>props.app.template.fields||[]);
+const isBookPurchase=computed(()=>props.app.template.variation_code==='purchase.books'||fields.value.some(item=>item.key==='isbn'));
 const vehicleBrandField=computed(()=>fields.value.find(item=>item.key==='vehicle_brand'));
 const vehicleModelField=computed(()=>fields.value.find(item=>item.key==='vehicle_model'));
 const vehicleYearField=computed(()=>fields.value.find(item=>item.key==='vehicle_year'));
 const extraFields=computed(()=>fields.value.filter(item=>!['phone','vehicle_brand','vehicle_model','vehicle_year'].includes(item.key)));
 const aiAssistant=computed(()=>props.app.template.ai_assistant||{});
-const missingRequired=computed(()=>slots.value.filter(slot=>slot.required&&!files.value.some(item=>item.slot===slot.key)));
+const missingRequired=computed(()=>slots.value.filter(slot=>slot.required&&!(isBookPurchase.value&&isbnAbsent.value&&slot.key==='book_isbn')&&!files.value.some(item=>item.slot===slot.key)));
 const progress=computed(()=>stage.value==='capture'?1:stage.value==='details'?2:stage.value==='success'?3:4);
 
-function nextSlotIndex(){const index=slots.value.findIndex(slot=>!files.value.some(item=>item.slot===slot.key));return index<0?Math.max(0,slots.value.length-1):index;}
+function nextSlotIndex(){const index=slots.value.findIndex(slot=>!(isBookPurchase.value&&isbnAbsent.value&&slot.key==='book_isbn')&&!files.value.some(item=>item.slot===slot.key));return index<0?Math.max(0,slots.value.length-1):index;}
 
 function back(){
   if(stage.value==='details')stage.value='capture';
@@ -57,6 +62,7 @@ function selected(event:Event){
   files.value=files.value.filter(item=>item.slot!==slot);
   files.value.push({file,slot,url:URL.createObjectURL(file)});
   activeIndex.value=nextSlotIndex(); input.value='';
+  if(isBookPurchase.value&&(isbnAbsent.value||slot==='book_isbn'||files.value.some(item=>item.slot==='book_isbn')))window.setTimeout(()=>void assistForm(true),0);
 }
 function remove(item:MediaItem){URL.revokeObjectURL(item.url);files.value=files.value.filter(value=>value!==item);activeIndex.value=0;}
 function slotItem(index:number){const slot=slots.value[index]?.key;return files.value.find(item=>item.slot===slot);}
@@ -82,20 +88,54 @@ async function enableNotifications(){
     notificationStatus.value=/applicationServerKey|P-256|public key/i.test(String(e?.message||''))?props.copy.notificationConfigurationError:props.copy.notificationDenied;
   }finally{notifying.value=false;}
 }
-async function assistForm(){
+function normalizeIsbn(value:string){return String(value||'').toUpperCase().replace(/[^0-9X]/g,'');}
+function validIsbn(value:string){
+  const isbn=normalizeIsbn(value);
+  if(isbn.length===10){let sum=0;for(let index=0;index<10;index++){const digit=isbn[index]==='X'&&index===9?10:Number(isbn[index]);if(!Number.isFinite(digit))return false;sum+=digit*(10-index);}return sum%11===0;}
+  if(isbn.length===13&&/^\d+$/.test(isbn)){let sum=0;for(let index=0;index<13;index++)sum+=Number(isbn[index])*(index%2===0?1:3);return sum%10===0;}
+  return false;
+}
+function isbnChanged(){
+  form.fields.isbn=normalizeIsbn(form.fields.isbn||'');
+  if(isbnLookupTimer)window.clearTimeout(isbnLookupTimer);
+  const valid=validIsbn(form.fields.isbn);
+  isbnStatus.value=valid?'analyzing':'unreadable';
+  if(valid&&files.value.length)isbnLookupTimer=window.setTimeout(()=>void assistForm(true),450);
+}
+function toggleIsbnAbsent(){
+  if(isbnAbsent.value){form.fields.isbn='';isbnStatus.value='absent';}
+  else isbnStatus.value='idle';
+  if(files.value.length)void assistForm(true);
+}
+async function assistForm(automatic=false){
   if(!assistantText.value.trim()&&!files.value.length)return;
+  if(assisting.value){if(automatic)assistancePending.value=true;return;}
   assisting.value=true;error.value='';
+  if(isBookPurchase.value)isbnStatus.value='analyzing';
   try{
     const body=new FormData();body.append('text',assistantText.value.trim());
-    if(aiAssistant.value.accepts_media!==false)files.value.slice(0,4).forEach(item=>body.append('media[]',item.file));
+    if(aiAssistant.value.accepts_media!==false)files.value.slice(0,6).forEach(item=>body.append('media[]',item.file));
+    body.append('media_slots',JSON.stringify(files.value.slice(0,6).map(item=>item.slot)));
+    body.append('current_fields',JSON.stringify(Object.fromEntries(fields.value.map(field=>[field.key,form.fields[field.key]??'']))));
+    body.append('isbn_absent',isbnAbsent.value?'1':'0');
     const response=await api('/tenant-app/request-assistance',{method:'POST',body});
     const values=response.values||{};
     if(values.summary)form.summary=values.summary;
     for(const field of fields.value)if(field.key!=='phone'&&values[field.key])form.fields[field.key]=values[field.key];
-  }catch(e:any){error.value=props.copy.aiAssistError;}finally{assisting.value=false;}
+    if(isBookPurchase.value){
+      isbnStatus.value=response.book?.isbn_status||'unreadable';
+      form.fields._ai_assessment=values._ai_assessment||'';
+      form.fields._book_catalog=values._book_catalog||{};
+      form.fields._recommended_purchase_price=values._recommended_purchase_price||'';
+    }
+  }catch(e:any){error.value=props.copy.aiAssistError;isbnStatus.value='idle';}finally{
+    assisting.value=false;
+    if(assistancePending.value){assistancePending.value=false;window.setTimeout(()=>void assistForm(true),0);}
+  }
 }
 async function submit(){
   if(!form.phone.trim()){error.value=props.copy.phone;return;}
+  if(isBookPurchase.value&&!isbnAbsent.value&&!validIsbn(form.fields.isbn||'')){error.value=props.copy.isbnUnreadable;isbnStatus.value='unreadable';return;}
   if(missingRequired.value.length){stage.value='capture';error.value=missingRequired.value.map(slot=>slot.title||slot.label||slot.key).join(', ');return;}
   if(!files.value.length){stage.value='capture';error.value=requestHint.value;return;}
   busy.value=true;error.value='';
@@ -104,6 +144,7 @@ async function submit(){
     for(const key of ['name','phone','email','summary','preferred_channel'])body.append(key,form[key]||'');
     body.append('fields',JSON.stringify(form.fields));
     body.append('media_slots',JSON.stringify(files.value.map(item=>item.slot)));
+    body.append('isbn_absent',isbnAbsent.value?'1':'0');
     files.value.forEach(item=>body.append('media[]',item.file));
     result.value=await api('/tenant-app/requests',{method:'POST',body,headers:props.token?{'X-Lookdo-Client-Token':props.token}:{}});
     stage.value='success';emit('success',result.value);
@@ -121,7 +162,7 @@ function finishSuccess(){
   }
   emit('close');
 }
-onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));});
+onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));if(isbnLookupTimer)window.clearTimeout(isbnLookupTimer);});
 </script>
 
 <template>
@@ -158,6 +199,8 @@ onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));})
             <i v-if="slotItem(index)" @click.stop="remove(slotItem(index)!)"><AppIcon name="close" :size="14"/></i>
           </button>
         </div>
+        <label v-if="isBookPurchase" class="ta-isbn-absent"><input v-model="isbnAbsent" type="checkbox" @change="toggleIsbnAbsent"><span><b>{{copy.noIsbn}}</b><small>{{copy.noIsbnHint}}</small></span></label>
+        <p v-if="isBookPurchase&&isbnStatus!=='idle'" class="ta-book-analysis" :class="isbnStatus"><span></span>{{isbnStatus==='analyzing'?copy.bookAnalyzing:isbnStatus==='found'?copy.bookFound:isbnStatus==='not_found'?copy.bookNotFound:isbnStatus==='absent'?copy.noIsbnSelected:copy.isbnUnreadable}}</p>
         <p v-if="error" class="ta-error">{{error}}</p>
         <button class="ta-gold-button" :disabled="!files.length" @click="continueToDetails">{{copy.usePhoto}}</button>
         <button class="ta-outline-button ta-add-photo-button" :disabled="files.length>=photosMax" @click="choose(nextSlotIndex())"><AppIcon name="plus"/>{{copy.addPhoto}}</button>
@@ -178,7 +221,7 @@ onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));})
           <p>{{aiAssistant.text||copy.aiAssistText}}</p>
           <textarea v-model="assistantText" rows="3" maxlength="2000" :placeholder="copy.aiAssistPlaceholder"></textarea>
           <small v-if="aiAssistant.accepts_media!==false&&files.length">{{files.length}} {{copy.photos.toLowerCase()}}</small>
-          <button class="ta-outline-button" :disabled="assisting||(!assistantText.trim()&&!files.length)" @click="assistForm">{{assisting?copy.aiAssisting:(aiAssistant.title||copy.aiAssistButton)}}</button>
+          <button class="ta-outline-button" :disabled="assisting||(!assistantText.trim()&&!files.length)" @click="assistForm(false)">{{assisting?copy.aiAssisting:(aiAssistant.title||copy.aiAssistButton)}}</button>
         </section>
         <section class="ta-dark-card">
           <h2>1. {{copy.photos}} <em>*</em></h2><p>{{requestHint}}</p>
@@ -195,12 +238,14 @@ onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));})
         <section class="ta-dark-card">
           <h2>3. {{copy.whatToDo}}</h2>
           <textarea v-model="form.summary" rows="4" maxlength="500" :placeholder="copy.summary"></textarea>
-          <div v-for="field in extraFields" :key="field.key" class="ta-extra-field">
+          <div v-for="field in extraFields" :key="field.key" class="ta-extra-field" :class="{'ta-isbn-field':field.key==='isbn'}">
             <label><span>{{fieldLabel(field)}}</span>
               <select v-if="field.type==='select'" v-model="form.fields[field.key]"><option value="">—</option><option v-for="option in field.options" :key="option" :value="option">{{option}}</option></select>
               <textarea v-else-if="field.type==='textarea'" v-model="form.fields[field.key]" rows="3"></textarea>
-              <input v-else v-model="form.fields[field.key]" :type="field.type==='number'?'number':'text'">
+              <input v-else v-model="form.fields[field.key]" :type="field.type==='number'?'number':'text'" :disabled="field.key==='isbn'&&isbnAbsent" :class="{'is-invalid':field.key==='isbn'&&isbnStatus==='unreadable'}" @input="field.key==='isbn'&&isbnChanged()">
             </label>
+            <label v-if="field.key==='isbn'" class="ta-isbn-absent compact"><input v-model="isbnAbsent" type="checkbox" @change="toggleIsbnAbsent"><span><b>{{copy.noIsbn}}</b><small>{{copy.noIsbnHint}}</small></span></label>
+            <p v-if="field.key==='isbn'&&isbnStatus!=='idle'" class="ta-book-analysis" :class="isbnStatus"><span></span>{{isbnStatus==='analyzing'?copy.bookAnalyzing:isbnStatus==='found'?copy.bookFound:isbnStatus==='not_found'?copy.bookNotFound:isbnStatus==='absent'?copy.noIsbnSelected:copy.isbnUnreadable}}</p>
           </div>
         </section>
         <section class="ta-dark-card">
@@ -326,5 +371,95 @@ onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));})
 .ta-add-photo-button :deep(svg) {
   display: block;
   flex: 0 0 auto;
+}
+
+.ta-isbn-absent {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--ta-dark-line, #34383d);
+  border-radius: 14px;
+  background: #171a1d;
+  color: #fff;
+  cursor: pointer;
+}
+
+.ta-isbn-absent.compact {
+  margin: 9px 0 0;
+  padding: 11px 13px;
+}
+
+.ta-isbn-absent input {
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+  flex: 0 0 auto;
+  accent-color: var(--ta-primary, #e0aa50);
+}
+
+.ta-isbn-absent span,
+.ta-isbn-absent b,
+.ta-isbn-absent small {
+  display: block;
+}
+
+.ta-isbn-absent small {
+  margin-top: 4px;
+  color: #a9adb2;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.ta-book-analysis {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 12px 0;
+  padding: 11px 13px;
+  border: 1px solid #444a50;
+  border-radius: 12px;
+  background: #171a1d;
+  color: #d2d5d8;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ta-book-analysis span {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #959ba1;
+}
+
+.ta-book-analysis.analyzing span {
+  background: var(--ta-primary, #e0aa50);
+  animation: lookdoPulse 1s infinite;
+}
+
+.ta-book-analysis.found {
+  border-color: #34795a;
+  color: #9ee0bd;
+}
+
+.ta-book-analysis.found span {
+  background: #54bc86;
+}
+
+.ta-book-analysis.unreadable {
+  border-color: #a7464c;
+  color: #ffb0b5;
+}
+
+.ta-book-analysis.unreadable span {
+  background: #df6976;
+}
+
+.ta-isbn-field input.is-invalid {
+  border-color: #df6976 !important;
+  background: rgba(223, 105, 118, 0.1) !important;
+  box-shadow: 0 0 0 3px rgba(223, 105, 118, 0.13);
 }
 </style>

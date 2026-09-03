@@ -307,6 +307,11 @@ class SaasFoundationTest extends TestCase
         $this->assertDatabaseHas('legal_acceptances', ['tenant_id' => $tenant->id, 'user_id' => $tenant->users()->firstOrFail()->id]);
         $this->assertNotNull(DB::table('legal_acceptances')->where('tenant_id', $tenant->id)->value('business_customer_confirmed_at'));
         $this->assertSame('pending', data_get($tenant->profile->content, 'ai_customization.status'));
+        $this->assertSame('Перетяжка рулей', data_get($tenant->profile->content, 'branding.services'));
+        $this->assertSame('Перетяжка рулей', data_get($tenant->profile->content, 'branding.description_translations.ru'));
+        $this->assertNotEmpty(data_get($tenant->profile->content, 'branding.customers'));
+        $this->assertNotEmpty(data_get($tenant->profile->content, 'branding.style'));
+        $this->assertNotEmpty(data_get($tenant->profile->content, 'branding.avoid'));
         Queue::assertPushed(GenerateTenantAppCustomization::class, fn ($job) => $job->tenantId === $tenant->id);
 
         $site = $this->getJson('http://leonid-deluxe.lookdo.app/api/tenant-site')
@@ -374,6 +379,14 @@ class SaasFoundationTest extends TestCase
                     'type' => 'text', 'label' => $localized('Материал'), 'placeholder' => $localized('Если известно'), 'required' => false, 'options' => [],
                 ]],
                 'starter_services' => [],
+                'branding' => [
+                    'description' => $localized('Покупаем и оцениваем иконы, серебро и старинные часы.'),
+                    'tagline' => $localized('Честная оценка антиквариата'),
+                    'services' => $localized('Покупка и предварительная оценка антиквариата'),
+                    'customers' => $localized('Владельцы частных коллекций и наследники'),
+                    'style' => $localized('Сдержанный классический стиль'),
+                    'avoid' => $localized('Современные массовые предметы и вымышленные клейма'),
+                ],
             ], JSON_UNESCAPED_UNICODE),
             'model' => 'gpt-5.6-luna',
             'usage' => ['input_tokens' => 400, 'output_tokens' => 220],
@@ -393,6 +406,9 @@ class SaasFoundationTest extends TestCase
         $this->assertSame('Предложить антиквариат', data_get($content, 'app_configuration.hero.action.ru'));
         $this->assertSame('custom_photo_1', data_get($content, 'app_configuration.media.slots.0.key'));
         $this->assertSame('custom_field_1', data_get($content, 'app_configuration.fields.0.key'));
+        $this->assertSame('Покупаем и оцениваем иконы, серебро и старинные часы.', data_get($content, 'branding.description_translations.ru'));
+        $this->assertSame('Честная оценка антиквариата', data_get($content, 'branding.tagline'));
+        $this->assertSame('Покупка и предварительная оценка антиквариата', data_get($content, 'branding.services'));
         $configurationMethod = new ReflectionMethod(TenantAppController::class, 'configuration');
         $configuration = $configurationMethod->invoke(app(TenantAppController::class), $tenant->fresh());
         $this->assertCount(2, $configuration['media']['slots']);

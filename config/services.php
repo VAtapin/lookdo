@@ -64,6 +64,10 @@ return [
         'image_cost_high' => (float) env('OPENAI_IMAGE_COST_HIGH', .211),
     ],
 
+    'books' => [
+        'google_api_key' => env('GOOGLE_BOOKS_API_KEY'),
+    ],
+
     'social' => [
         'meta' => [
             'client_id' => env('META_APP_ID'),

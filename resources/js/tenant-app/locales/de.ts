@@ -109,6 +109,13 @@ export default {
     aiAssisting: "Wird ausgefüllt…",
     aiAssistError:
         "Das automatische Ausfüllen ist fehlgeschlagen. Sie können manuell fortfahren.",
+    noIsbn: "Das Buch hat keine ISBN",
+    noIsbnHint: "Bei älteren Ausgaben ohne ISBN erfolgt die Einschätzung anhand der Fotos.",
+    noIsbnSelected: "Keine ISBN vorhanden – das Buch wird nur anhand der Fotos geprüft.",
+    bookAnalyzing: "KI liest die ISBN, prüft Kataloge und bewertet den Zustand…",
+    bookFound: "ISBN erkannt. Buchdaten gefunden und automatisch eingetragen.",
+    bookNotFound: "Die ISBN ist lesbar, aber das Buch wurde nicht im Katalog gefunden. Sichtbare Angaben wurden aus den Fotos übernommen.",
+    isbnUnreadable: "Die ISBN konnte nicht gelesen werden. Machen Sie ein schärferes Foto oder geben Sie die Nummer ein.",
     later: "Nicht jetzt",
     noActivity: "Noch keine Anfragen oder Termine",
     noActivityText:

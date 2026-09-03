@@ -23,7 +23,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
     Route::prefix('tenant-app')->middleware('throttle:120,1')->group(function () {
         Route::get('/bootstrap', [TenantAppController::class, 'bootstrap']);
         Route::post('/requests', [TenantAppController::class, 'createRequest'])->middleware('throttle:12,1');
-        Route::post('/request-assistance', [TenantAppController::class, 'assistRequest'])->middleware('throttle:6,1');
+        Route::post('/request-assistance', [TenantAppController::class, 'assistRequest'])->middleware('throttle:20,1');
         Route::get('/activity', [TenantAppController::class, 'activity']);
         Route::post('/requests/{tenantRequest}/messages', [TenantAppController::class, 'postMessage'])->middleware('throttle:30,1');
         Route::get('/availability', [TenantAppController::class, 'availability'])->middleware('throttle:60,1');

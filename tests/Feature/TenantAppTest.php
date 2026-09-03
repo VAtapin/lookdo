@@ -150,6 +150,7 @@ class TenantAppTest extends TestCase
         $this->withHeader('X-Locale', 'ru')->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
             ->assertOk()
             ->assertJsonPath('template.code', 'purchase.general')
+            ->assertJsonPath('template.variation_code', 'purchase.books')
             ->assertJsonPath('template.hero.image', '/brand/purchase-books.webp')
             ->assertJsonPath('template.media.photos_min', 2)
             ->assertJsonPath('template.media_slots.0.key', 'book_cover')
@@ -160,6 +161,68 @@ class TenantAppTest extends TestCase
             ->assertJsonPath('template.capabilities.portfolio', false)
             ->assertJsonPath('template.capabilities.reviews', false)
             ->assertJsonPath('template.navigation', ['home', 'action', 'activity']);
+    }
+
+    public function test_book_photos_are_immediately_enriched_from_isbn_catalogues(): void
+    {
+        $tenant = $this->tenant('book-recognition', 'purchase.general', true, 'purchase.books');
+        config(['services.openai.key' => 'test-key', 'services.openai.text_model' => 'gpt-5.6-luna']);
+        Http::fake([
+            'api.openai.com/*' => Http::response([
+                'model' => 'gpt-5.6-luna',
+                'output_text' => json_encode([
+                    'summary' => 'Старая книга', 'isbn' => '9783161484100', 'title' => '', 'author' => '', 'publisher' => '',
+                    'publication_year' => '', 'edition' => '', 'pages' => '', 'dimensions' => '', 'illustrator' => '', 'language' => '',
+                    'book_count' => '1', 'condition' => 'Потёртый переплёт', 'special_features' => '', 'listing_description' => '',
+                    'asking_price' => '', 'pickup_location' => '', 'condition_grade' => 'fair', 'master_comment' => 'Проверить комплектность.',
+                    'recommended_purchase_price' => 2.0, 'price_currency' => 'EUR',
+                ], JSON_UNESCAPED_UNICODE),
+                'usage' => ['input_tokens' => 220, 'output_tokens' => 90],
+            ]),
+            'openlibrary.org/*' => Http::response(['docs' => [[
+                'key' => '/works/OL123W', 'title' => 'Каталожное название', 'author_name' => ['Автор Каталога'],
+                'publisher' => ['Издательство'], 'publish_date' => ['1999'], 'number_of_pages_median' => 320,
+            ]]]),
+            'www.googleapis.com/books/*' => Http::response(['items' => [[
+                'volumeInfo' => ['title' => 'Каталожное название', 'authors' => ['Автор Каталога'], 'publisher' => 'Издательство', 'publishedDate' => '1999', 'pageCount' => 320, 'language' => 'ru', 'description' => 'Описание из каталога'],
+                'saleInfo' => ['retailPrice' => ['amount' => 20, 'currencyCode' => 'EUR']],
+            ]]]),
+        ]);
+
+        $this->withHeader('X-Locale', 'ru')->post($this->url($tenant, '/api/tenant-app/request-assistance'), [
+            'text' => '',
+            'media_slots' => json_encode(['book_cover', 'book_isbn']),
+            'isbn_absent' => false,
+            'media' => [
+                UploadedFile::fake()->image('cover.jpg', 900, 1200),
+                UploadedFile::fake()->image('isbn.jpg', 1200, 900),
+            ],
+        ])->assertOk()
+            ->assertJsonPath('book.isbn_status', 'found')
+            ->assertJsonPath('values.isbn', '9783161484100')
+            ->assertJsonPath('values.title', 'Каталожное название')
+            ->assertJsonPath('values.author', 'Автор Каталога')
+            ->assertJsonPath('values.condition', 'Потёртый переплёт')
+            ->assertJsonPath('book.recommended_purchase_price', '1.60 EUR');
+    }
+
+    public function test_old_book_without_isbn_only_requires_cover_photo(): void
+    {
+        Storage::fake('public');
+        Bus::fake([AnalyzeTenantRequestMedia::class]);
+        $tenant = $this->tenant('book-without-isbn', 'purchase.general', true, 'purchase.books');
+
+        $this->post($this->url($tenant, '/api/tenant-app/requests'), [
+            'phone' => '+4915112345678',
+            'summary' => 'Старинная книга без ISBN',
+            'isbn_absent' => true,
+            'fields' => json_encode(['condition' => 'Потёртый переплёт']),
+            'media_slots' => json_encode(['book_cover']),
+            'media' => [UploadedFile::fake()->image('cover.jpg', 900, 1200)],
+        ])->assertCreated();
+
+        $requestId = $tenant->appRequests()->latest('id')->value('id');
+        $this->assertDatabaseHas('tenant_request_values', ['request_id' => $requestId, 'field_key' => 'isbn_absent']);
     }
 
     public function test_template_change_does_not_merge_stale_ai_configuration_from_previous_activity(): void

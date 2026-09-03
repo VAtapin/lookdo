@@ -13,6 +13,7 @@ use App\Models\TenantPushSubscription;
 use App\Models\TenantRequest;
 use App\Models\TenantRequestValue;
 use App\Models\TenantService;
+use App\Services\BookCatalogService;
 use App\Services\EntitlementService;
 use App\Services\ImageStorageService;
 use App\Services\OpenAiBudgetService;
@@ -78,14 +79,17 @@ class TenantAppController extends Controller
         ]);
     }
 
-    public function assistRequest(Request $request, OpenAiService $openAi, OpenAiBudgetService $budget): JsonResponse
+    public function assistRequest(Request $request, OpenAiService $openAi, OpenAiBudgetService $budget, BookCatalogService $books): JsonResponse
     {
         $tenant = $this->tenant($request);
         $this->ensureAvailable($request, $tenant);
         $data = $request->validate([
             'text' => 'nullable|string|max:2000',
-            'media' => 'nullable|array|max:4',
+            'media' => 'nullable|array|max:6',
             'media.*' => 'file|mimetypes:image/jpeg,image/png,image/webp|max:10240',
+            'media_slots' => 'nullable|string|max:2000',
+            'current_fields' => 'nullable|string|max:20000',
+            'isbn_absent' => 'nullable|boolean',
         ]);
         $uploaded = $request->file('media', []);
         if (mb_strlen(trim((string) ($data['text'] ?? ''))) < 3 && $uploaded === []) {
@@ -93,6 +97,11 @@ class TenantAppController extends Controller
         }
         $locale = $this->locale($request, $tenant);
         $configuration = $this->configuration($tenant);
+        $variationCode = (string) ($tenant->businessProfile?->variation?->code ?? '');
+        $isBookPurchase = $variationCode === 'purchase.books';
+        $isbnAbsent = (bool) ($data['isbn_absent'] ?? false);
+        $mediaSlots = $this->jsonArray($data['media_slots'] ?? []);
+        $currentFields = $this->jsonArray($data['current_fields'] ?? []);
         $fields = collect((array) ($configuration['fields'] ?? []))
             ->filter(fn (array $field) => filled($field['key'] ?? null) && ($field['key'] ?? null) !== 'phone')
             ->values();
@@ -100,13 +109,21 @@ class TenantAppController extends Controller
         foreach ($fields as $field) {
             $properties[(string) $field['key']] = ['type' => 'string'];
         }
+        if ($isBookPurchase) {
+            $properties['condition_grade'] = ['type' => 'string', 'enum' => ['poor', 'fair', 'good', 'very_good', 'unknown']];
+            $properties['master_comment'] = ['type' => 'string'];
+            $properties['recommended_purchase_price'] = ['type' => 'number', 'minimum' => 0];
+            $properties['price_currency'] = ['type' => 'string'];
+        }
         $fieldContext = $fields->map(fn (array $field) => [
             'key' => $field['key'],
             'label' => $this->localized($field['label'] ?? $field['key'], $locale),
         ])->all();
         $budget->ensureAvailable();
-        $instructions = 'Help a customer fill a request for '.($this->localized(data_get($configuration, 'condition_assessment.context', 'a local specialist'), $locale)).'. Read visible identifiers such as ISBN, VIN, maker marks and labels carefully. Preserve facts, never invent missing bibliographic, vehicle, provenance or condition details, and use empty strings for unknown facts. Return concise values in '.$locale.'.';
-        $input = json_encode(['customer_note' => (string) ($data['text'] ?? ''), 'fields' => $fieldContext], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $instructions = $isBookPurchase
+            ? 'Analyze the uploaded book photos immediately for a professional book buyer. OCR an ISBN-10 or ISBN-13 exactly when visible, including its check digit. Describe binding, spine, pages, completeness, stains, inscriptions, signatures and visible defects. Fill every reliably inferable bibliographic field and prepare a useful listing description and a complete internal master comment in '.$locale.'. Recommend a deliberately conservative low purchase price for the buyer; it is an internal suggestion, not a guaranteed valuation. Never invent an ISBN or claim a defect that is not visible. Use empty strings for unknown text fields. If the user states that no ISBN exists, leave ISBN empty and assess from the other photos.'
+            : 'Help a customer fill a request for '.($this->localized(data_get($configuration, 'condition_assessment.context', 'a local specialist'), $locale)).'. Read visible identifiers such as ISBN, VIN, maker marks and labels carefully. Preserve facts, never invent missing bibliographic, vehicle, provenance or condition details, and use empty strings for unknown facts. Return concise values in '.$locale.'.';
+        $input = json_encode(['customer_note' => (string) ($data['text'] ?? ''), 'fields' => $fieldContext, 'current_values' => $currentFields, 'photo_slots' => $mediaSlots, 'isbn_absent' => $isbnAbsent], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         $schema = ['type' => 'object', 'additionalProperties' => false, 'properties' => $properties, 'required' => array_keys($properties)];
         $images = collect($uploaded)->map(fn ($file) => [
             'contents' => (string) file_get_contents($file->getRealPath()),
@@ -121,10 +138,62 @@ class TenantAppController extends Controller
         }
         $budget->record('tenant_request_assistance', $result['model'], $result['input_tokens'], $result['output_tokens'], tenantId: $tenant->id);
 
+        if ($isBookPurchase) {
+            $enteredIsbn = $books->normalize((string) ($currentFields['isbn'] ?? ''));
+            $rawIsbn = $isbnAbsent ? '' : ($books->isValid($enteredIsbn) ? $enteredIsbn : (string) ($values['isbn'] ?? ''));
+            $isbn = $books->normalize($rawIsbn);
+            $isbnValid = $books->isValid($isbn);
+            $catalog = $isbnValid ? $books->lookup($isbn) : [];
+            foreach (['isbn', 'title', 'author', 'publisher', 'publication_year', 'edition', 'pages', 'dimensions', 'language', 'listing_description'] as $key) {
+                if (filled($catalog[$key] ?? null)) {
+                    $values[$key] = (string) $catalog[$key];
+                }
+            }
+            $values['isbn'] = $isbnAbsent ? '' : ($isbnValid ? $isbn : '');
+            $suggestedPrice = max(0, (float) ($values['recommended_purchase_price'] ?? 0));
+            $currency = strtoupper((string) ($values['price_currency'] ?? 'EUR')) ?: 'EUR';
+            if (isset($catalog['reference_price'])) {
+                $factor = match ((string) ($values['condition_grade'] ?? 'unknown')) {
+                    'poor' => .05,
+                    'fair' => .08,
+                    'good' => .12,
+                    'very_good' => .18,
+                    default => .07,
+                };
+                $suggestedPrice = max(.50, round((float) $catalog['reference_price'] * $factor, 2));
+                $currency = (string) ($catalog['reference_currency'] ?? $currency);
+            }
+            $price = number_format($suggestedPrice > 0 ? $suggestedPrice : .50, 2, '.', '').' '.$currency;
+            $catalogSummary = collect(['title', 'author', 'publisher', 'publication_year'])
+                ->map(fn (string $key): string => (string) ($values[$key] ?? ''))->filter()->implode(' · ');
+            $masterComment = trim(implode("\n", array_filter([
+                $catalogSummary,
+                (string) ($values['listing_description'] ?? ''),
+                (string) ($values['condition'] ?? ''),
+                (string) ($values['special_features'] ?? ''),
+                (string) ($values['master_comment'] ?? ''),
+                'Empfohlener niedriger Ankaufspreis / Recommended low purchase price: '.$price,
+                filled($catalog['catalog_url'] ?? null) ? 'Quelle / Source: '.$catalog['catalog_url'] : null,
+            ])));
+            $values['_ai_assessment'] = $masterComment;
+            $values['_book_catalog'] = $catalog;
+            $values['_recommended_purchase_price'] = $price;
+
+            return response()->json([
+                'values' => $values,
+                'book' => [
+                    'isbn_status' => $isbnAbsent ? 'absent' : (! $isbnValid ? 'unreadable' : ($catalog === [] ? 'not_found' : 'found')),
+                    'isbn' => $values['isbn'],
+                    'catalog' => $catalog,
+                    'recommended_purchase_price' => $price,
+                ],
+            ]);
+        }
+
         return response()->json(['values' => $values]);
     }
 
-    public function createRequest(Request $request, ImageStorageService $images): JsonResponse
+    public function createRequest(Request $request, ImageStorageService $images, BookCatalogService $books): JsonResponse
     {
         $tenant = $this->tenant($request);
         $this->ensureAvailable($request, $tenant);
@@ -141,15 +210,37 @@ class TenantAppController extends Controller
             'preferred_channel' => 'nullable|in:phone,whatsapp,sms,email,push,vk', 'summary' => 'nullable|string|max:5000',
             'fields' => 'nullable', 'media_slots' => 'nullable', 'media' => 'required|array|min:1|max:12',
             'media.*' => 'file|mimetypes:image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime|max:262144',
+            'isbn_absent' => 'nullable|boolean',
         ]);
         $fields = $this->jsonArray($data['fields'] ?? []);
         $slots = $this->jsonArray($data['media_slots'] ?? []);
         $locale = $this->locale($request, $tenant);
+        $variationCode = (string) ($tenant->businessProfile?->variation?->code ?? '');
+        $isBookPurchase = $variationCode === 'purchase.books';
+        $isbnAbsent = $isBookPurchase && (bool) ($data['isbn_absent'] ?? false);
+        if ($isBookPurchase && ! $isbnAbsent) {
+            $isbn = $books->normalize((string) ($fields['isbn'] ?? ''));
+            if (! $books->isValid($isbn)) {
+                throw ValidationException::withMessages(['isbn' => 'ISBN could not be read. Enter a valid ISBN or select “No ISBN”.']);
+            }
+            $fields['isbn'] = $isbn;
+        }
+        $prefillAssessment = $isBookPurchase ? trim((string) ($fields['_ai_assessment'] ?? '')) : '';
+        $bookCatalog = $isBookPurchase && is_array($fields['_book_catalog'] ?? null) ? $fields['_book_catalog'] : [];
+        $recommendedPurchasePrice = $isBookPurchase ? trim((string) ($fields['_recommended_purchase_price'] ?? '')) : '';
+        unset($fields['_ai_assessment'], $fields['_book_catalog'], $fields['_recommended_purchase_price']);
+        if ($isBookPurchase) {
+            $fields['isbn_absent'] = $isbnAbsent;
+        }
         $mediaConfiguration = (array) data_get($this->configuration($tenant), 'media', []);
         $imageCount = collect($request->file('media', []))->filter(fn ($file) => str_starts_with((string) $file->getMimeType(), 'image/'))->count();
         $photosMin = max(1, (int) ($mediaConfiguration['photos_min'] ?? 1));
         $photosMax = max($photosMin, (int) ($mediaConfiguration['photos_max'] ?? 12));
         $requiredSlots = collect((array) ($mediaConfiguration['slots'] ?? []))->filter(fn (array $slot) => ($slot['required'] ?? false) === true)->pluck('key')->filter()->all();
+        if ($isbnAbsent) {
+            $photosMin = 1;
+            $requiredSlots = array_values(array_diff($requiredSlots, ['book_isbn']));
+        }
         $missingSlots = array_values(array_diff($requiredSlots, $slots));
         if ($imageCount < $photosMin || $imageCount > $photosMax || $missingSlots !== []) {
             throw ValidationException::withMessages([
@@ -160,7 +251,7 @@ class TenantAppController extends Controller
         }
         [$customer, $rawToken] = $this->customerAndToken($request, $tenant, $data, $locale);
 
-        $tenantRequest = DB::transaction(function () use ($tenant, $customer, $data, $fields, $slots, $locale, $request, $images) {
+        $tenantRequest = DB::transaction(function () use ($tenant, $customer, $data, $fields, $slots, $locale, $request, $images, $prefillAssessment, $bookCatalog, $recommendedPurchasePrice) {
             $contactSnapshot = Arr::only($data, ['name', 'phone', 'email', 'preferred_channel']);
             $contactSnapshot['business_variation_code'] = $tenant->businessProfile?->variation?->code;
             $appRequest = $tenant->appRequests()->create([
@@ -171,6 +262,19 @@ class TenantAppController extends Controller
             ]);
             foreach ($fields as $key => $value) {
                 TenantRequestValue::create(['request_id' => $appRequest->id, 'field_key' => Str::limit((string) $key, 120, ''), 'value' => is_array($value) ? $value : ['value' => $value]]);
+            }
+            if ($prefillAssessment !== '') {
+                TenantRequestValue::create([
+                    'request_id' => $appRequest->id,
+                    'field_key' => 'ai_condition_assessment',
+                    'value' => [
+                        'value' => $prefillAssessment,
+                        'catalog' => $bookCatalog,
+                        'recommended_purchase_price' => $recommendedPurchasePrice,
+                        'analyzed_at' => now()->toIso8601String(),
+                        'status' => 'prefilled',
+                    ],
+                ]);
             }
             foreach ($request->file('media', []) as $index => $file) {
                 $type = str_starts_with((string) $file->getMimeType(), 'video/') ? 'video' : 'image';
@@ -787,6 +891,7 @@ class TenantAppController extends Controller
 
         return [
             'id' => $template?->id, 'code' => $templateCode, 'name' => $template?->localized('name', $locale),
+            'variation_code' => $tenant->businessProfile?->variation?->code,
             'engine' => $configuration['engine'] ?? 'request', 'layout' => $configuration['layout'] ?? 'general', 'navigation' => $this->normalizedNavigation($templateCode, $configuration),
             'theme' => $configuration['theme'] ?? [],
             'hero' => array_replace(

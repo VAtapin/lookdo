@@ -59,11 +59,35 @@ class GenerateTenantAppCustomization implements ShouldQueue
             $this->schema(),
         );
         $personalization = json_decode($result['text'], true, flags: JSON_THROW_ON_ERROR);
-        $override = $this->configuration($personalization, (string) ($base['engine'] ?? 'request'), $base);
+        $variationCode = (string) ($tenant->businessProfile->variation?->code ?? '');
+        $override = $this->configuration($personalization, (string) ($base['engine'] ?? 'request'), $base, $variationCode);
 
         $tenant->profile->refresh();
         $content = (array) $tenant->profile->content;
         $content['app_configuration'] = $override;
+        $branding = (array) ($personalization['branding'] ?? []);
+        $generatedBranding = [
+            'description_translations' => (array) ($branding['description'] ?? []),
+            'tagline_translations' => (array) ($branding['tagline'] ?? []),
+            'tagline' => $this->localized($branding['tagline'] ?? [], $tenant->locale),
+            'services' => $this->localized($branding['services'] ?? [], $tenant->locale),
+            'customers' => $this->localized($branding['customers'] ?? [], $tenant->locale),
+            'style' => $this->localized($branding['style'] ?? [], $tenant->locale),
+            'avoid' => $this->localized($branding['avoid'] ?? [], $tenant->locale),
+            'generated_from_registration' => true,
+        ];
+        $existingBranding = (array) ($content['branding'] ?? []);
+        $registrationSeed = (array) ($existingBranding['registration_seed'] ?? []);
+        foreach ($generatedBranding as $key => $value) {
+            if (! array_key_exists($key, $existingBranding)
+                || blank($existingBranding[$key])
+                || array_key_exists($key, $registrationSeed) && $existingBranding[$key] === $registrationSeed[$key]
+                || $key === 'generated_from_registration') {
+                $existingBranding[$key] = $value;
+            }
+        }
+        unset($existingBranding['registration_seed']);
+        $content['branding'] = $existingBranding;
         $content['ai_customization'] = [
             'status' => 'ready',
             'base_template' => $template->code,
@@ -86,7 +110,7 @@ class GenerateTenantAppCustomization implements ShouldQueue
     private function instructions(): string
     {
         return <<<'PROMPT'
-You create a safe tenant-specific configuration layer on top of an existing LOOKDO business template. Use the exact business description to specialize customer-facing wording, intake questions, photo instructions and, for booking templates, starter services. For example, an antiques buyer specializing in furniture, paintings, icons, porcelain, glass, silver, watches, coins, medals, stamps and postcards needs useful object-specific labels and photo guidance rather than generic antiques wording.
+You create a safe tenant-specific configuration layer on top of an existing LOOKDO business template. Use the exact business description to specialize customer-facing wording, intake questions, photo instructions and, for booking templates, starter services. Also prepare the complete initial branding questionnaire immediately: a public business description, short tagline, services, target customers, visual style, and sensible image exclusions. The user must see these fields already filled when opening the workspace. For example, an antiques buyer specializing in furniture, paintings, icons, porcelain, glass, silver, watches, coins, medals, stamps and postcards needs useful object-specific labels and photo guidance rather than generic antiques wording.
 
 Keep the base engine and capabilities unchanged. Do not invent executable code, integrations, legal claims, prices, valuations, guarantees, medical advice or hidden facts. Ask only for information and photos genuinely useful to this specialist. Keep the flow short: no more than 6 photo slots, 8 fields, 4 trust points and 6 starter services. At least one photo is required for request templates. For booking templates return no photo slots or intake fields and return 3 to 6 starter services. For request templates return an empty starter_services array. Produce natural, concise customer-facing copy in German, English, Russian and Ukrainian. Every translation must express the same meaning.
 PROMPT;
@@ -152,13 +176,25 @@ PROMPT;
                 'photo_slots' => ['type' => 'array', 'maxItems' => 6, 'items' => $slot],
                 'fields' => ['type' => 'array', 'maxItems' => 8, 'items' => $field],
                 'starter_services' => ['type' => 'array', 'maxItems' => 6, 'items' => $service],
+                'branding' => [
+                    'type' => 'object', 'additionalProperties' => false,
+                    'properties' => [
+                        'description' => $localized,
+                        'tagline' => $localized,
+                        'services' => $localized,
+                        'customers' => $localized,
+                        'style' => $localized,
+                        'avoid' => $localized,
+                    ],
+                    'required' => ['description', 'tagline', 'services', 'customers', 'style', 'avoid'],
+                ],
             ],
-            'required' => ['specialization', 'hero', 'submit_label', 'success_title', 'success_text', 'condition_context', 'trust', 'photo_slots', 'fields', 'starter_services'],
+            'required' => ['specialization', 'hero', 'submit_label', 'success_title', 'success_text', 'condition_context', 'trust', 'photo_slots', 'fields', 'starter_services', 'branding'],
         ];
     }
 
     /** @param array<string, mixed> $personalization @param array<string, mixed> $base */
-    private function configuration(array $personalization, string $engine, array $base): array
+    private function configuration(array $personalization, string $engine, array $base, string $variationCode): array
     {
         $hero = Arr::only((array) ($personalization['hero'] ?? []), ['eyebrow', 'title', 'text', 'action']);
         $hero['subtitle'] = $hero['text'] ?? [];
@@ -183,6 +219,10 @@ PROMPT;
                 $override['starter_services'] = $services;
             }
 
+            return $override;
+        }
+
+        if ($variationCode === 'purchase.books') {
             return $override;
         }
 
@@ -222,6 +262,15 @@ PROMPT;
         })->values()->all();
 
         return $override;
+    }
+
+    private function localized(mixed $value, string $locale): string
+    {
+        if (! is_array($value)) {
+            return (string) $value;
+        }
+
+        return (string) ($value[$locale] ?? $value['de'] ?? $value['en'] ?? $value['ru'] ?? reset($value) ?: '');
     }
 
     private function setStatus(Tenant $tenant, string $status): void
