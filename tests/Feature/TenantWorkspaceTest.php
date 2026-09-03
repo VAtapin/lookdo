@@ -94,6 +94,12 @@ class TenantWorkspaceTest extends TestCase
         $this->actingAs($owner)->putJson('/api/tenant/'.$tenant->id.'/workspace/appointments/'.$appointment->id, [
             'status' => 'confirmed',
         ])->assertOk()->assertJsonPath('appointment.status', 'confirmed');
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'workspace.appointment.updated',
+            'actor_id' => $owner->id,
+            'tenant_id' => $tenant->id,
+            'subject_id' => $appointment->id,
+        ]);
 
         $this->actingAs($owner)->getJson('/api/tenant/'.$tenant->id.'/workspace')
             ->assertOk()
@@ -110,6 +116,11 @@ class TenantWorkspaceTest extends TestCase
             'body' => 'Можно завтра в 10:00.',
             'event' => 'master_replied',
         ])->assertCreated();
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'workspace.request.replied',
+            'actor_id' => $owner->id,
+            'tenant_id' => $tenant->id,
+        ]);
 
         $this->withHeader('X-Lookdo-Client-Token', $token)
             ->getJson($this->tenantUrl($tenant, '/api/tenant-app/activity'))
@@ -273,6 +284,11 @@ class TenantWorkspaceTest extends TestCase
             'color' => '#ff6b00',
             'active' => true,
         ])->assertCreated()->json('segment');
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'workspace.operations.save_segment',
+            'actor_id' => $owner->id,
+            'tenant_id' => $tenant->id,
+        ]);
 
         $this->actingAs($owner)->putJson('/api/tenant/'.$tenant->id.'/workspace/customers/'.$customer->id.'/segments', [
             'segment_ids' => [$segment['id']],

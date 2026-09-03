@@ -117,8 +117,14 @@ const {
             <td>
                 <b>{{ item.action }}</b>
             </td>
-            <td>{{ item.actor_id || "System" }}</td>
-            <td>{{ item.tenant_id || "—" }}</td>
+            <td>
+                <b>{{ item.actor?.name || "System" }}</b>
+                <small v-if="item.actor">{{ item.actor.email }}</small>
+            </td>
+            <td>
+                <b>{{ item.tenant?.name || "Plattform" }}</b>
+                <small v-if="item.tenant">{{ item.tenant.slug }}</small>
+            </td>
             <td>
                 {{
                     item.subject_type

@@ -28,7 +28,12 @@ const pretty = (value: unknown) => {
                 <div><dt>Zeit</dt><dd>{{ formatDate(audit.created_at) }}</dd></div>
                 <div>
                     <dt>Benutzer / Kunde</dt>
-                    <dd>{{ audit.actor_id || "System" }} / {{ audit.tenant_id || "—" }}</dd>
+                    <dd>
+                        {{ audit.actor?.name || "System" }} / {{ audit.tenant?.name || "Plattform" }}
+                        <small v-if="audit.actor || audit.tenant">
+                            {{ audit.actor?.email || "—" }} / {{ audit.tenant?.slug || "—" }}
+                        </small>
+                    </dd>
                 </div>
                 <div>
                     <dt>IP / Browser</dt>

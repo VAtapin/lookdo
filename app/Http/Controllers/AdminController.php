@@ -727,18 +727,47 @@ class AdminController extends Controller
 
     public function audits(Request $request): JsonResponse
     {
-        $q = AuditLog::query();
+        $q = AuditLog::query()->with([
+            'actor:id,name,email',
+            'tenant:id,name,slug',
+        ]);
         if ($s = $request->string('search')->trim()->toString()) {
             $q->where(fn ($query) => $query->where('action', 'like', "%$s%")
                 ->orWhere('subject_type', 'like', "%$s%")
-                ->orWhere('ip_address', 'like', "%$s%"));
+                ->orWhere('ip_address', 'like', "%$s%")
+                ->orWhereHas('actor', fn ($actor) => $actor->where('name', 'like', "%$s%")
+                    ->orWhere('email', 'like', "%$s%"))
+                ->orWhereHas('tenant', fn ($tenant) => $tenant->where('name', 'like', "%$s%")
+                    ->orWhere('slug', 'like', "%$s%")));
         }
         if ($action = $request->string('action')->toString()) {
             $q->where('action', 'like', $action.'%');
         }
+        $actorId = $request->string('actor_id')->trim()->toString();
+        if ($actorId === 'system') {
+            $q->whereNull('actor_id');
+        } elseif (ctype_digit($actorId) && (int) $actorId > 0) {
+            $q->where('actor_id', (int) $actorId);
+        }
+        $tenantId = $request->string('tenant_id')->trim()->toString();
+        if ($tenantId === 'platform') {
+            $q->whereNull('tenant_id');
+        } elseif (ctype_digit($tenantId) && (int) $tenantId > 0) {
+            $q->where('tenant_id', (int) $tenantId);
+        }
         $sort = $this->sortColumn($request, ['action', 'actor_id', 'tenant_id', 'subject_type', 'created_at']);
+        $result = $q->orderBy($sort, $this->sortDirection($request))->paginate($this->perPage($request))->toArray();
+        $result['actors'] = User::query()
+            ->whereIn('id', AuditLog::query()->whereNotNull('actor_id')->select('actor_id')->distinct())
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+        $result['tenants'] = Tenant::query()
+            ->whereIn('id', AuditLog::query()->whereNotNull('tenant_id')->select('tenant_id')->distinct())
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug']);
+        $result['actions'] = AuditLog::query()->select('action')->distinct()->orderBy('action')->pluck('action');
 
-        return response()->json($q->orderBy($sort, $this->sortDirection($request))->paginate($this->perPage($request)));
+        return response()->json($result);
     }
 
     public function clearAudits(Request $request, AuditService $audit): JsonResponse

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\SystemSetting;
+use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -12,6 +13,31 @@ use Tests\TestCase;
 class AdminAuditAndReminderOperationsTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_audits_include_names_and_can_be_filtered_by_actor_and_tenant(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true, 'is_active' => true]);
+        $master = User::factory()->create(['name' => 'Marta Meister', 'email' => 'marta@example.test']);
+        $otherMaster = User::factory()->create(['name' => 'Andere Meisterin']);
+        $tenant = Tenant::create(['name' => 'Salon Morgen', 'slug' => 'salon-morgen', 'status' => 'active']);
+        $otherTenant = Tenant::create(['name' => 'Salon Abend', 'slug' => 'salon-abend', 'status' => 'active']);
+        AuditLog::create(['action' => 'tenant.request.updated', 'actor_id' => $master->id, 'tenant_id' => $tenant->id]);
+        AuditLog::create(['action' => 'tenant.request.updated', 'actor_id' => $otherMaster->id, 'tenant_id' => $otherTenant->id]);
+
+        $this->actingAs($admin)->getJson("/api/control/audits?actor_id={$master->id}&tenant_id={$tenant->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.actor.name', 'Marta Meister')
+            ->assertJsonPath('data.0.actor.email', 'marta@example.test')
+            ->assertJsonPath('data.0.tenant.name', 'Salon Morgen')
+            ->assertJsonPath('data.0.tenant.slug', 'salon-morgen')
+            ->assertJsonFragment(['name' => 'Andere Meisterin'])
+            ->assertJsonFragment(['name' => 'Salon Abend']);
+
+        $this->actingAs($admin)->getJson('/api/control/audits?search=Morgen')
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+    }
 
     public function test_super_admin_can_prune_old_audit_entries_without_removing_recent_entries(): void
     {

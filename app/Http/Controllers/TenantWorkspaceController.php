@@ -9,6 +9,7 @@ use App\Models\TenantCustomer;
 use App\Models\TenantPushSubscription;
 use App\Models\TenantRequest;
 use App\Models\User;
+use App\Services\AuditService;
 use App\Services\CustomerMergeService;
 use App\Services\EntitlementService;
 use App\Services\SmsService;
@@ -97,17 +98,19 @@ class TenantWorkspaceController extends Controller
         ]);
     }
 
-    public function updateAppointment(Request $request, Tenant $tenant, TenantAppointment $tenantAppointment): JsonResponse
+    public function updateAppointment(Request $request, Tenant $tenant, TenantAppointment $tenantAppointment, AuditService $audit): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($tenantAppointment->tenant_id === $tenant->id, 404);
         $data = $request->validate(['status' => ['required', Rule::in(['pending', 'confirmed', 'completed', 'cancelled', 'no_show'])]]);
+        $before = $tenantAppointment->only(['status']);
         $tenantAppointment->update($data);
+        $audit->log('workspace.appointment.updated', $tenantAppointment, $before, $tenantAppointment->fresh()->only(['status']), $tenant->id);
 
         return response()->json(['appointment' => $this->appointment($tenantAppointment->fresh(['customer', 'service'])) + ['kind' => 'appointment']]);
     }
 
-    public function updateRequest(Request $request, Tenant $tenant, TenantRequest $tenantRequest): JsonResponse
+    public function updateRequest(Request $request, Tenant $tenant, TenantRequest $tenantRequest, AuditService $audit): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($tenantRequest->tenant_id === $tenant->id, 404);
@@ -115,7 +118,9 @@ class TenantWorkspaceController extends Controller
         if (($data['status'] ?? null) === 'completed') {
             $data['completed_at'] = now();
         }
+        $before = $tenantRequest->only(['status', 'internal_note', 'completed_at']);
         $tenantRequest->update($data);
+        $audit->log('workspace.request.updated', $tenantRequest, $before, $tenantRequest->fresh()->only(['status', 'internal_note', 'completed_at']), $tenant->id);
 
         return response()->json(['request' => $this->requestItem($tenantRequest->fresh(['customer', 'media', 'values', 'messages.senderUser', 'template']), true)]);
     }
@@ -131,7 +136,7 @@ class TenantWorkspaceController extends Controller
         return response()->json(['marked' => $marked, 'unread' => $unread, 'read_at' => $readAt->toIso8601String()]);
     }
 
-    public function reply(Request $request, Tenant $tenant, TenantRequest $tenantRequest, SmsService $sms): JsonResponse
+    public function reply(Request $request, Tenant $tenant, TenantRequest $tenantRequest, SmsService $sms, AuditService $audit): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($tenantRequest->tenant_id === $tenant->id, 404);
@@ -151,6 +156,12 @@ class TenantWorkspaceController extends Controller
                 }
             }
         }
+        $audit->log('workspace.request.replied', $message, null, [
+            'request_id' => $tenantRequest->id,
+            'request_number' => $tenantRequest->number,
+            'event' => $data['event'] ?? 'master_replied',
+            'delivery' => $delivery,
+        ], $tenant->id);
 
         return response()->json(['message' => $message, 'delivery' => $delivery], 201);
     }
@@ -190,7 +201,7 @@ class TenantWorkspaceController extends Controller
         ]);
     }
 
-    public function updateCustomer(Request $request, Tenant $tenant, TenantCustomer $customer): JsonResponse
+    public function updateCustomer(Request $request, Tenant $tenant, TenantCustomer $customer, AuditService $audit): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($customer->tenant_id === $tenant->id, 404);
@@ -210,23 +221,27 @@ class TenantWorkspaceController extends Controller
             $data['publication_consent_at'] = $data['publication_consent'] ? now() : null;
             unset($data['publication_consent']);
         }
+        $before = $customer->only(array_keys($data));
         $customer->update($data);
+        $audit->log('workspace.customer.updated', $customer, $before, $customer->fresh()->only(array_keys($data)), $tenant->id);
 
         return response()->json(['customer' => $customer->fresh(['possibleDuplicate', 'segments'])]);
     }
 
-    public function mergeCustomer(Request $request, Tenant $tenant, TenantCustomer $customer, CustomerMergeService $merger): JsonResponse
+    public function mergeCustomer(Request $request, Tenant $tenant, TenantCustomer $customer, CustomerMergeService $merger, AuditService $audit): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($customer->tenant_id === $tenant->id, 404);
         $data = $request->validate(['source_id' => 'required|integer|different:target_id']);
         $source = $tenant->customers()->findOrFail($data['source_id']);
+        $before = ['target' => $customer->only(['id', 'name', 'phone', 'email']), 'source' => $source->only(['id', 'name', 'phone', 'email'])];
         $customer = $merger->merge($customer, $source);
+        $audit->log('workspace.customer.merged', $customer, $before, ['target' => $customer->only(['id', 'name', 'phone', 'email'])], $tenant->id);
 
         return response()->json(['customer' => $customer]);
     }
 
-    public function subscribePush(Request $request, Tenant $tenant, EntitlementService $entitlements): JsonResponse
+    public function subscribePush(Request $request, Tenant $tenant, EntitlementService $entitlements, AuditService $audit): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless((string) $entitlements->get($tenant, 'push_enabled', '1') === '1', 403, 'PUSH_NOT_INCLUDED');
@@ -247,19 +262,23 @@ class TenantWorkspaceController extends Controller
                 'locale' => in_array($tenant->locale, ['de', 'en', 'ru', 'uk'], true) ? $tenant->locale : 'de',
             ],
         );
+        $audit->log('workspace.push.enabled', $tenant, null, ['user_id' => $request->user()->id], $tenant->id);
 
         return response()->json(['subscribed' => true]);
     }
 
-    public function unsubscribePush(Request $request, Tenant $tenant): JsonResponse
+    public function unsubscribePush(Request $request, Tenant $tenant, AuditService $audit): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         $data = $request->validate(['endpoint' => 'required|url|max:2000']);
-        TenantPushSubscription::query()
+        $deleted = TenantPushSubscription::query()
             ->where('tenant_id', $tenant->id)
             ->where('user_id', $request->user()->id)
             ->where('endpoint_hash', hash('sha256', $data['endpoint']))
             ->delete();
+        if ($deleted) {
+            $audit->log('workspace.push.disabled', $tenant, ['user_id' => $request->user()->id], null, $tenant->id);
+        }
 
         return response()->json(['subscribed' => false]);
     }
@@ -282,7 +301,7 @@ class TenantWorkspaceController extends Controller
         ]);
     }
 
-    public function addTeamMember(Request $request, Tenant $tenant, EntitlementService $entitlements): JsonResponse
+    public function addTeamMember(Request $request, Tenant $tenant, EntitlementService $entitlements, AuditService $audit): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($this->canManageTeam($request, $tenant), 403, 'OWNER_REQUIRED');
@@ -313,22 +332,25 @@ class TenantWorkspaceController extends Controller
             $token = Password::broker()->createToken($user);
             $setupUrl = url('/reset-password/'.$token).'?email='.urlencode($user->email);
         }
+        $audit->log('workspace.team_member.added', $user, null, ['name' => $user->name, 'email' => $user->email, 'role' => $data['role']], $tenant->id);
 
         return response()->json(['member' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'role' => $data['role']], 'setup_url' => $setupUrl], 201);
     }
 
-    public function removeTeamMember(Request $request, Tenant $tenant, User $user): JsonResponse
+    public function removeTeamMember(Request $request, Tenant $tenant, User $user, AuditService $audit): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($this->canManageTeam($request, $tenant), 403, 'OWNER_REQUIRED');
         $member = $tenant->users()->whereKey($user->id)->firstOrFail();
         abort_if($member->pivot->role === 'owner', 422, 'OWNER_CANNOT_BE_REMOVED');
+        $before = ['name' => $member->name, 'email' => $member->email, 'role' => $member->pivot->role];
         $tenant->users()->detach($user->id);
+        $audit->log('workspace.team_member.removed', $user, $before, null, $tenant->id);
 
         return response()->json(['deleted' => true]);
     }
 
-    public function updateTeamMember(Request $request, Tenant $tenant, User $user): JsonResponse
+    public function updateTeamMember(Request $request, Tenant $tenant, User $user, AuditService $audit): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($this->canManageTeam($request, $tenant), 403, 'OWNER_REQUIRED');
@@ -340,19 +362,22 @@ class TenantWorkspaceController extends Controller
             'role' => 'required|in:staff,manager',
             'active' => 'required|boolean',
         ]);
+        $before = ['name' => $user->name, 'email' => $user->email, 'active' => $user->is_active, 'role' => $member->pivot->role];
         $user->update(['name' => $data['name'], 'email' => mb_strtolower($data['email']), 'is_active' => $data['active']]);
         $tenant->users()->updateExistingPivot($user->id, ['role' => $data['role']]);
+        $audit->log('workspace.team_member.updated', $user, $before, ['name' => $user->name, 'email' => $user->email, 'active' => $user->is_active, 'role' => $data['role']], $tenant->id);
 
         return response()->json(['member' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'active' => $user->is_active, 'role' => $data['role']]]);
     }
 
-    public function teamMemberSetupLink(Request $request, Tenant $tenant, User $user): JsonResponse
+    public function teamMemberSetupLink(Request $request, Tenant $tenant, User $user, AuditService $audit): JsonResponse
     {
         $this->authorizeWorkspace($request, $tenant);
         abort_unless($this->canManageTeam($request, $tenant), 403, 'OWNER_REQUIRED');
         $member = $tenant->users()->whereKey($user->id)->firstOrFail();
         abort_if($member->pivot->role === 'owner', 422, 'OWNER_CANNOT_BE_CHANGED');
         $token = Password::broker()->createToken($user);
+        $audit->log('workspace.team_member.setup_link_created', $user, null, ['email' => $user->email], $tenant->id);
 
         return response()->json(['setup_url' => url('/reset-password/'.$token).'?email='.urlencode($user->email)]);
     }

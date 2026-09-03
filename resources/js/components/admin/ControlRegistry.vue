@@ -89,6 +89,28 @@ const {
                 <option value="ai">KI</option>
                 <option value="fallback">Standard</option>
             </select>
+            <template v-else-if="section === 'audit'">
+                <select v-model="filters.actor_id" aria-label="Nach Benutzer filtern">
+                    <option value="">Alle Benutzer</option>
+                    <option value="system">System</option>
+                    <option v-for="actor in data.actors || []" :key="actor.id" :value="actor.id">
+                        {{ actor.name }} · {{ actor.email }}
+                    </option>
+                </select>
+                <select v-model="filters.tenant_id" aria-label="Nach Kunde filtern">
+                    <option value="">Alle Kunden</option>
+                    <option value="platform">Plattform / ohne Kunde</option>
+                    <option v-for="tenant in data.tenants || []" :key="tenant.id" :value="tenant.id">
+                        {{ tenant.name }} · {{ tenant.slug }}
+                    </option>
+                </select>
+                <select v-model="filters.action" aria-label="Nach Aktion filtern">
+                    <option value="">Alle Aktionen</option>
+                    <option v-for="action in data.actions || []" :key="action" :value="action">
+                        {{ action }}
+                    </option>
+                </select>
+            </template>
             <select v-if="statusOptions[section]" v-model="filters.status">
                 <option value="">Alle Status</option>
                 <option
