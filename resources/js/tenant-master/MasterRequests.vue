@@ -416,6 +416,10 @@ onMounted(load);
                         /><span v-else>▶</span></a
                     >
                 </div>
+                <section v-if="selected.ai_assessment" class="mw-ai-assessment">
+                    <span>AI</span>
+                    <div><h3>{{ t("aiConditionAssessment") }}</h3><p>{{ selected.ai_assessment }}</p></div>
+                </section>
                 <section
                     v-if="selected.details?.length"
                     class="mw-request-details"

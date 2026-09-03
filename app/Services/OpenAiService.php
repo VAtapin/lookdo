@@ -32,6 +32,33 @@ class OpenAiService
         ]);
     }
 
+    /**
+     * @param  array<int, array{contents:string,mime:string}>  $images
+     * @param  array<string, mixed>  $schema
+     * @return array{text:string,model:string,input_tokens:int,output_tokens:int}
+     */
+    public function structuredWithImages(string $instructions, string $input, string $name, array $schema, array $images): array
+    {
+        $content = [['type' => 'input_text', 'text' => $input]];
+        foreach ($images as $image) {
+            $content[] = [
+                'type' => 'input_image',
+                'image_url' => 'data:'.$image['mime'].';base64,'.base64_encode($image['contents']),
+                'detail' => 'high',
+            ];
+        }
+
+        return $this->request($instructions, [[
+            'role' => 'user',
+            'content' => $content,
+        ]], [
+            'type' => 'json_schema',
+            'name' => $name,
+            'strict' => true,
+            'schema' => $schema,
+        ]);
+    }
+
     /** @return array{contents:string,model:string,format:string,quality:string} */
     public function image(string $prompt, string $quality = 'medium', string $size = '1536x1024'): array
     {
@@ -67,7 +94,7 @@ class OpenAiService
      * @param  array<string, mixed>|null  $format
      * @return array{text:string,model:string,input_tokens:int,output_tokens:int}
      */
-    private function request(string $instructions, string $input, ?array $format = null): array
+    private function request(string $instructions, string|array $input, ?array $format = null): array
     {
         if (! $this->configured()) {
             throw new RuntimeException('OPENAI_API_KEY is not configured.');

@@ -57,4 +57,24 @@ class RequestTemplate extends Model
 
         return $configuration;
     }
+
+    /** Resolve the shared template and apply only the selected business variation. */
+    public function resolvedForVariation(?string $variationCode, array $presets = []): array
+    {
+        $configuration = $this->resolvedConfiguration($presets);
+        $overrides = (array) ($configuration['variation_overrides'] ?? []);
+        $variation = $variationCode ? (array) ($overrides[$variationCode] ?? []) : [];
+        unset($configuration['variation_overrides']);
+        $resolved = array_replace_recursive($configuration, $variation);
+        foreach (['fields', 'navigation', 'trust', 'screens', 'actions'] as $listKey) {
+            if (array_key_exists($listKey, $variation)) {
+                $resolved[$listKey] = $variation[$listKey];
+            }
+        }
+        if (array_key_exists('slots', (array) ($variation['media'] ?? []))) {
+            $resolved['media']['slots'] = $variation['media']['slots'];
+        }
+
+        return $resolved;
+    }
 }

@@ -394,6 +394,7 @@ class TenantWorkspaceController extends Controller
             $base['values'] = $r->values;
             $base['messages'] = $r->messages;
             $base['details'] = $this->requestDetails($r);
+            $base['ai_assessment'] = data_get($r->values->firstWhere('field_key', 'ai_condition_assessment')?->value, 'value');
         }
 
         return $base;
@@ -418,7 +419,8 @@ class TenantWorkspaceController extends Controller
         $details[] = ['key' => 'summary', 'label' => $labels['summary'][$locale] ?? $labels['summary']['de'], 'value' => $tenantRequest->summary];
 
         $values = $tenantRequest->values->keyBy('field_key');
-        $configuration = $tenantRequest->template?->resolvedConfiguration((array) config('tenant_apps.templates', [])) ?? [];
+        $variationCode = (string) data_get($tenantRequest->contact_snapshot, 'business_variation_code', $tenantRequest->tenant?->businessProfile?->variation?->code);
+        $configuration = $tenantRequest->template?->resolvedForVariation($variationCode, (array) config('tenant_apps.templates', [])) ?? [];
         foreach ((array) ($configuration['fields'] ?? []) as $field) {
             $key = (string) ($field['key'] ?? '');
             if ($key === '' || $key === 'phone') {

@@ -76,6 +76,21 @@ class SaasFoundationTest extends TestCase
         $this->assertSame('/brand/leonid-demo.webp', $response->json('candidates.0.preview.image'));
     }
 
+    public function test_purchase_activity_uses_one_template_with_three_distinct_variations(): void
+    {
+        $template = RequestTemplate::where('code', 'purchase.general')->firstOrFail();
+        $variations = BusinessVariation::whereIn('code', ['purchase.books', 'purchase.vehicles', 'purchase.antiques'])->get();
+
+        $this->assertNull($template->variation_id);
+        $this->assertCount(3, $variations);
+        $this->assertSame(['purchase.general'], $variations->pluck('template_code')->unique()->values()->all());
+
+        $this->postJson('/api/classify', ['description' => 'скупка книг и журналов', 'locale' => 'ru'])
+            ->assertOk()
+            ->assertJsonPath('candidates.0.template_code', 'purchase.general')
+            ->assertJsonPath('candidates.0.preview.image', '/brand/purchase-books.webp');
+    }
+
     public function test_registration_availability_reports_existing_email_and_slug_before_submit(): void
     {
         User::factory()->create(['email' => 'owner@example.test']);

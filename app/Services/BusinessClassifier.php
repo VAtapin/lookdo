@@ -48,8 +48,10 @@ class BusinessClassifier
             $score *= max(.5, min(1.25, $phrase->weight));
 
             $templateCode = $phrase->variation?->template_code;
+            $templateConfiguration = (array) ($templates->get($templateCode)?->configuration ?? []);
+            $variationPreview = (array) (($templateConfiguration['variation_overrides'][$phrase->variation?->code]['preview'] ?? []));
 
-            return ['category_id' => $phrase->category_id, 'variation_id' => $phrase->variation_id, 'category' => $phrase->category?->localized('name'), 'variation' => $phrase->variation?->localized('name'), 'template_code' => $templateCode, 'preview' => data_get($templates->get($templateCode), 'configuration.preview', $this->fallbackPreview()), 'score' => round(min(1, $score), 4), 'phrase' => $phrase->phrase, 'exact' => $exact];
+            return ['category_id' => $phrase->category_id, 'variation_id' => $phrase->variation_id, 'category' => $phrase->category?->localized('name'), 'variation' => $phrase->variation?->localized('name'), 'template_code' => $templateCode, 'preview' => $variationPreview ?: ($templateConfiguration['preview'] ?? $this->fallbackPreview()), 'score' => round(min(1, $score), 4), 'phrase' => $phrase->phrase, 'exact' => $exact];
         })->filter(fn (array $result) => $result['score'] > 0)
             ->sortByDesc('score')->unique(fn ($r) => $r['category_id'].':'.($r['variation_id'] ?? 0))->take(3)->values();
         $best = $ranked->first();

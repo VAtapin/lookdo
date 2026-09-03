@@ -1,0 +1,187 @@
+{
+  "code": "purchase.general",
+  "category": "purchase",
+  "type": "standard",
+  "version": 1,
+  "priority": 100,
+  "name": {
+    "de": "Ankauf",
+    "en": "Buying",
+    "ru": "Покупка",
+    "uk": "Купівля"
+  },
+  "preview": {
+    "image": "/brand/purchase-general.webp",
+    "primary_color": "#c77832",
+    "secondary_color": "#24211e"
+  },
+  "capabilities": {
+    "request": true,
+    "messages": true,
+    "push": true,
+    "ai_communication": true,
+    "ai_media": true
+  },
+  "title": "Покажите, что вы хотите продать",
+  "intro": "Сфотографируйте предмет и важные детали. Покупатель предварительно оценит состояние и свяжется с вами.",
+  "primary_action": {
+    "de": "Gegenstand anbieten",
+    "en": "Offer an item",
+    "ru": "Предложить предмет",
+    "uk": "Запропонувати предмет"
+  },
+  "media": {
+    "photos_min": 1,
+    "photos_max": 6,
+    "slots": [
+      {
+        "key": "overall",
+        "role": "condition",
+        "title": {"de": "Gesamtansicht", "en": "Overall view", "ru": "Общий вид", "uk": "Загальний вигляд"},
+        "instruction": {"de": "Den ganzen Gegenstand bei gutem Licht fotografieren.", "en": "Photograph the whole item in good light.", "ru": "Сфотографируйте предмет целиком при хорошем освещении.", "uk": "Сфотографуйте предмет повністю при доброму освітленні."},
+        "required": true
+      },
+      {
+        "key": "details",
+        "role": "condition_detail",
+        "title": {"de": "Wichtige Details", "en": "Important details", "ru": "Важные детали", "uk": "Важливі деталі"},
+        "instruction": {"de": "Markierungen, Modell oder besondere Details zeigen.", "en": "Show marks, model information, or special details.", "ru": "Покажите маркировку, модель или особые детали.", "uk": "Покажіть маркування, модель або особливі деталі."},
+        "required": false
+      },
+      {
+        "key": "defects",
+        "role": "condition_detail",
+        "title": {"de": "Mängel", "en": "Defects", "ru": "Недостатки", "uk": "Недоліки"},
+        "instruction": {"de": "Kratzer, Risse und andere Mängel aus der Nähe zeigen.", "en": "Show scratches, cracks, and other defects up close.", "ru": "Крупно покажите царапины, трещины и другие недостатки.", "uk": "Крупно покажіть подряпини, тріщини та інші недоліки."},
+        "required": false
+      },
+      {
+        "key": "documents",
+        "role": "reference",
+        "title": {"de": "Dokumente", "en": "Documents", "ru": "Документы", "uk": "Документи"},
+        "instruction": {"de": "Falls vorhanden: Belege, Zertifikate oder Herkunftsnachweise.", "en": "If available, add receipts, certificates, or provenance.", "ru": "Если есть, добавьте чек, сертификат или сведения о происхождении.", "uk": "Якщо є, додайте чек, сертифікат або відомості про походження."},
+        "required": false
+      }
+    ],
+    "video": {"allowed": true, "recommended": false, "prominence": "secondary"}
+  },
+  "fields": [
+    {"key": "item_category", "type": "text", "label": {"de": "Was möchten Sie verkaufen?", "en": "What would you like to sell?", "ru": "Что вы хотите продать?", "uk": "Що ви хочете продати?"}, "required": true},
+    {"key": "condition", "type": "textarea", "label": {"de": "Zustand", "en": "Condition", "ru": "Состояние", "uk": "Стан"}, "required": false},
+    {"key": "asking_price", "type": "text", "label": {"de": "Preisvorstellung", "en": "Expected price", "ru": "Желаемая цена", "uk": "Бажана ціна"}, "required": false},
+    {"key": "pickup_location", "type": "text", "label": {"de": "Standort", "en": "Location", "ru": "Где находится предмет", "uk": "Де знаходиться предмет"}, "required": false},
+    {"key": "comment", "type": "textarea", "label": {"de": "Weitere Angaben", "en": "Additional details", "ru": "Дополнительная информация", "uk": "Додаткова інформація"}, "required": false},
+    {"key": "phone", "type": "phone", "label": {"de": "Telefon", "en": "Phone", "ru": "Телефон", "uk": "Телефон"}, "required": true, "tenant_can_disable": false}
+  ],
+  "ai_assistant": {
+    "accepts_media": true,
+    "title": {"de": "Mit KI ausfüllen", "en": "Fill with AI", "ru": "Заполнить с помощью ИИ", "uk": "Заповнити за допомогою ШІ"},
+    "text": {"de": "Fotos und kurze Hinweise werden ausgewertet. Unklare Angaben bleiben leer.", "en": "Photos and a short note are analyzed. Unclear facts stay empty.", "ru": "ИИ изучит фотографии и короткое пояснение. Неясные данные останутся пустыми.", "uk": "ШІ проаналізує фотографії та коротке пояснення. Неясні дані залишаться порожніми."}
+  },
+  "condition_assessment": {
+    "enabled": true,
+    "context": {"de": "Ankauf und erste Zustandsprüfung", "en": "purchase and initial condition review", "ru": "покупка и предварительная оценка состояния", "uk": "купівля та попередня оцінка стану"}
+  },
+  "integrations": {
+    "bukinist_listing": {
+      "status": "planned",
+      "endpoint": null,
+      "mode": "draft_only",
+      "variation": "purchase.books",
+      "note": "The listing draft fields are prepared, but publishing stays disabled until bukinist.de supplies a supported API or import contract."
+    }
+  },
+  "submit": {
+    "label": {"de": "Angebot senden", "en": "Send offer", "ru": "Отправить предложение", "uk": "Надіслати пропозицію"},
+    "loading": {"de": "Wird gesendet…", "en": "Sending…", "ru": "Отправляем…", "uk": "Надсилаємо…"}
+  },
+  "success": {
+    "title": {"de": "Angebot gesendet", "en": "Offer sent", "ru": "Предложение отправлено", "uk": "Пропозицію надіслано"},
+    "text": {"de": "Die Angaben werden geprüft. Der Käufer meldet sich bei Ihnen.", "en": "The details will be reviewed and the buyer will contact you.", "ru": "Покупатель проверит информацию и свяжется с вами.", "uk": "Покупець перевірить інформацію та зв’яжеться з вами."}
+  },
+  "variation_overrides": {
+    "purchase.books": {
+      "preview": {"image": "/brand/purchase-books.webp", "primary_color": "#a76731", "secondary_color": "#25211e"},
+      "hero": {
+        "title": {"de": "Bücher einfach anbieten", "en": "Offer books easily", "ru": "Предложите книги на продажу", "uk": "Запропонуйте книги на продаж"},
+        "subtitle": {"de": "Cover und ISBN-Seite fotografieren – die KI übernimmt bekannte Angaben.", "en": "Photograph the cover and ISBN page; AI fills known details.", "ru": "Сфотографируйте обложку и страницу с ISBN — известные данные заполнит ИИ.", "uk": "Сфотографуйте обкладинку та сторінку з ISBN — відомі дані заповнить ШІ."},
+        "image": "/brand/purchase-books.webp"
+      },
+      "media": {
+        "photos_min": 2,
+        "photos_max": 6,
+        "slots": [
+          {"key": "book_cover", "role": "condition", "title": {"de": "Buchcover", "en": "Book cover", "ru": "Обложка книги", "uk": "Обкладинка книги"}, "instruction": {"de": "Das ganze Cover gerade und scharf fotografieren.", "en": "Photograph the entire cover straight and in focus.", "ru": "Сфотографируйте обложку целиком, прямо и резко.", "uk": "Сфотографуйте обкладинку повністю, прямо й чітко."}, "required": true},
+          {"key": "book_isbn", "role": "identifier", "title": {"de": "ISBN- oder Titelseite", "en": "ISBN or title page", "ru": "Страница с ISBN", "uk": "Сторінка з ISBN"}, "instruction": {"de": "ISBN, Verlag und Erscheinungsjahr müssen lesbar sein.", "en": "Make the ISBN, publisher, and publication year readable.", "ru": "ISBN, издательство и год должны быть хорошо видны.", "uk": "ISBN, видавництво та рік мають бути добре видимі."}, "required": true},
+          {"key": "book_spine", "role": "condition_detail", "title": {"de": "Buchrücken", "en": "Spine", "ru": "Корешок", "uk": "Корінець"}, "instruction": {"de": "Den Zustand des Buchrückens zeigen.", "en": "Show the condition of the spine.", "ru": "Покажите состояние корешка.", "uk": "Покажіть стан корінця."}, "required": false},
+          {"key": "book_defects", "role": "condition_detail", "title": {"de": "Seiten und Mängel", "en": "Pages and defects", "ru": "Страницы и недостатки", "uk": "Сторінки та недоліки"}, "instruction": {"de": "Beschädigungen, Notizen, Flecken oder Signaturen zeigen.", "en": "Show damage, notes, stains, or signatures.", "ru": "Покажите повреждения, пометки, пятна или автограф.", "uk": "Покажіть пошкодження, нотатки, плями або автограф."}, "required": false}
+        ]
+      },
+      "fields": [
+        {"key": "isbn", "type": "text", "label": {"de": "ISBN", "en": "ISBN", "ru": "ISBN", "uk": "ISBN"}, "required": false},
+        {"key": "title", "type": "text", "label": {"de": "Titel", "en": "Title", "ru": "Название", "uk": "Назва"}, "required": false},
+        {"key": "author", "type": "text", "label": {"de": "Autor", "en": "Author", "ru": "Автор", "uk": "Автор"}, "required": false},
+        {"key": "publisher", "type": "text", "label": {"de": "Verlag", "en": "Publisher", "ru": "Издательство", "uk": "Видавництво"}, "required": false},
+        {"key": "publication_year", "type": "text", "label": {"de": "Erscheinungsjahr", "en": "Publication year", "ru": "Год издания", "uk": "Рік видання"}, "required": false},
+        {"key": "edition", "type": "text", "label": {"de": "Ausgabe", "en": "Edition", "ru": "Издание", "uk": "Видання"}, "required": false},
+        {"key": "pages", "type": "number", "label": {"de": "Seitenzahl", "en": "Pages", "ru": "Количество страниц", "uk": "Кількість сторінок"}, "required": false},
+        {"key": "dimensions", "type": "text", "label": {"de": "Maße", "en": "Dimensions", "ru": "Размеры", "uk": "Розміри"}, "required": false},
+        {"key": "illustrator", "type": "text", "label": {"de": "Illustrator", "en": "Illustrator", "ru": "Иллюстратор", "uk": "Ілюстратор"}, "required": false},
+        {"key": "language", "type": "text", "label": {"de": "Sprache", "en": "Language", "ru": "Язык", "uk": "Мова"}, "required": false},
+        {"key": "book_count", "type": "number", "label": {"de": "Anzahl Bücher", "en": "Number of books", "ru": "Количество книг", "uk": "Кількість книг"}, "required": false},
+        {"key": "condition", "type": "textarea", "label": {"de": "Zustand und Mängel", "en": "Condition and defects", "ru": "Состояние и недостатки", "uk": "Стан і недоліки"}, "required": false},
+        {"key": "special_features", "type": "textarea", "label": {"de": "Besonderheiten", "en": "Special features", "ru": "Особенности: автограф, иллюстрации, комплект", "uk": "Особливості: автограф, ілюстрації, комплект"}, "required": false},
+        {"key": "listing_description", "type": "textarea", "label": {"de": "Entwurf der Verkaufsbeschreibung", "en": "Listing description draft", "ru": "Черновик описания для публикации", "uk": "Чернетка опису для публікації"}, "required": false},
+        {"key": "asking_price", "type": "text", "label": {"de": "Preisvorstellung", "en": "Expected price", "ru": "Желаемая цена", "uk": "Бажана ціна"}, "required": false},
+        {"key": "pickup_location", "type": "text", "label": {"de": "Standort", "en": "Location", "ru": "Где находятся книги", "uk": "Де знаходяться книги"}, "required": false},
+        {"key": "phone", "type": "phone", "label": {"de": "Telefon", "en": "Phone", "ru": "Телефон", "uk": "Телефон"}, "required": true, "tenant_can_disable": false}
+      ],
+      "condition_assessment": {"enabled": true, "context": {"de": "antiquarischer Buchankauf; Einband, Buchrücken, Seiten, Vollständigkeit, Ausgabe, ISBN und sichtbare Besonderheiten", "en": "used and antiquarian book buying; binding, spine, pages, completeness, edition, ISBN, and visible special features", "ru": "скупка букинистических книг; переплёт, корешок, страницы, комплектность, издание, ISBN и видимые особенности", "uk": "скупка букіністичних книг; палітурка, корінець, сторінки, комплектність, видання, ISBN і видимі особливості"}}
+    },
+    "purchase.vehicles": {
+      "preview": {"image": "/brand/purchase-vehicles.webp", "primary_color": "#c8752f", "secondary_color": "#252525"},
+      "hero": {"title": {"de": "Fahrzeug in jedem Zustand anbieten", "en": "Offer a vehicle in any condition", "ru": "Предложите автомобиль в любом состоянии", "uk": "Запропонуйте автомобіль у будь-якому стані"}, "subtitle": {"de": "Fotos und Fahrzeugdaten genügen für eine erste Einschätzung.", "en": "Photos and vehicle details are enough for an initial review.", "ru": "Для предварительной оценки достаточно фотографий и данных автомобиля.", "uk": "Для попередньої оцінки достатньо фотографій і даних автомобіля."}, "image": "/brand/purchase-vehicles.webp"},
+      "media": {"photos_min": 2, "photos_max": 8, "slots": [
+        {"key": "vehicle_front", "role": "condition", "title": {"de": "Vorne und Seite", "en": "Front and side", "ru": "Спереди и сбоку", "uk": "Спереду і збоку"}, "instruction": {"de": "Das ganze Fahrzeug schräg von vorn fotografieren.", "en": "Photograph the full vehicle from a front three-quarter angle.", "ru": "Сфотографируйте автомобиль целиком спереди и сбоку.", "uk": "Сфотографуйте автомобіль повністю спереду і збоку."}, "required": true},
+        {"key": "vehicle_rear", "role": "condition", "title": {"de": "Hinten und Seite", "en": "Rear and side", "ru": "Сзади и сбоку", "uk": "Ззаду і збоку"}, "instruction": {"de": "Das ganze Fahrzeug schräg von hinten fotografieren.", "en": "Photograph the full vehicle from the rear and side.", "ru": "Сфотографируйте автомобиль целиком сзади и сбоку.", "uk": "Сфотографуйте автомобіль повністю ззаду і збоку."}, "required": true},
+        {"key": "vehicle_interior", "role": "condition_detail", "title": {"de": "Innenraum", "en": "Interior", "ru": "Салон", "uk": "Салон"}, "instruction": {"de": "Cockpit, Sitze und Kilometerstand zeigen.", "en": "Show the dashboard, seats, and mileage.", "ru": "Покажите приборную панель, салон и пробег.", "uk": "Покажіть панель приладів, салон і пробіг."}, "required": false},
+        {"key": "vehicle_damage", "role": "condition_detail", "title": {"de": "Schäden", "en": "Damage", "ru": "Повреждения", "uk": "Пошкодження"}, "instruction": {"de": "Unfallspuren, Rost, Dellen oder Kratzer zeigen.", "en": "Show accident damage, rust, dents, or scratches.", "ru": "Покажите следы ДТП, ржавчину, вмятины и царапины.", "uk": "Покажіть сліди ДТП, іржу, вм’ятини та подряпини."}, "required": false}
+      ]},
+      "fields": [
+        {"key": "vehicle_brand", "type": "text", "label": {"de": "Marke", "en": "Make", "ru": "Марка", "uk": "Марка"}, "required": false},
+        {"key": "vehicle_model", "type": "text", "label": {"de": "Modell", "en": "Model", "ru": "Модель", "uk": "Модель"}, "required": false},
+        {"key": "vehicle_year", "type": "text", "label": {"de": "Baujahr", "en": "Year", "ru": "Год выпуска", "uk": "Рік випуску"}, "required": false},
+        {"key": "mileage", "type": "number", "label": {"de": "Kilometerstand", "en": "Mileage", "ru": "Пробег", "uk": "Пробіг"}, "required": false},
+        {"key": "vin", "type": "text", "label": {"de": "FIN / VIN", "en": "VIN", "ru": "VIN", "uk": "VIN"}, "required": false},
+        {"key": "condition", "type": "textarea", "label": {"de": "Zustand und bekannte Schäden", "en": "Condition and known damage", "ru": "Состояние и известные повреждения", "uk": "Стан і відомі пошкодження"}, "required": false},
+        {"key": "asking_price", "type": "text", "label": {"de": "Preisvorstellung", "en": "Expected price", "ru": "Желаемая цена", "uk": "Бажана ціна"}, "required": false},
+        {"key": "pickup_location", "type": "text", "label": {"de": "Fahrzeugstandort", "en": "Vehicle location", "ru": "Где находится автомобиль", "uk": "Де знаходиться автомобіль"}, "required": false},
+        {"key": "phone", "type": "phone", "label": {"de": "Telefon", "en": "Phone", "ru": "Телефон", "uk": "Телефон"}, "required": true, "tenant_can_disable": false}
+      ],
+      "condition_assessment": {"enabled": true, "context": {"de": "Fahrzeugankauf; Karosserie, Lack, Glas, Reifen, Innenraum und sichtbare Schäden", "en": "vehicle buying; bodywork, paint, glass, tires, interior, and visible damage", "ru": "скупка автомобилей; кузов, лакокрасочное покрытие, стёкла, шины, салон и видимые повреждения", "uk": "скупка автомобілів; кузов, лакофарбове покриття, скло, шини, салон і видимі пошкодження"}}
+    },
+    "purchase.antiques": {
+      "preview": {"image": "/brand/purchase-antiques.webp", "primary_color": "#9a652d", "secondary_color": "#28231f"},
+      "hero": {"title": {"de": "Antiquitäten schätzen und anbieten", "en": "Appraise and offer antiques", "ru": "Предложите антиквариат для оценки", "uk": "Запропонуйте антикваріат для оцінки"}, "subtitle": {"de": "Gesamtansicht, Signaturen und Mängel helfen bei der ersten Einschätzung.", "en": "Overall views, marks, and defects help with the first assessment.", "ru": "Общий вид, клейма и недостатки помогут провести предварительную оценку.", "uk": "Загальний вигляд, клейма та недоліки допоможуть провести попередню оцінку."}, "image": "/brand/purchase-antiques.webp"},
+      "media": {"photos_min": 2, "photos_max": 8, "slots": [
+        {"key": "antique_overall", "role": "condition", "title": {"de": "Gesamtansicht", "en": "Overall view", "ru": "Общий вид", "uk": "Загальний вигляд"}, "instruction": {"de": "Den ganzen Gegenstand aus mehreren Seiten zeigen.", "en": "Show the whole object from a useful angle.", "ru": "Покажите предмет целиком с подходящего ракурса.", "uk": "Покажіть предмет повністю з відповідного ракурсу."}, "required": true},
+        {"key": "antique_marks", "role": "identifier", "title": {"de": "Marke oder Signatur", "en": "Mark or signature", "ru": "Клеймо или подпись", "uk": "Клеймо або підпис"}, "instruction": {"de": "Stempel, Signaturen, Etiketten oder Nummern scharf fotografieren.", "en": "Photograph stamps, signatures, labels, or numbers in focus.", "ru": "Чётко сфотографируйте клейма, подписи, этикетки или номера.", "uk": "Чітко сфотографуйте клейма, підписи, етикетки або номери."}, "required": true},
+        {"key": "antique_back", "role": "condition_detail", "title": {"de": "Rück- oder Unterseite", "en": "Back or underside", "ru": "Оборотная или нижняя сторона", "uk": "Зворотний або нижній бік"}, "instruction": {"de": "Rückseite, Sockel oder Unterseite zeigen.", "en": "Show the back, base, or underside.", "ru": "Покажите оборотную сторону, основание или дно.", "uk": "Покажіть зворотний бік, основу або дно."}, "required": false},
+        {"key": "antique_defects", "role": "condition_detail", "title": {"de": "Mängel und Reparaturen", "en": "Defects and repairs", "ru": "Недостатки и следы ремонта", "uk": "Недоліки та сліди ремонту"}, "instruction": {"de": "Risse, Abplatzer, Fehlteile oder Reparaturen zeigen.", "en": "Show cracks, chips, missing parts, or repairs.", "ru": "Покажите трещины, сколы, утраты или следы ремонта.", "uk": "Покажіть тріщини, відколи, втрати або сліди ремонту."}, "required": false}
+      ]},
+      "fields": [
+        {"key": "object_type", "type": "text", "label": {"de": "Art des Gegenstands", "en": "Object type", "ru": "Что это за предмет", "uk": "Що це за предмет"}, "required": false},
+        {"key": "maker_artist", "type": "text", "label": {"de": "Hersteller oder Künstler", "en": "Maker or artist", "ru": "Производитель или автор", "uk": "Виробник або автор"}, "required": false},
+        {"key": "estimated_age", "type": "text", "label": {"de": "Vermutetes Alter", "en": "Estimated age", "ru": "Предполагаемый возраст", "uk": "Приблизний вік"}, "required": false},
+        {"key": "material", "type": "text", "label": {"de": "Material", "en": "Material", "ru": "Материал", "uk": "Матеріал"}, "required": false},
+        {"key": "dimensions", "type": "text", "label": {"de": "Maße", "en": "Dimensions", "ru": "Размеры", "uk": "Розміри"}, "required": false},
+        {"key": "provenance", "type": "textarea", "label": {"de": "Herkunft", "en": "Provenance", "ru": "Происхождение и история", "uk": "Походження та історія"}, "required": false},
+        {"key": "condition", "type": "textarea", "label": {"de": "Zustand und Mängel", "en": "Condition and defects", "ru": "Состояние и недостатки", "uk": "Стан і недоліки"}, "required": false},
+        {"key": "asking_price", "type": "text", "label": {"de": "Preisvorstellung", "en": "Expected price", "ru": "Желаемая цена", "uk": "Бажана ціна"}, "required": false},
+        {"key": "pickup_location", "type": "text", "label": {"de": "Standort", "en": "Location", "ru": "Где находится предмет", "uk": "Де знаходиться предмет"}, "required": false},
+        {"key": "phone", "type": "phone", "label": {"de": "Telefon", "en": "Phone", "ru": "Телефон", "uk": "Телефон"}, "required": true, "tenant_can_disable": false}
+      ],
+      "condition_assessment": {"enabled": true, "context": {"de": "Antiquitätenankauf; Material, Altershinweise, Marke, Signatur, Vollständigkeit, Restaurierung und sichtbare Schäden", "en": "antiques buying; material, age indicators, marks, signatures, completeness, restoration, and visible damage", "ru": "скупка антиквариата; материал, признаки возраста, клеймо, подпись, комплектность, реставрация и видимые повреждения", "uk": "скупка антикваріату; матеріал, ознаки віку, клеймо, підпис, комплектність, реставрація та видимі пошкодження"}}
+    }
+  }
+}

@@ -117,7 +117,10 @@ class PlatformController extends Controller
         abort_unless($tenant, 404);
         app()->setLocale($tenant->locale);
         $tenant->load(['businessProfile.category', 'businessProfile.variation', 'businessProfile.template']);
-        $configuration = $tenant->businessProfile?->template?->configuration ?? [];
+        $configuration = $tenant->businessProfile?->template?->resolvedForVariation(
+            $tenant->businessProfile?->variation?->code,
+            (array) config('tenant_apps.templates', []),
+        ) ?? [];
 
         return response()->json([
             'name' => $tenant->name,

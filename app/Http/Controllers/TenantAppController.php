@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\AnalyzeTenantRequestMedia;
 use App\Jobs\SendTenantMasterPush;
 use App\Models\Tenant;
 use App\Models\TenantAppointment;
@@ -81,25 +82,39 @@ class TenantAppController extends Controller
     {
         $tenant = $this->tenant($request);
         $this->ensureAvailable($request, $tenant);
-        $data = $request->validate(['text' => 'required|string|min:3|max:2000']);
+        $data = $request->validate([
+            'text' => 'nullable|string|max:2000',
+            'media' => 'nullable|array|max:4',
+            'media.*' => 'file|mimetypes:image/jpeg,image/png,image/webp|max:10240',
+        ]);
+        $uploaded = $request->file('media', []);
+        if (mb_strlen(trim((string) ($data['text'] ?? ''))) < 3 && $uploaded === []) {
+            throw ValidationException::withMessages(['text' => 'Add a short note or at least one photo.']);
+        }
         $locale = $this->locale($request, $tenant);
+        $configuration = $this->configuration($tenant);
+        $fields = collect((array) ($configuration['fields'] ?? []))
+            ->filter(fn (array $field) => filled($field['key'] ?? null) && ($field['key'] ?? null) !== 'phone')
+            ->values();
+        $properties = ['summary' => ['type' => 'string']];
+        foreach ($fields as $field) {
+            $properties[(string) $field['key']] = ['type' => 'string'];
+        }
+        $fieldContext = $fields->map(fn (array $field) => [
+            'key' => $field['key'],
+            'label' => $this->localized($field['label'] ?? $field['key'], $locale),
+        ])->all();
         $budget->ensureAvailable();
-        $result = $openAi->structured(
-            'Help a customer fill a service request. Preserve facts, fix obvious spelling, never invent details. Return concise values in '.$locale.'. Use empty strings for facts not stated.',
-            (string) $data['text'],
-            'tenant_request_assistance',
-            [
-                'type' => 'object',
-                'additionalProperties' => false,
-                'properties' => [
-                    'summary' => ['type' => 'string'],
-                    'vehicle_brand' => ['type' => 'string'],
-                    'vehicle_model' => ['type' => 'string'],
-                    'vehicle_year' => ['type' => 'string'],
-                ],
-                'required' => ['summary', 'vehicle_brand', 'vehicle_model', 'vehicle_year'],
-            ],
-        );
+        $instructions = 'Help a customer fill a request for '.($this->localized(data_get($configuration, 'condition_assessment.context', 'a local specialist'), $locale)).'. Read visible identifiers such as ISBN, VIN, maker marks and labels carefully. Preserve facts, never invent missing bibliographic, vehicle, provenance or condition details, and use empty strings for unknown facts. Return concise values in '.$locale.'.';
+        $input = json_encode(['customer_note' => (string) ($data['text'] ?? ''), 'fields' => $fieldContext], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $schema = ['type' => 'object', 'additionalProperties' => false, 'properties' => $properties, 'required' => array_keys($properties)];
+        $images = collect($uploaded)->map(fn ($file) => [
+            'contents' => (string) file_get_contents($file->getRealPath()),
+            'mime' => (string) $file->getMimeType(),
+        ])->all();
+        $result = $images !== []
+            ? $openAi->structuredWithImages($instructions, $input, 'tenant_request_assistance', $schema, $images)
+            : $openAi->structured($instructions, $input, 'tenant_request_assistance', $schema);
         $values = json_decode($result['text'], true);
         if (! is_array($values)) {
             throw new RuntimeException('AI returned an invalid form result.');
@@ -130,14 +145,29 @@ class TenantAppController extends Controller
         $fields = $this->jsonArray($data['fields'] ?? []);
         $slots = $this->jsonArray($data['media_slots'] ?? []);
         $locale = $this->locale($request, $tenant);
+        $mediaConfiguration = (array) data_get($this->configuration($tenant), 'media', []);
+        $imageCount = collect($request->file('media', []))->filter(fn ($file) => str_starts_with((string) $file->getMimeType(), 'image/'))->count();
+        $photosMin = max(1, (int) ($mediaConfiguration['photos_min'] ?? 1));
+        $photosMax = max($photosMin, (int) ($mediaConfiguration['photos_max'] ?? 12));
+        $requiredSlots = collect((array) ($mediaConfiguration['slots'] ?? []))->filter(fn (array $slot) => ($slot['required'] ?? false) === true)->pluck('key')->filter()->all();
+        $missingSlots = array_values(array_diff($requiredSlots, $slots));
+        if ($imageCount < $photosMin || $imageCount > $photosMax || $missingSlots !== []) {
+            throw ValidationException::withMessages([
+                'media' => $missingSlots !== []
+                    ? 'Required photos are missing: '.implode(', ', $missingSlots).'.'
+                    : "Upload between {$photosMin} and {$photosMax} photos.",
+            ]);
+        }
         [$customer, $rawToken] = $this->customerAndToken($request, $tenant, $data, $locale);
 
         $tenantRequest = DB::transaction(function () use ($tenant, $customer, $data, $fields, $slots, $locale, $request, $images) {
+            $contactSnapshot = Arr::only($data, ['name', 'phone', 'email', 'preferred_channel']);
+            $contactSnapshot['business_variation_code'] = $tenant->businessProfile?->variation?->code;
             $appRequest = $tenant->appRequests()->create([
                 'customer_id' => $customer->id,
                 'request_template_id' => $tenant->businessProfile?->request_template_id,
                 'number' => $this->number('R'), 'status' => 'new', 'summary' => $data['summary'] ?? null, 'locale' => $locale,
-                'contact_snapshot' => Arr::only($data, ['name', 'phone', 'email', 'preferred_channel']),
+                'contact_snapshot' => $contactSnapshot,
             ]);
             foreach ($fields as $key => $value) {
                 TenantRequestValue::create(['request_id' => $appRequest->id, 'field_key' => Str::limit((string) $key, 120, ''), 'value' => is_array($value) ? $value : ['value' => $value]]);
@@ -168,6 +198,7 @@ class TenantAppController extends Controller
             return $appRequest;
         });
 
+        AnalyzeTenantRequestMedia::dispatch($tenantRequest->id)->afterCommit();
         $this->notifyMaster($tenant, 'new_request', '/app/requests', 'request-'.$tenantRequest->id);
 
         return response()->json(['token' => $rawToken, 'request' => $this->requestPayload($tenantRequest->fresh(['media', 'messages'])), 'success' => $this->localized(data_get($this->configuration($tenant), 'success', []), $locale)], 201);
@@ -510,12 +541,12 @@ class TenantAppController extends Controller
 
     private function configuration(Tenant $tenant): array
     {
-        $tenant->loadMissing(['businessProfile.template', 'profile']);
+        $tenant->loadMissing(['businessProfile.template', 'businessProfile.variation', 'profile']);
         $presets = (array) config('tenant_apps.templates', []);
         $template = $tenant->businessProfile?->template;
 
         $configuration = $template
-            ? $template->resolvedConfiguration($presets)
+            ? $template->resolvedForVariation($tenant->businessProfile?->variation?->code, $presets)
             : (array) ($presets['general-services.general'] ?? []);
         $presetCode = (string) data_get($tenant->profile?->content, 'preset.code', '');
         $tenantPreset = (array) config('tenant_presets.presets.'.$presetCode, []);
@@ -742,7 +773,8 @@ class TenantAppController extends Controller
                     ? ['image' => $this->assetUrl(data_get($tenant->profile?->content, 'branding.hero_image_path'))]
                     : [],
             ), 'trust' => array_map(fn ($item) => $this->localized($item, $locale), $configuration['trust'] ?? []),
-            'media_slots' => $slots, 'video' => $media['video'] ?? $configuration['video'] ?? [], 'fields' => $fields,
+            'media_slots' => $slots, 'media' => ['photos_min' => (int) ($media['photos_min'] ?? 1), 'photos_max' => (int) ($media['photos_max'] ?? max(1, count($slots)))], 'video' => $media['video'] ?? $configuration['video'] ?? [], 'fields' => $fields,
+            'ai_assistant' => $this->localized($configuration['ai_assistant'] ?? [], $locale),
             'submit' => $this->localized($configuration['submit'] ?? ['label' => $configuration['submit_label'] ?? null], $locale),
             'success' => $this->localized($configuration['success'] ?? [], $locale), 'push_prompt' => $this->localized($configuration['push_prompt'] ?? [], $locale),
             'screens' => collect($configuration['screens'] ?? [])->map(function ($screen) use ($locale) {
@@ -770,10 +802,11 @@ class TenantAppController extends Controller
         $labels = trans('tenant_app.media_slots', locale: $locale);
         $labels = is_array($labels) ? $labels : [];
 
-        return array_map(function (array $slot) use ($labels): array {
-            $label = $labels[$slot['key'] ?? ''] ?? $slot['title'] ?? $slot['label'] ?? null;
+        return array_map(function (array $slot) use ($labels, $locale): array {
+            $label = $labels[$slot['key'] ?? ''] ?? $this->localized($slot['title'] ?? $slot['label'] ?? null, $locale);
             $slot['title'] = $label;
             $slot['label'] = $label;
+            $slot['instruction'] = $this->localized($slot['instruction'] ?? '', $locale);
 
             return $slot;
         }, $slots);
@@ -786,10 +819,11 @@ class TenantAppController extends Controller
         $labels = is_array($labels) ? $labels : [];
         $options = is_array($options) ? $options : [];
 
-        return array_map(function (array $field) use ($labels, $options): array {
-            $field['label'] = $labels[$field['key'] ?? ''] ?? $field['label'] ?? $field['key'];
+        return array_map(function (array $field) use ($labels, $options, $locale): array {
+            $field['label'] = $labels[$field['key'] ?? ''] ?? $this->localized($field['label'] ?? $field['key'], $locale);
+            $field['placeholder'] = $this->localized($field['placeholder'] ?? null, $locale);
             if (isset($field['options'])) {
-                $field['options'] = array_map(fn ($option) => $options[$option] ?? $option, $field['options']);
+                $field['options'] = array_map(fn ($option) => $options[is_string($option) ? $option : ''] ?? $this->localized($option, $locale), $field['options']);
             }
 
             return $field;

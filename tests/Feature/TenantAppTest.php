@@ -2,13 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\AnalyzeTenantRequestMedia;
 use App\Jobs\SendTenantMessagePush;
+use App\Models\BusinessVariation;
 use App\Models\Plan;
 use App\Models\RequestTemplate;
 use App\Models\Tenant;
 use App\Models\TenantAppointment;
 use App\Models\TenantMessage;
 use App\Models\User;
+use App\Services\OpenAiBudgetService;
+use App\Services\OpenAiService;
 use App\Services\TenantPresetService;
 use App\Services\TenantWebPushService;
 use Carbon\CarbonImmutable;
@@ -16,6 +20,7 @@ use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -138,9 +143,26 @@ class TenantAppTest extends TestCase
             ->assertJsonPath('name', 'Golden Wheel')->assertJsonPath('scope', '/')->assertJsonPath('display', 'standalone');
     }
 
+    public function test_books_purchase_variant_exposes_isbn_photo_flow_from_shared_template(): void
+    {
+        $tenant = $this->tenant('book-buyer', 'purchase.general', true, 'purchase.books');
+
+        $this->withHeader('X-Locale', 'ru')->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('template.code', 'purchase.general')
+            ->assertJsonPath('template.hero.image', '/brand/purchase-books.webp')
+            ->assertJsonPath('template.media.photos_min', 2)
+            ->assertJsonPath('template.media_slots.0.key', 'book_cover')
+            ->assertJsonPath('template.media_slots.0.title', 'Обложка книги')
+            ->assertJsonPath('template.media_slots.1.key', 'book_isbn')
+            ->assertJsonPath('template.fields.0.key', 'isbn')
+            ->assertJsonPath('template.ai_assistant.accepts_media', true);
+    }
+
     public function test_anonymous_customer_can_send_media_request_and_continue_on_same_device(): void
     {
         Storage::fake('public');
+        Bus::fake([AnalyzeTenantRequestMedia::class]);
         $tenant = $this->tenant('wheel-request', 'automotive.steering-wheel-upholstery');
 
         $response = $this->withHeaders(['X-Locale' => 'ru', 'Accept' => 'application/json'])->post($this->url($tenant, '/api/tenant-app/requests'), [
@@ -157,6 +179,7 @@ class TenantAppTest extends TestCase
         $this->assertDatabaseHas('tenant_request_values', ['request_id' => $requestId, 'field_key' => 'vehicle_brand']);
         $path = $response->json('request.media.0.url');
         $this->assertStringContainsString('/storage/tenant-app/', $path);
+        Bus::assertDispatched(AnalyzeTenantRequestMedia::class, fn ($job) => $job->tenantRequestId === $requestId);
 
         $this->withHeader('X-Lookdo-Client-Token', $token)->getJson($this->url($tenant, '/api/tenant-app/activity'))
             ->assertOk()->assertJsonPath('requests.0.id', $requestId)->assertJsonCount(1, 'requests.0.messages');
@@ -170,6 +193,36 @@ class TenantAppTest extends TestCase
             'endpoint' => $endpoint, 'keys' => ['p256dh' => 'public-key', 'auth' => 'auth-key'],
         ])->assertOk()->assertJsonPath('subscribed', true);
         $this->assertDatabaseHas('tenant_push_subscriptions', ['tenant_id' => $tenant->id, 'endpoint_hash' => hash('sha256', $endpoint)]);
+    }
+
+    public function test_media_analysis_saves_activity_specific_ai_comment_for_master(): void
+    {
+        Storage::fake('public');
+        $tenant = $this->tenant('book-condition', 'purchase.general', true, 'purchase.books');
+        $customer = $tenant->customers()->create(['name' => 'Анна', 'phone' => '+4915112345678', 'locale' => 'ru']);
+        $tenantRequest = $tenant->appRequests()->create([
+            'customer_id' => $customer->id,
+            'request_template_id' => $tenant->businessProfile->request_template_id,
+            'number' => 'R-BOOK-001',
+            'status' => 'new',
+            'summary' => 'Продать старую книгу',
+            'locale' => 'ru',
+            'contact_snapshot' => ['phone' => $customer->phone, 'business_variation_code' => 'purchase.books'],
+        ]);
+        Storage::disk('public')->put('tenant-app/test/book.jpg', UploadedFile::fake()->image('book.jpg')->getContent());
+        $tenantRequest->media()->create(['tenant_id' => $tenant->id, 'type' => 'image', 'role' => 'condition', 'slot_key' => 'book_cover', 'sort_order' => 0, 'storage_key' => 'tenant-app/test/book.jpg', 'metadata' => ['mime' => 'image/jpeg']]);
+        config(['services.openai.key' => 'test-key', 'services.openai.text_model' => 'gpt-5.6-luna']);
+        Http::fake(['api.openai.com/*' => Http::response([
+            'model' => 'gpt-5.6-luna',
+            'output_text' => '{"comment":"Переплёт заметно потёрт; корешок виден не полностью. Нужны фото ISBN и страниц с дефектами."}',
+            'usage' => ['input_tokens' => 200, 'output_tokens' => 35],
+        ])]);
+
+        app(AnalyzeTenantRequestMedia::class, ['tenantRequestId' => $tenantRequest->id])
+            ->handle(app(OpenAiService::class), app(OpenAiBudgetService::class));
+
+        $this->assertDatabaseHas('tenant_request_values', ['request_id' => $tenantRequest->id, 'field_key' => 'ai_condition_assessment']);
+        $this->assertDatabaseHas('ai_usage_records', ['tenant_id' => $tenant->id, 'operation' => 'tenant_media_condition_assessment']);
     }
 
     public function test_device_can_subscribe_before_creating_a_request_and_is_linked_afterwards(): void
@@ -543,12 +596,13 @@ class TenantAppTest extends TestCase
             ->assertJsonPath('message', 'Тестовый период закончился или подписка не активна.');
     }
 
-    private function tenant(string $slug, string $templateCode, bool $active = true): Tenant
+    private function tenant(string $slug, string $templateCode, bool $active = true, ?string $variationCode = null): Tenant
     {
         $template = RequestTemplate::where('code', $templateCode)->firstOrFail();
         $tenant = Tenant::create(['name' => $slug === 'golden-wheel' ? 'Golden Wheel' : ucfirst(str_replace('-', ' ', $slug)), 'slug' => $slug, 'status' => 'active', 'country' => 'DE', 'locale' => 'ru', 'business_description' => 'Индивидуальная работа мастера']);
         $tenant->profile()->create(['contact_name' => 'Owner', 'phone' => '+4915112345678', 'city' => 'Berlin', 'primary_color' => '#d6a552', 'secondary_color' => '#111318']);
-        $tenant->businessProfile()->create(['category_id' => $template->category_id, 'variation_id' => $template->variation_id, 'request_template_id' => $template->id, 'original_description' => 'Индивидуальная работа мастера']);
+        $variationId = $variationCode ? BusinessVariation::where('code', $variationCode)->value('id') : $template->variation_id;
+        $tenant->businessProfile()->create(['category_id' => $template->category_id, 'variation_id' => $variationId, 'request_template_id' => $template->id, 'original_description' => 'Индивидуальная работа мастера']);
         $plan = Plan::where('code', 'start')->firstOrFail();
         $tenant->subscriptions()->create(['plan_id' => $plan->id, 'provider' => 'manual', 'status' => $active ? 'active' : 'incomplete', 'started_at' => now()]);
 

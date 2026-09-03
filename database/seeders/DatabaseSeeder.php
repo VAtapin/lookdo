@@ -46,6 +46,7 @@ class DatabaseSeeder extends Seeder
             'cleaning' => [70, ['de' => 'Reinigung', 'en' => 'Cleaning', 'ru' => 'Уборка и чистка', 'uk' => 'Прибирання та чищення']],
             'bicycles' => [80, ['de' => 'Fahrräder', 'en' => 'Bicycles', 'ru' => 'Велосипеды', 'uk' => 'Велосипеди']],
             'advertising-signage' => [90, ['de' => 'Werbeschilder & Beschriftung', 'en' => 'Advertising & signage', 'ru' => 'Рекламные вывески и оформление', 'uk' => 'Рекламні вивіски та оформлення']],
+            'purchase' => [100, ['de' => 'Ankauf', 'en' => 'Buying', 'ru' => 'Покупка', 'uk' => 'Купівля']],
             'general-services' => [999, ['de' => 'Allgemeine Dienstleistungen', 'en' => 'General services', 'ru' => 'Другие услуги', 'uk' => 'Інші послуги']],
         ];
         $categories = [];
@@ -66,11 +67,16 @@ class DatabaseSeeder extends Seeder
             'cleaning.general' => ['cleaning', 20, ['de' => 'Reinigung', 'en' => 'Cleaning', 'ru' => 'Уборка и чистка', 'uk' => 'Прибирання та чищення']],
             'bicycles.general' => ['bicycles', 20, ['de' => 'Fahrradservice', 'en' => 'Bicycle service', 'ru' => 'Велосипеды', 'uk' => 'Велосипеди']],
             'advertising-signage.general' => ['advertising-signage', 20, ['de' => 'Werbeschilder & Beschriftung', 'en' => 'Advertising & signage', 'ru' => 'Рекламные вывески', 'uk' => 'Рекламні вивіски']],
+            'purchase.books' => ['purchase', 100, ['de' => 'Bücher & Zeitschriften', 'en' => 'Books & magazines', 'ru' => 'Книги и журналы', 'uk' => 'Книги та журнали'], 'purchase.general'],
+            'purchase.vehicles' => ['purchase', 90, ['de' => 'Fahrzeuge', 'en' => 'Vehicles', 'ru' => 'Автомобили', 'uk' => 'Автомобілі'], 'purchase.general'],
+            'purchase.antiques' => ['purchase', 80, ['de' => 'Antiquitäten', 'en' => 'Antiques', 'ru' => 'Антиквариат', 'uk' => 'Антикваріат'], 'purchase.general'],
             'general-services.general' => ['general-services', 1, ['de' => 'Universelle Anfrage', 'en' => 'Universal request', 'ru' => 'Универсальная заявка', 'uk' => 'Універсальна заявка']],
         ];
         $variations = [];
-        foreach ($variationDefinitions as $code => [$categoryCode, $priority, $name]) {
-            $variations[$code] = BusinessVariation::updateOrCreate(['code' => $code], ['category_id' => $categories[$categoryCode]->id, 'name' => $name, 'template_code' => $code, 'priority' => $priority]);
+        foreach ($variationDefinitions as $code => $definition) {
+            [$categoryCode, $priority, $name] = $definition;
+            $templateCode = $definition[3] ?? $code;
+            $variations[$code] = BusinessVariation::updateOrCreate(['code' => $code], ['category_id' => $categories[$categoryCode]->id, 'name' => $name, 'template_code' => $templateCode, 'priority' => $priority]);
         }
 
         $requestTemplates = [
@@ -115,6 +121,7 @@ class DatabaseSeeder extends Seeder
         $this->seedTemplateFromJson(base_path('templates/automotive/steering-wheel/template.json'), $categories['automotive'], $variations['automotive.steering-wheel-upholstery'], 'automotive.general');
         $this->seedTemplateFromJson(base_path('templates/repair-finishing-installation/door-installation/template.json'), $categories['repair-finishing-installation'], $variations['repair-finishing-installation.door-installation'], 'repair-finishing-installation.general');
         $this->seedTemplateFromJson(base_path('templates/beauty/brows/template.json'), $categories['beauty'], $variations['beauty.brows'], 'beauty.general');
+        $this->seedTemplateFromJson(base_path('templates/purchase/template.json'), $categories['purchase']);
 
         $automotive = $categories['automotive'];
         $repair = $categories['repair-finishing-installation'];
@@ -135,6 +142,9 @@ class DatabaseSeeder extends Seeder
             'cleaning.general' => ['ru' => ['уборка', 'клининг', 'генеральная уборка', 'уборка после ремонта'], 'uk' => ['прибирання', 'клінінг', 'генеральне прибирання'], 'de' => ['reinigung'], 'en' => ['cleaning service']],
             'bicycles.general' => ['ru' => ['ремонт велосипеда', 'веломастерская', 'велосервис'], 'uk' => ['ремонт велосипеда', 'веломайстерня'], 'de' => ['fahrrad reparatur'], 'en' => ['bicycle repair']],
             'advertising-signage.general' => ['ru' => ['вывески', 'изготовление вывесок', 'наружная реклама', 'оформление витрины'], 'uk' => ['вивіски', 'виготовлення вивісок', 'зовнішня реклама'], 'de' => ['werbeschilder'], 'en' => ['signage installation']],
+            'purchase.books' => ['ru' => ['покупка книг', 'скупка книг', 'куплю книги', 'букинист', 'покупка журналов', 'продать книги', 'продать библиотеку'], 'uk' => ['купівля книг', 'скупка книг', 'продати книги'], 'de' => ['bücher ankauf', 'bücher verkaufen', 'bibliothek verkaufen'], 'en' => ['buy books', 'sell books', 'book buyer']],
+            'purchase.vehicles' => ['ru' => ['покупка автомобилей', 'скупка авто', 'купим автомобиль', 'авто в любом состоянии', 'продать машину'], 'uk' => ['купівля автомобілів', 'скупка авто', 'продати авто'], 'de' => ['autoankauf', 'gebrauchtwagen ankauf', 'auto verkaufen'], 'en' => ['car buyer', 'we buy cars', 'sell a car']],
+            'purchase.antiques' => ['ru' => ['покупка антиквариата', 'скупка антиквариата', 'куплю старинные вещи', 'продать антиквариат'], 'uk' => ['купівля антикваріату', 'скупка антикваріату'], 'de' => ['antiquitäten ankauf', 'antik ankauf'], 'en' => ['antiques buyer', 'sell antiques']],
         ];
         foreach ($phraseSets as $variationCode => $locales) {
             $variation = $variations[$variationCode];
@@ -221,33 +231,52 @@ class DatabaseSeeder extends Seeder
         }
     }
 
-    private function seedTemplateFromJson(string $path, BusinessCategory $category, BusinessVariation $variation, string $parent): void
+    private function seedTemplateFromJson(string $path, BusinessCategory $category, ?BusinessVariation $variation = null, ?string $parent = null): void
     {
         if (! is_file($path)) {
             return;
         }
         $raw = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+        $templateCode = (string) ($raw['code'] ?? $variation?->template_code ?? '');
         $configuration = [
             'engine' => ($raw['capabilities']['booking_primary'] ?? false) ? 'booking' : 'request',
             'capabilities' => $raw['capabilities'] ?? ['request' => true],
             'primary_action_label' => $raw['primary_action'] ?? ['ru' => $raw['cta_label'] ?? 'Показать задачу'],
             'title' => ['ru' => $raw['title'] ?? ''], 'intro' => ['ru' => $raw['intro'] ?? ''],
+            'hero' => $raw['hero'] ?? [
+                'title' => $raw['title'] ?? '',
+                'subtitle' => $raw['intro'] ?? '',
+                'action' => $raw['primary_action'] ?? ['ru' => $raw['cta_label'] ?? 'Показать задачу'],
+                'image' => data_get($raw, 'preview.image'),
+            ],
             'media' => $raw['media'] ?? ['slots' => $raw['media_slots'] ?? [], 'video' => $raw['video'] ?? []],
             'fields' => $raw['fields'] ?? [], 'booking' => $raw['booking'] ?? null,
             'submit' => $raw['submit'] ?? ['label' => $raw['submit_label'] ?? 'Отправить мастеру'],
             'success' => $raw['success'] ?? ['title' => $raw['success_title'] ?? 'Готово!', 'text' => $raw['success_text'] ?? ''],
             'push_prompt' => $raw['push_prompt'] ?? [], 'ai_phrases' => $raw['ai_phrases'] ?? [],
             'ai_rules' => $raw['ai_rules'] ?? null, 'locales' => $raw['locales'] ?? ['de', 'en', 'ru', 'uk'],
+            'ai_assistant' => $raw['ai_assistant'] ?? null,
+            'condition_assessment' => $raw['condition_assessment'] ?? ['enabled' => true],
+            'integrations' => $raw['integrations'] ?? [],
+            'variation_overrides' => $raw['variation_overrides'] ?? [],
             'ui_reference' => $raw['ui_reference'] ?? null,
             'preview' => $raw['preview'] ?? ['image' => '/brand/service-renovation.webp', 'primary_color' => '#ff6b00', 'secondary_color' => '#25282e'],
             'source_definition' => str_replace(base_path().DIRECTORY_SEPARATOR, '', $path),
         ];
         $presets = (array) config('tenant_apps.templates', []);
-        $configuration = array_replace_recursive($configuration, (array) ($presets[$variation->template_code] ?? []));
-        if ($variation->code === 'beauty.brows') {
+        $configuration = array_replace_recursive($configuration, (array) ($presets[$templateCode] ?? []));
+        if ($variation?->code === 'beauty.brows') {
             $configuration['ui_reference'] = ['strict' => true, 'path' => 'templates/beauty/brows/UI/mobile-reference.svg'];
             $configuration['preview_palette'] = ['example' => 'pink', 'tenant_configurable' => true, 'semantic_tokens_required' => true];
         }
-        RequestTemplate::updateOrCreate(['code' => $variation->template_code], ['category_id' => $category->id, 'variation_id' => $variation->id, 'parent_code' => $parent, 'name' => $variation->name, 'configuration' => $configuration, 'version' => 1, 'sort_order' => $variation->priority]);
+        RequestTemplate::updateOrCreate(['code' => $templateCode], [
+            'category_id' => $category->id,
+            'variation_id' => $variation?->id,
+            'parent_code' => $parent,
+            'name' => $raw['name'] ?? $variation?->name ?? ['de' => 'Ankauf', 'en' => 'Buying', 'ru' => 'Покупка', 'uk' => 'Купівля'],
+            'configuration' => $configuration,
+            'version' => (int) ($raw['version'] ?? 1),
+            'sort_order' => (int) ($raw['priority'] ?? $variation?->priority ?? 100),
+        ]);
     }
 }

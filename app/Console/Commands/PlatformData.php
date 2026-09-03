@@ -27,9 +27,9 @@ class PlatformData extends Command
 
         $required = [
             'plans' => [Plan::class, ['start', 'pro', 'business']],
-            'categories' => [BusinessCategory::class, ['automotive', 'repair-finishing-installation', 'beauty', 'appliance-repair', 'furniture', 'garden', 'cleaning', 'bicycles', 'advertising-signage', 'general-services']],
-            'variations' => [BusinessVariation::class, ['automotive.general', 'automotive.steering-wheel-upholstery', 'repair-finishing-installation.general', 'repair-finishing-installation.door-installation', 'beauty.general', 'beauty.brows', 'appliance-repair.general', 'furniture.general', 'garden.general', 'cleaning.general', 'bicycles.general', 'advertising-signage.general', 'general-services.general']],
-            'templates' => [RequestTemplate::class, ['automotive.general', 'automotive.steering-wheel-upholstery', 'repair-finishing-installation.general', 'repair-finishing-installation.door-installation', 'beauty.general', 'beauty.brows', 'appliance-repair.general', 'furniture.general', 'garden.general', 'cleaning.general', 'bicycles.general', 'advertising-signage.general', 'general-services.general']],
+            'categories' => [BusinessCategory::class, ['automotive', 'repair-finishing-installation', 'beauty', 'appliance-repair', 'furniture', 'garden', 'cleaning', 'bicycles', 'advertising-signage', 'purchase', 'general-services']],
+            'variations' => [BusinessVariation::class, ['automotive.general', 'automotive.steering-wheel-upholstery', 'repair-finishing-installation.general', 'repair-finishing-installation.door-installation', 'beauty.general', 'beauty.brows', 'appliance-repair.general', 'furniture.general', 'garden.general', 'cleaning.general', 'bicycles.general', 'advertising-signage.general', 'purchase.books', 'purchase.vehicles', 'purchase.antiques', 'general-services.general']],
+            'templates' => [RequestTemplate::class, ['automotive.general', 'automotive.steering-wheel-upholstery', 'repair-finishing-installation.general', 'repair-finishing-installation.door-installation', 'beauty.general', 'beauty.brows', 'appliance-repair.general', 'furniture.general', 'garden.general', 'cleaning.general', 'bicycles.general', 'advertising-signage.general', 'purchase.general', 'general-services.general']],
         ];
         $missing = [];
         foreach ($required as $label => [$model, $codes]) {
