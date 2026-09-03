@@ -950,20 +950,21 @@ const loginContext = {
                                 <div>
                                     <button
                                         v-if="hasMultipleLocales"
-                                        class="ta-language-trigger"
+                                        class="ta-header-action ta-language-trigger"
                                         @click="languageOpen = true"
                                     >
                                         {{ locale.toUpperCase() }}
                                     </button>
                                     <button
                                         v-if="hasContactMethods"
-                                        class="ta-contact-trigger"
+                                        class="ta-header-action ta-contact-trigger"
                                         :aria-label="copy.contacts"
                                         @click="contactOpen = !contactOpen"
                                     >
                                         <AppIcon name="phone" />
                                     </button>
                                     <button
+                                        class="ta-header-action"
                                         @click="
                                             contactOpen = false;
                                             menuOpen = true;
@@ -1190,20 +1191,21 @@ const loginContext = {
                                     <div>
                                         <button
                                             v-if="hasMultipleLocales"
-                                            class="ta-language-trigger"
+                                            class="ta-header-action ta-language-trigger"
                                             @click="languageOpen = true"
                                         >
                                             {{ locale.toUpperCase() }}
                                         </button>
                                         <button
                                             v-if="hasContactMethods"
-                                            class="ta-contact-trigger"
+                                            class="ta-header-action ta-contact-trigger"
                                             :aria-label="copy.contacts"
                                             @click="contactOpen = !contactOpen"
                                         >
                                             <AppIcon name="phone" />
                                         </button>
                                         <button
+                                            class="ta-header-action"
                                             @click="
                                                 contactOpen = false;
                                                 menuOpen = true;

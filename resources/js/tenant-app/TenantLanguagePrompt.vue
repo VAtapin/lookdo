@@ -21,7 +21,6 @@ defineEmits<{ select: [locale: string]; close: [] }>();
 </template>
 
 <style>
-.ta-language-trigger{min-width:40px!important;height:40px!important;padding:0 7px!important;border:1px solid currentColor!important;border-radius:12px!important;background:transparent!important;color:inherit!important;font-size:10px!important;font-weight:900!important;letter-spacing:.06em!important}
 .ta-language-prompt{position:absolute;inset:0;z-index:45;display:grid;place-items:center;padding:20px;background:rgba(15,13,12,.68);backdrop-filter:blur(12px)}
 .ta-language-prompt>section{position:relative;width:min(420px,100%);padding:27px 20px 20px;border:1px solid color-mix(in srgb,var(--ta-primary) 35%,#ddd);border-radius:24px;background:var(--ta-template-surface,#fff);color:var(--ta-template-text,#111318);box-shadow:0 24px 70px rgba(0,0,0,.28);text-align:center}
 .ta-language-prompt>section>span{color:var(--ta-primary);font-size:10px;font-weight:900;letter-spacing:.12em}.ta-language-prompt h2{margin:9px 30px 5px;font-size:25px;line-height:1.1}.ta-language-prompt p{margin:0 0 18px;color:var(--ta-muted);font-size:13px}

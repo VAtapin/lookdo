@@ -318,7 +318,7 @@ class TenantController extends Controller
         }
         $budget->ensureAvailable($request->user()?->id);
         $instructions = match ($data['asset']) {
-            'logo' => 'Write one editable image-generation prompt entirely in '.$language.' for a simple premium square business logo mark. It must remain legible as a tiny app icon, use no copyrighted marks, vehicle brand logos, photographs, mockups, text, letters or watermarks.',
+            'logo' => 'Write one editable image-generation prompt entirely in '.$language.' for a simple premium square business logo mark. It must remain legible as a tiny app icon. Keep the complete symbol centered inside the middle 64 percent of the canvas, with at least 18 percent empty safe space on every side; no element may touch or be cut by an edge. Use no copyrighted marks, vehicle brand logos, photographs, mockups, text, letters or watermarks.',
             default => 'Write one editable image-generation prompt entirely in '.$language.' for a premium vertical mobile-app hero photograph. The business_description is authoritative: if category, variation or template conflicts with it, follow the concrete business activity and objects in business_description. Show that exact activity in a realistic workplace, leave darker clean areas for interface text, and include no text, logos, vehicle brand marks, number plates, UI or watermarks.',
         };
         $result = $openAi->structured($instructions.' Return JSON only.', json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 'tenant_branding_prompt', [
@@ -352,7 +352,7 @@ class TenantController extends Controller
             };
             $generationPrompt = $data['prompt'];
             if (in_array($data['asset'], ['logo', 'logo_horizontal'], true)) {
-                $generationPrompt .= '\n\nHard constraint: render no words, letters, initials, numbers, company names, slogans, signatures, watermarks, or pseudo-text anywhere in the image.';
+                $generationPrompt .= '\n\nHard constraints: render the complete mark centered with generous empty safe space on every side. No part of the symbol may touch or be cut by any canvas edge. Render no words, letters, initials, numbers, company names, slogans, signatures, watermarks, or pseudo-text anywhere in the image.';
             }
             $result = $openAi->image($generationPrompt, 'medium', $size);
         } catch (Throwable $exception) {
