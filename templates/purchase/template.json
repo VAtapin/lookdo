@@ -20,8 +20,11 @@
     "messages": true,
     "push": true,
     "ai_communication": true,
-    "ai_media": true
+    "ai_media": true,
+    "portfolio": false,
+    "reviews": false
   },
+  "navigation": ["home", "action", "activity"],
   "title": "Покажите, что вы хотите продать",
   "intro": "Сфотографируйте предмет и важные детали. Покупатель предварительно оценит состояние и свяжется с вами.",
   "primary_action": {

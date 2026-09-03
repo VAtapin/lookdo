@@ -258,6 +258,7 @@ class DatabaseSeeder extends Seeder
             'ai_assistant' => $raw['ai_assistant'] ?? null,
             'condition_assessment' => $raw['condition_assessment'] ?? ['enabled' => true],
             'integrations' => $raw['integrations'] ?? [],
+            'navigation' => $raw['navigation'] ?? [],
             'variation_overrides' => $raw['variation_overrides'] ?? [],
             'ui_reference' => $raw['ui_reference'] ?? null,
             'preview' => $raw['preview'] ?? ['image' => '/brand/service-renovation.webp', 'primary_color' => '#ff6b00', 'secondary_color' => '#25282e'],

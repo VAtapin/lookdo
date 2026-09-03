@@ -156,7 +156,10 @@ class TenantAppTest extends TestCase
             ->assertJsonPath('template.media_slots.0.title', 'Обложка книги')
             ->assertJsonPath('template.media_slots.1.key', 'book_isbn')
             ->assertJsonPath('template.fields.0.key', 'isbn')
-            ->assertJsonPath('template.ai_assistant.accepts_media', true);
+            ->assertJsonPath('template.ai_assistant.accepts_media', true)
+            ->assertJsonPath('template.capabilities.portfolio', false)
+            ->assertJsonPath('template.capabilities.reviews', false)
+            ->assertJsonPath('template.navigation', ['home', 'action', 'activity']);
     }
 
     public function test_template_change_does_not_merge_stale_ai_configuration_from_previous_activity(): void
@@ -336,6 +339,7 @@ class TenantAppTest extends TestCase
                 ->assertOk()
                 ->assertJsonPath('template.engine', 'booking')
                 ->assertJsonPath('template.layout', 'brows')
+                ->assertJsonPath('template.navigation', ['home', 'services', 'book', 'activity', 'reviews'])
                 ->assertJsonPath('template.hero.action', $action)
                 ->assertJsonPath('template.theme.primary', '#c8663e')
                 ->assertJsonPath('services.0.image', '/brand/service-brows.webp');

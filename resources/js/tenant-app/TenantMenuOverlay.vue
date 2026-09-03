@@ -55,7 +55,7 @@ const navigate = (screen: string) => {
                     <AppIcon name="phone" />{{ copy.contacts
                     }}<AppIcon name="arrow" />
                 </button>
-                <button @click="navigate('reviews')">
+                <button v-if="app.template.capabilities?.reviews !== false" @click="navigate('reviews')">
                     <AppIcon name="star" />{{ copy.reviews
                     }}<AppIcon name="arrow" />
                 </button>

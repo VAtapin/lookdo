@@ -24,7 +24,7 @@ return [
         'repair-finishing-installation.door-installation' => [
             'engine' => 'request',
             'layout' => 'doors',
-            'navigation' => ['home', 'works', 'action', 'activity', 'profile'],
+            'navigation' => ['home', 'works', 'action', 'activity', 'reviews'],
             'hero' => [
                 'image' => '/brand/service-door.webp',
                 'eyebrow' => ['de' => 'TÜRMONTAGE', 'en' => 'DOOR INSTALLATION', 'ru' => 'УСТАНОВКА ДВЕРЕЙ', 'uk' => 'ВСТАНОВЛЕННЯ ДВЕРЕЙ'],
@@ -46,7 +46,7 @@ return [
         'beauty.brows' => [
             'engine' => 'booking',
             'layout' => 'brows',
-            'navigation' => ['home', 'services', 'book', 'contacts'],
+            'navigation' => ['home', 'services', 'book', 'activity', 'reviews'],
             'theme' => ['primary' => '#c8663e', 'secondary' => '#fff8f3', 'surface' => '#fffaf6', 'text' => '#2e1c18'],
             'hero' => [
                 'image' => '/brand/service-brows.webp',
@@ -78,7 +78,7 @@ return [
         'general-services.general' => [
             'engine' => 'request',
             'layout' => 'general',
-            'navigation' => ['home', 'works', 'action', 'activity', 'profile'],
+            'navigation' => ['home', 'works', 'action', 'activity', 'reviews'],
             'hero' => [
                 'image' => '/brand/lookdo-service-workspace.webp',
                 'eyebrow' => ['de' => 'SERVICE', 'en' => 'SERVICE', 'ru' => 'УСЛУГИ', 'uk' => 'ПОСЛУГИ'],

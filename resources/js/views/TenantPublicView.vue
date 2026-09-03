@@ -143,6 +143,12 @@ function homeBlock(types: string | string[]) {
     return homeBlocks.value.find((item: any) => accepted.includes(item.type));
 }
 function homeBlockVisible(types: string | string[]) {
+    const accepted = Array.isArray(types) ? types : [types];
+    if (
+        app.value?.template?.capabilities?.portfolio === false &&
+        accepted.some((type) => ["gallery", "before-after", "videos"].includes(type))
+    )
+        return false;
     const block = homeBlock(types);
     if (block) return block.enabled !== false;
     return !app.value?.template?.capabilities?.ui_builder_enabled;
@@ -319,7 +325,9 @@ const navItems = computed(() => {
     const fallback = isBrows.value
         ? ["home", "services", "book", "activity", "reviews"]
         : ["home", "works", "action", "activity", "reviews"];
-    const configured = app.value?.template?.navigation || fallback;
+    const configured = app.value?.template?.navigation?.length
+        ? app.value.template.navigation
+        : fallback;
     const catalog: Record<string, any> = {
         home: { key: "home", icon: "home", label: copy.value.home },
         works: { key: "works", icon: "works", label: copy.value.works },
@@ -427,8 +435,16 @@ function applyTenantLocale(value: unknown) {
     locale.value = next;
     setLocale(next);
 }
+function screenAllowed(target: string) {
+    if (target === "works")
+        return app.value?.template?.capabilities?.portfolio !== false;
+    if (target === "reviews")
+        return app.value?.template?.capabilities?.reviews !== false;
+    return true;
+}
 function go(target: string) {
     menuOpen.value = false;
+    if (!screenAllowed(target)) target = "home";
     router.push(target === "home" ? "/" : "/" + target);
 }
 async function load() {
@@ -440,6 +456,7 @@ async function load() {
         if (clientToken.value)
             headers["X-Lookdo-Client-Token"] = clientToken.value;
         app.value = await api("/tenant-app/bootstrap", { headers });
+        if (!screenAllowed(screen.value)) await router.replace("/");
         applyTenantLocale(app.value.tenant.locale || "de");
         if (
             !hasSelectedLocale.value &&

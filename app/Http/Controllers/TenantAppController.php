@@ -772,13 +772,22 @@ class TenantAppController extends Controller
     private function templatePayload(Tenant $tenant, array $configuration, string $locale): array
     {
         $template = $tenant->businessProfile?->template;
+        $templateCode = $template?->code ?: 'general-services.general';
         $media = (array) ($configuration['media'] ?? []);
         $slots = $this->localizedSlots((array) ($media['slots'] ?? $configuration['media_slots'] ?? []), $locale);
         $fields = $this->localizedFields((array) ($configuration['fields'] ?? []), $locale);
+        $capabilities = array_replace(
+            ['request' => true, 'portfolio' => true, 'reviews' => true],
+            (array) ($configuration['capabilities'] ?? []),
+        );
+        if (str_starts_with($templateCode, 'purchase.')) {
+            $capabilities['portfolio'] = false;
+            $capabilities['reviews'] = false;
+        }
 
         return [
-            'id' => $template?->id, 'code' => $template?->code ?: 'general-services.general', 'name' => $template?->localized('name', $locale),
-            'engine' => $configuration['engine'] ?? 'request', 'layout' => $configuration['layout'] ?? 'general', 'navigation' => $configuration['navigation'] ?? ['home', 'works', 'action', 'activity', 'profile'],
+            'id' => $template?->id, 'code' => $templateCode, 'name' => $template?->localized('name', $locale),
+            'engine' => $configuration['engine'] ?? 'request', 'layout' => $configuration['layout'] ?? 'general', 'navigation' => $this->normalizedNavigation($templateCode, $configuration),
             'theme' => $configuration['theme'] ?? [],
             'hero' => array_replace(
                 (array) $this->localized($configuration['hero'] ?? [], $locale),
@@ -806,8 +815,22 @@ class TenantAppController extends Controller
                 return $action;
             })->values()->all(),
             'locales' => $this->enabledLocales($tenant, $configuration),
-            'capabilities' => $configuration['capabilities'] ?? ['request' => true],
+            'capabilities' => $capabilities,
         ];
+    }
+
+    /** @return list<string> */
+    private function normalizedNavigation(string $templateCode, array $configuration): array
+    {
+        if (str_starts_with($templateCode, 'purchase.')) {
+            return ['home', 'action', 'activity'];
+        }
+
+        $configured = array_values((array) ($configuration['navigation'] ?? []));
+        $content = in_array('services', $configured, true) ? 'services' : 'works';
+        $primary = ($configuration['engine'] ?? 'request') === 'booking' ? 'book' : 'action';
+
+        return ['home', $content, $primary, 'activity', 'reviews'];
     }
 
     private function localizedSlots(array $slots, string $locale): array
