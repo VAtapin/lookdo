@@ -98,7 +98,7 @@ return [
             'tenant' => [
                 'name' => 'Ivanna Brows',
                 'locale' => 'uk',
-                'business_description' => 'Догляд, оформлення, корекція, фарбування та ламінування брів і вій у Темпліні — у студії або з виїздом до клієнта.',
+                'business_description' => 'Догляд, оформлення, корекція, фарбування та ламінування брів у Темпліні — у студії або з виїздом до клієнта.',
             ],
             'profile' => [
                 'contact_name' => 'Ivanna Pasteliak',
@@ -114,15 +114,15 @@ return [
                     'horizontal_logo_path' => '/brand/tenants/ivanna-brows/logo-horizontal.webp',
                     'hero_image_path' => '/brand/service-brows.webp',
                     'confirmed_at' => 'preset',
-                    'services' => 'Корекція, оформлення, фарбування та ламінування брів і вій. Робота у студії та з виїздом до клієнта.',
-                    'customers' => 'Клієнти у Темпліні та околицях, яким потрібен професійний догляд за бровами та віями.',
+                    'services' => 'Корекція, оформлення, фарбування та ламінування брів. Робота у студії та з виїздом до клієнта.',
+                    'customers' => 'Клієнти у Темпліні та околицях, яким потрібен професійний догляд за бровами.',
                     'style' => 'Світлий, теплий, кремово-помаранчевий, жіночний та професійний.',
                     'avoid' => 'Чужі логотипи, неприродна ретуш, медичні обіцянки та результати, яких немає у портфоліо.',
                     'service_modes' => ['workshop', 'on_site'],
                     'description_translations' => [
-                        'uk' => 'Догляд, оформлення, корекція, фарбування та ламінування брів і вій у Темпліні — у студії або з виїздом до клієнта.',
-                        'ru' => 'Уход, оформление, коррекция, окрашивание и ламинирование бровей и ресниц в Темплине — в студии или с выездом к клиенту.',
-                        'de' => 'Kosmetische Behandlungen, Gestaltung und Pflege von Augenbrauen und Wimpern in Templin – im Studio oder mobil bei Kundinnen und Kunden.',
+                        'uk' => 'Догляд, оформлення, корекція, фарбування та ламінування брів у Темпліні — у студії або з виїздом до клієнта.',
+                        'ru' => 'Уход, оформление, коррекция, окрашивание и ламинирование бровей в Темплине — в студии или с выездом к клиенту.',
+                        'de' => 'Pflege, Formgebung, Korrektur, Färben und Laminierung von Augenbrauen in Templin – im Studio oder mobil bei Kundinnen und Kunden.',
                     ],
                     'tagline_translations' => [
                         'uk' => 'Брови, які підкреслюють вашу красу',
