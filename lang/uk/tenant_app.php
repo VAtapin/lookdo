@@ -24,8 +24,15 @@ return [
         'new_message' => ['body' => 'Ви отримали нове повідомлення від майстра.'],
         'appointment_confirmed' => ['body' => 'Запис на послугу «:service» підтверджено: :date.'],
     ],
+    'notifications' => [
+        'customer_request_received_subject' => 'Заявку :number отримано',
+        'customer_request_received_body' => ":business отримав вашу заявку :number.\n\nКоротко: :summary\n\nСтатус і відповіді майстра: :url",
+        'request_context' => "Заявка: :number\nКоротко: :summary",
+        'no_summary' => 'Нова заявка клієнта',
+    ],
     'sms' => [
         'request_received' => ':business отримав вашу заявку. Статус: :url',
+        'request_received_with_context' => ':business: заявку :number отримано. :summary Статус: :url',
         'master_replied' => ':business відповів вам. Відповідь: :url',
         'work_ready' => 'Ваша робота у :business готова. Докладніше: :url',
     ],

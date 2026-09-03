@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\AnalyzeTenantRequestMedia;
 use App\Jobs\SendPlatformAdminNewRequestNotification;
 use App\Jobs\SendTenantMasterPush;
+use App\Mail\TenantNotificationMail;
 use App\Models\Tenant;
 use App\Models\TenantAppointment;
 use App\Models\TenantClientToken;
@@ -198,7 +199,7 @@ class TenantAppController extends Controller
         return response()->json(['values' => $values]);
     }
 
-    public function createRequest(Request $request, ImageStorageService $images, BookCatalogService $books, BookPurchasePricingService $pricing): JsonResponse
+    public function createRequest(Request $request, ImageStorageService $images, BookCatalogService $books, BookPurchasePricingService $pricing, SmsService $sms): JsonResponse
     {
         $tenant = $this->tenant($request);
         $this->ensureAvailable($request, $tenant);
@@ -211,7 +212,7 @@ class TenantAppController extends Controller
         }
 
         $data = $request->validate([
-            'name' => 'nullable|string|max:120', 'phone' => 'required|string|max:100', 'email' => 'nullable|string|max:190',
+            'name' => 'nullable|string|max:120', 'phone' => 'required|string|max:100', 'email' => 'nullable|email|max:190|required_if:preferred_channel,email',
             'preferred_channel' => 'nullable|in:phone,whatsapp,sms,email,push,vk', 'summary' => 'nullable|string|max:5000',
             'fields' => 'nullable', 'media_slots' => 'nullable', 'media' => 'required|array|min:1|max:12',
             'media.*' => 'file|mimetypes:image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime|max:262144',
@@ -320,7 +321,8 @@ class TenantAppController extends Controller
         }
 
         AnalyzeTenantRequestMedia::dispatch($tenantRequest->id)->afterCommit();
-        $this->notifyMaster($tenant, 'new_request', '/app/requests', 'request-'.$tenantRequest->id);
+        $this->notifyCustomerRequestReceived($tenant, $tenantRequest, $sms);
+        $this->notifyMaster($tenant, 'new_request', '/app/requests', 'request-'.$tenantRequest->id, $tenantRequest);
         SendPlatformAdminNewRequestNotification::dispatch($tenant->id, $tenantRequest->id)->afterResponse();
 
         return response()->json(['token' => $rawToken, 'request' => $this->requestPayload($tenantRequest->fresh(['media', 'messages'])), 'success' => $this->localized(data_get($this->configuration($tenant), 'success', []), $locale)], 201);
@@ -591,23 +593,42 @@ class TenantAppController extends Controller
         ];
     }
 
-    private function notifyMaster(Tenant $tenant, string $event, string $url, string $tag): void
+    private function notifyMaster(Tenant $tenant, string $event, string $url, string $tag, ?TenantRequest $tenantRequest = null): void
     {
         $tenant->loadMissing(['profile', 'users']);
         $preferences = (array) data_get($tenant->profile?->content, 'notifications', []);
         $locale = in_array($tenant->locale, ['de', 'en', 'ru', 'uk'], true) ? $tenant->locale : 'de';
         $title = trans("tenant_app.master_push.$event.title", locale: $locale);
         $body = trans("tenant_app.master_push.$event.body", locale: $locale);
+        $requestContext = $tenantRequest
+            ? trans('tenant_app.notifications.request_context', [
+                'number' => $tenantRequest->number,
+                'summary' => $this->notificationSummary($tenantRequest, 700, $locale),
+            ], $locale)
+            : null;
         if (($preferences['push'] ?? true) && $this->enabled($tenant, 'push_enabled', true)) {
             SendTenantMasterPush::dispatch($tenant->id, [
                 'title' => $title, 'body' => $body, 'url' => $url, 'tag' => "lookdo-master-$tag",
                 'action' => trans('tenant_app.master_push.open', locale: $locale),
             ])->afterResponse();
         }
-        if ($preferences['email'] ?? false) {
-            foreach ($tenant->users->where('is_active', true)->pluck('email')->filter()->unique() as $email) {
+        $emailEnabled = array_key_exists('email', $preferences)
+            ? (bool) $preferences['email']
+            : $event === 'new_request';
+        if ($emailEnabled) {
+            $emails = $tenant->users->where('is_active', true)->pluck('email')
+                ->push($tenant->profile?->email)
+                ->map(fn ($email) => trim((string) $email))
+                ->filter()
+                ->unique();
+            foreach ($emails as $email) {
                 try {
-                    Mail::raw($title."\n\n".$body."\n\n".rtrim(config('app.url'), '/').$url, fn ($mail) => $mail->to($email)->subject($title));
+                    Mail::to($email)->send(new TenantNotificationMail(
+                        $title,
+                        collect([$title, $body, $requestContext, rtrim(config('app.url'), '/').$url])
+                            ->filter()
+                            ->implode("\n\n"),
+                    ));
                 } catch (Throwable $exception) {
                     report($exception);
                 }
@@ -616,10 +637,82 @@ class TenantAppController extends Controller
         if (($preferences['sms'] ?? false) && $event === 'new_request' && filled($tenant->profile?->phone)) {
             try {
                 app(SmsService::class)->queueImportant($tenant, $tenant->profile->phone, $title.': '.$body, 'request_received', 'master-'.$tag);
-            } catch (DomainException $exception) {
+            } catch (DomainException) {
+                // SMS is an optional paid channel; email and in-app delivery remain active.
+            }
+        }
+    }
+
+    private function notifyCustomerRequestReceived(Tenant $tenant, TenantRequest $tenantRequest, SmsService $sms): void
+    {
+        $contact = (array) $tenantRequest->contact_snapshot;
+        $locale = in_array($tenantRequest->locale, ['de', 'en', 'ru', 'uk'], true) ? $tenantRequest->locale : 'de';
+        $summary = $this->notificationSummary($tenantRequest, 700, $locale);
+        $url = $this->customerActivityUrl($tenant);
+        $email = trim((string) ($contact['email'] ?? ''));
+
+        if ($email !== '') {
+            $subject = trans('tenant_app.notifications.customer_request_received_subject', [
+                'number' => $tenantRequest->number,
+            ], $locale);
+            $body = trans('tenant_app.notifications.customer_request_received_body', [
+                'business' => $tenant->name,
+                'number' => $tenantRequest->number,
+                'summary' => $summary,
+                'url' => $url,
+            ], $locale);
+            try {
+                Mail::to($email)->send(new TenantNotificationMail($subject, $body));
+            } catch (Throwable $exception) {
                 report($exception);
             }
         }
+
+        if (($contact['preferred_channel'] ?? null) === 'sms' && filled($contact['phone'] ?? null)) {
+            $smsSummary = $this->notificationSummary($tenantRequest, 180, $locale);
+            $message = trans('tenant_app.sms.request_received_with_context', [
+                'business' => $tenant->name,
+                'number' => $tenantRequest->number,
+                'summary' => $smsSummary,
+                'url' => $url,
+            ], $locale);
+            try {
+                $sms->queueImportant(
+                    $tenant,
+                    (string) $contact['phone'],
+                    $message,
+                    'request_received',
+                    'request-'.$tenantRequest->id.'-received',
+                );
+            } catch (DomainException) {
+                // SMS is optional; a disabled channel must not suppress email confirmation.
+            }
+        }
+    }
+
+    private function notificationSummary(TenantRequest $tenantRequest, int $limit, string $locale): string
+    {
+        $summary = trim((string) $tenantRequest->summary);
+        if ($summary === '') {
+            $tenantRequest->loadMissing('values');
+            $summary = $tenantRequest->values
+                ->whereIn('field_key', ['title', 'author', 'isbn', 'comment', 'condition'])
+                ->map(fn ($value) => trim((string) data_get($value->value, 'value', '')))
+                ->filter()
+                ->unique()
+                ->take(3)
+                ->implode(' · ');
+        }
+
+        return Str::limit($summary !== '' ? $summary : trans('tenant_app.notifications.no_summary', locale: $locale), $limit);
+    }
+
+    private function customerActivityUrl(Tenant $tenant): string
+    {
+        $tenant->loadMissing('primaryDomain');
+        $domain = $tenant->primaryDomain?->domain ?: $tenant->slug.'.'.config('tenancy.platform_domain');
+
+        return 'https://'.$domain.'/activity';
     }
 
     private function tenant(Request $request): Tenant

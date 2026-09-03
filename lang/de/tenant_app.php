@@ -24,8 +24,15 @@ return [
         'new_message' => ['body' => 'Sie haben eine neue Nachricht vom Betrieb erhalten.'],
         'appointment_confirmed' => ['body' => 'Ihr Termin für „:service“ wurde bestätigt: :date.'],
     ],
+    'notifications' => [
+        'customer_request_received_subject' => 'Anfrage :number eingegangen',
+        'customer_request_received_body' => ":business hat Ihre Anfrage :number erhalten.\n\nKurzinfo: :summary\n\nStatus und Antworten des Betriebs: :url",
+        'request_context' => "Anfrage: :number\nKurzinfo: :summary",
+        'no_summary' => 'Neue Kundenanfrage',
+    ],
     'sms' => [
         'request_received' => 'Ihre Anfrage bei :business ist eingegangen. Status: :url',
+        'request_received_with_context' => ':business: Anfrage :number eingegangen. :summary Status: :url',
         'master_replied' => ':business hat geantwortet. Antwort: :url',
         'work_ready' => 'Ihre Arbeit bei :business ist fertig. Details: :url',
     ],

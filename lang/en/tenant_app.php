@@ -24,8 +24,15 @@ return [
         'new_message' => ['body' => 'You have received a new message from the business.'],
         'appointment_confirmed' => ['body' => 'Your booking for “:service” is confirmed: :date.'],
     ],
+    'notifications' => [
+        'customer_request_received_subject' => 'Request :number received',
+        'customer_request_received_body' => ":business has received your request :number.\n\nSummary: :summary\n\nStatus and replies from the business: :url",
+        'request_context' => "Request: :number\nSummary: :summary",
+        'no_summary' => 'New customer request',
+    ],
     'sms' => [
         'request_received' => ':business has received your request. Status: :url',
+        'request_received_with_context' => ':business: request :number received. :summary Status: :url',
         'master_replied' => ':business has replied. Read the reply: :url',
         'work_ready' => 'Your work at :business is ready. Details: :url',
     ],

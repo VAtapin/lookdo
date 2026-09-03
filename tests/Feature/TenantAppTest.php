@@ -3,10 +3,15 @@
 namespace Tests\Feature;
 
 use App\Jobs\AnalyzeTenantRequestMedia;
+use App\Jobs\SendPlatformAdminNewRequestNotification;
+use App\Jobs\SendSmsMessage;
+use App\Jobs\SendTenantMasterPush;
 use App\Jobs\SendTenantMessagePush;
+use App\Mail\TenantNotificationMail;
 use App\Models\BusinessVariation;
 use App\Models\Plan;
 use App\Models\RequestTemplate;
+use App\Models\SystemSetting;
 use App\Models\Tenant;
 use App\Models\TenantAppointment;
 use App\Models\TenantMessage;
@@ -21,7 +26,9 @@ use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -348,6 +355,55 @@ class TenantAppTest extends TestCase
             'endpoint_hash' => hash('sha256', $endpoint),
             'customer_id' => $customer->id,
         ]);
+    }
+
+    public function test_new_request_notifies_customer_with_context_and_emails_master(): void
+    {
+        Storage::fake('public');
+        Mail::fake();
+        Bus::fake([
+            AnalyzeTenantRequestMedia::class,
+            SendPlatformAdminNewRequestNotification::class,
+            SendSmsMessage::class,
+            SendTenantMasterPush::class,
+        ]);
+        $tenant = $this->tenant('context-notifications', 'automotive.steering-wheel-upholstery');
+        $tenant->profile()->update(['email' => 'master@example.test']);
+        DB::table('tenant_entitlement_overrides')->insert([
+            ['tenant_id' => $tenant->id, 'key' => 'sms_enabled', 'value' => '1', 'created_at' => now(), 'updated_at' => now()],
+            ['tenant_id' => $tenant->id, 'key' => 'sms_monthly_limit', 'value' => '50', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        SystemSetting::where('key', 'integrations')->update(['value' => ['stripe' => true, 'openai' => true, 'sms' => true]]);
+        SystemSetting::writeSecret('sms_seven_api_key', 'test-seven-key');
+
+        $response = $this->withHeader('X-Locale', 'ru')->post($this->url($tenant, '/api/tenant-app/requests'), [
+            'name' => 'Владимир',
+            'phone' => '01713517274',
+            'email' => 'customer@example.test',
+            'preferred_channel' => 'sms',
+            'summary' => 'Книга «Мать Мария» в твёрдом переплёте, ISBN 9783689593292.',
+            'fields' => json_encode(['title' => 'Мать Мария', 'isbn' => '9783689593292']),
+            'media_slots' => json_encode(['overall']),
+            'media' => [UploadedFile::fake()->image('book.jpg', 900, 1200)],
+        ])->assertCreated();
+
+        $requestNumber = $response->json('request.number');
+        Mail::assertSent(TenantNotificationMail::class, fn (TenantNotificationMail $mail): bool => $mail->hasTo('customer@example.test')
+            && str_contains($mail->subjectLine, $requestNumber)
+            && str_contains($mail->bodyText, 'Мать Мария')
+            && str_contains($mail->bodyText, '/activity'));
+        Mail::assertSent(TenantNotificationMail::class, fn (TenantNotificationMail $mail): bool => $mail->hasTo('master@example.test')
+            && str_contains($mail->bodyText, $requestNumber)
+            && str_contains($mail->bodyText, 'Мать Мария'));
+        Mail::assertSentCount(2);
+        $this->assertDatabaseHas('sms_messages', [
+            'tenant_id' => $tenant->id,
+            'event_type' => 'request_received',
+            'status' => 'queued',
+        ]);
+        $smsText = $tenant->smsMessages()->latest('id')->value('message');
+        $this->assertStringContainsString($requestNumber, $smsText);
+        $this->assertStringContainsString('Мать Мария', $smsText);
     }
 
     public function test_only_customer_with_unreviewed_completed_request_can_submit_review(): void
