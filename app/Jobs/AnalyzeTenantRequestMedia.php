@@ -8,6 +8,7 @@ use App\Services\OpenAiService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class AnalyzeTenantRequestMedia implements ShouldQueue
 {
@@ -63,8 +64,6 @@ class AnalyzeTenantRequestMedia implements ShouldQueue
         $isBookPurchase = $variationCode === 'purchase.books';
         $properties = $isBookPurchase ? [
             'comment' => ['type' => 'string'],
-            'description' => ['type' => 'string'],
-            'condition' => ['type' => 'string'],
             'recommended_purchase_price' => ['type' => 'string'],
             'price_basis' => ['type' => 'string'],
         ] : ['comment' => ['type' => 'string']];
@@ -72,7 +71,7 @@ class AnalyzeTenantRequestMedia implements ShouldQueue
         $budget->ensureAvailable();
         $result = $openAi->structuredWithImages(
             $isBookPurchase
-                ? 'You assist a professional antiquarian book buyer. Using the photos, submitted bibliographic data and catalogue result, write a complete internal description in '.$locale.': identify the edition, summarize visible binding/spine/page condition, defects, completeness and notable features, then recommend a deliberately low defensible purchase price. Explain the price basis briefly and clearly label uncertainty. This is an internal buying recommendation, not an appraisal or guarantee. Never invent an ISBN, edition, market listing, authenticity, hidden damage or source.'
+                ? 'You assist a professional antiquarian book buyer. Return a very short practical buying note in '.$locale.'. The comment must contain only: visible physical condition, the single most important defect, and what must still be checked. Maximum 3 short sentences and 420 characters. Do not repeat title, author, ISBN, publisher, year, edition, description, page references or any other submitted/catalogue data already displayed elsewhere. Recommend a deliberately low defensible purchase price and explain its basis in one short phrase. Never invent authenticity, hidden damage, completeness, rarity or market sales.'
                 : 'You are an assistant to a professional handling '.$context.'. Inspect only what is actually visible in the customer photos. Write a short practical condition note of 2 to 4 sentences for the professional in '.$locale.'. Mention visible condition, relevant defects or identifying details, and what important photo or fact is missing. Do not estimate a price, guarantee authenticity, diagnose hidden damage, or invent facts.',
             json_encode(['request' => $request->summary, 'submitted_fields' => $submitted, 'catalog' => $existingAssessment['catalog'] ?? [], 'prefilled_price' => $existingAssessment['recommended_purchase_price'] ?? null, 'photo_slots' => $request->media->where('type', 'image')->pluck('slot_key')->values()->all()], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             'tenant_media_condition_assessment',
@@ -86,21 +85,15 @@ class AnalyzeTenantRequestMedia implements ShouldQueue
         );
         $decoded = json_decode($result['text'], true, flags: JSON_THROW_ON_ERROR);
         $comment = $isBookPurchase
-            ? trim(implode("\n\n", array_filter([
-                (string) ($decoded['description'] ?? ''),
-                (string) ($decoded['condition'] ?? ''),
-                (string) ($decoded['comment'] ?? ''),
-                filled($decoded['recommended_purchase_price'] ?? null) ? 'Empfohlener niedriger Ankaufspreis / Recommended low purchase price: '.trim((string) $decoded['recommended_purchase_price']) : null,
-                (string) ($decoded['price_basis'] ?? ''),
-            ])))
-            : trim((string) ($decoded['comment'] ?? ''));
+            ? $this->bookAssessment($decoded, $locale)
+            : Str::limit($this->singleLine((string) ($decoded['comment'] ?? '')), 500);
         if ($comment === '') {
             return;
         }
 
         $request->values()->updateOrCreate(
             ['field_key' => 'ai_condition_assessment'],
-            ['value' => array_merge($existingAssessment, $decoded, ['value' => $comment, 'model' => $result['model'], 'analyzed_at' => now()->toIso8601String(), 'status' => 'complete'])],
+            ['value' => array_merge($existingAssessment, $decoded, ['value' => $comment, 'display_value' => $comment, 'model' => $result['model'], 'analyzed_at' => now()->toIso8601String(), 'status' => 'complete'])],
         );
         $budget->record('tenant_media_condition_assessment', $result['model'], $result['input_tokens'], $result['output_tokens'], tenantId: $request->tenant_id);
     }
@@ -112,5 +105,29 @@ class AnalyzeTenantRequestMedia implements ShouldQueue
         }
 
         return (string) ($value[$locale] ?? $value['de'] ?? $value['en'] ?? $value['ru'] ?? reset($value));
+    }
+
+    /** @param array<string, mixed> $assessment */
+    private function bookAssessment(array $assessment, string $locale): string
+    {
+        $comment = Str::limit($this->singleLine((string) ($assessment['comment'] ?? '')), 420);
+        $price = Str::limit($this->singleLine((string) ($assessment['recommended_purchase_price'] ?? '')), 40);
+        $basis = Str::limit($this->singleLine((string) ($assessment['price_basis'] ?? '')), 140);
+        $priceLabel = match ($locale) {
+            'ru' => 'Закупка',
+            'uk' => 'Закупівля',
+            'de' => 'Ankauf',
+            default => 'Purchase',
+        };
+
+        return trim(implode("\n", array_filter([
+            $comment !== '' ? '• '.$comment : null,
+            $price !== '' ? '• '.$priceLabel.': '.$price.($basis !== '' ? ' — '.$basis : '') : null,
+        ])));
+    }
+
+    private function singleLine(string $value): string
+    {
+        return trim((string) preg_replace('/\s+/u', ' ', $value));
     }
 }

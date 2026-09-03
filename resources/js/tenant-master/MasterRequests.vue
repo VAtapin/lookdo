@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api } from "../api";
 const props = defineProps<{
     tenantId: number;
@@ -20,7 +20,9 @@ const items = ref<any[]>([]),
     note = ref(""),
     busy = ref(false),
     error = ref(""),
-    messageList = ref<HTMLElement | null>(null);
+    messageList = ref<HTMLElement | null>(null),
+    detailsExpanded = ref(false),
+    previewMedia = ref<any>(null);
 async function scrollMessages() {
     await nextTick();
     if (messageList.value)
@@ -60,6 +62,7 @@ async function load() {
 }
 async function choose(item: any) {
     selected.value = props.mode === "messages" ? item.request : item;
+    detailsExpanded.value = false;
     note.value = selected.value.internal_note || "";
     if (
         selected.value.kind !== "appointment" &&
@@ -226,8 +229,18 @@ function rowKey(item: any) {
         props.mode === "messages" && item.request ? item.request : item;
     return `${value.kind || "request"}-${value.id}`;
 }
+function closePreview() {
+    previewMedia.value = null;
+}
+function handleEscape(event: KeyboardEvent) {
+    if (event.key === "Escape") closePreview();
+}
 watch(() => props.mode, load);
-onMounted(load);
+onMounted(() => {
+    load();
+    window.addEventListener("keydown", handleEscape);
+});
+onBeforeUnmount(() => window.removeEventListener("keydown", handleEscape));
 </script>
 <template>
     <section class="mw-stack">
@@ -405,16 +418,17 @@ onMounted(load);
                     </dl>
                 </section>
                 <div v-if="selected.media?.length" class="mw-media">
-                    <a
+                    <button
                         v-for="media in selected.media"
                         :key="media.id"
-                        :href="media.url"
-                        target="_blank"
-                        ><img
+                        type="button"
+                        @click="previewMedia = media"
+                    >
+                        <img
                             v-if="media.type === 'image'"
                             :src="media.url"
-                        /><span v-else>▶</span></a
-                    >
+                        /><span v-else>▶</span>
+                    </button>
                 </div>
                 <section v-if="selected.ai_assessment" class="mw-ai-assessment">
                     <span>AI</span>
@@ -424,9 +438,33 @@ onMounted(load);
                     v-if="selected.details?.length"
                     class="mw-request-details"
                 >
-                    <h3>{{ t("requestDetails") }}</h3>
-                    <dl>
-                        <div v-for="field in selected.details" :key="field.key">
+                    <div class="mw-request-details-head">
+                        <h3>{{ t("requestDetails") }}</h3>
+                        <button
+                            type="button"
+                            class="mw-details-toggle"
+                            @click="detailsExpanded = !detailsExpanded"
+                        >
+                            {{
+                                detailsExpanded
+                                    ? t("hideDetails")
+                                    : t("showAllDetails")
+                            }}
+                        </button>
+                    </div>
+                    <dl
+                        :class="{
+                            'mw-mobile-collapsed': !detailsExpanded,
+                        }"
+                    >
+                        <div
+                            v-for="field in selected.details"
+                            :key="field.key"
+                            :class="{
+                                'detail-empty':
+                                    detailValue(field.value) === t('notFilled'),
+                            }"
+                        >
                             <dt>{{ field.label }}</dt>
                             <dd
                                 :class="{
@@ -497,5 +535,29 @@ onMounted(load);
                 {{ t("noItems") }}
             </article>
         </div>
+        <Teleport to="body">
+            <div
+                v-if="previewMedia"
+                class="mw-media-modal"
+                role="dialog"
+                aria-modal="true"
+                @click.self="closePreview"
+            >
+                <button
+                    type="button"
+                    class="mw-media-modal-close"
+                    :aria-label="t('closePreview')"
+                    @click="closePreview"
+                >
+                    ×
+                </button>
+                <img
+                    v-if="previewMedia.type === 'image'"
+                    :src="previewMedia.url"
+                    :alt="t('requestDetails')"
+                />
+                <video v-else :src="previewMedia.url" controls autoplay></video>
+            </div>
+        </Teleport>
     </section>
 </template>

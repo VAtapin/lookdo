@@ -307,6 +307,9 @@ class TenantAppTest extends TestCase
 
         $this->assertDatabaseHas('tenant_request_values', ['request_id' => $tenantRequest->id, 'field_key' => 'ai_condition_assessment']);
         $this->assertDatabaseHas('ai_usage_records', ['tenant_id' => $tenant->id, 'operation' => 'tenant_media_condition_assessment']);
+        $assessment = $tenantRequest->values()->where('field_key', 'ai_condition_assessment')->firstOrFail()->value;
+        $this->assertSame('• Переплёт заметно потёрт; корешок виден не полностью. Нужны фото ISBN и страниц с дефектами.', $assessment['display_value']);
+        $this->assertLessThanOrEqual(650, mb_strlen($assessment['display_value']));
     }
 
     public function test_device_can_subscribe_before_creating_a_request_and_is_linked_afterwards(): void

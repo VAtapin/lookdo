@@ -121,7 +121,7 @@ class TenantAppController extends Controller
         ])->all();
         $budget->ensureAvailable();
         $instructions = $isBookPurchase
-            ? 'Analyze the uploaded book photos immediately for a professional book buyer. OCR an ISBN-10 or ISBN-13 exactly when visible, including its check digit. Describe binding, spine, pages, completeness, stains, inscriptions, signatures and visible defects. Fill every reliably inferable bibliographic field and prepare a useful listing description and a complete internal master comment in '.$locale.'. Recommend a deliberately conservative low purchase price for the buyer; it is an internal suggestion, not a guaranteed valuation. Never invent an ISBN or claim a defect that is not visible. Use empty strings for unknown text fields. If the user states that no ISBN exists, leave ISBN empty and assess from the other photos.'
+            ? 'Analyze the uploaded book photos immediately for a professional book buyer. OCR an ISBN-10 or ISBN-13 exactly when visible, including its check digit. Fill every reliably inferable form field, including visible binding, spine, page condition, completeness, stains, inscriptions, signatures and defects. The master_comment is a separate concise decision note: maximum 3 short sentences and 320 characters, only visible condition, the most important risk and what still needs checking. Do not repeat title, author, ISBN, publisher, year, edition, page references, listing description or other form data in master_comment. Recommend a deliberately conservative low purchase price; it is an internal suggestion, not a guaranteed valuation. Never invent an ISBN or claim a defect that is not visible. Use empty strings for unknown text fields. If the user states that no ISBN exists, leave ISBN empty and assess from the other photos.'
             : 'Help a customer fill a request for '.($this->localized(data_get($configuration, 'condition_assessment.context', 'a local specialist'), $locale)).'. Read visible identifiers such as ISBN, VIN, maker marks and labels carefully. Preserve facts, never invent missing bibliographic, vehicle, provenance or condition details, and use empty strings for unknown facts. Return concise values in '.$locale.'.';
         $input = json_encode(['customer_note' => (string) ($data['text'] ?? ''), 'fields' => $fieldContext, 'current_values' => $currentFields, 'photo_slots' => $mediaSlots, 'isbn_absent' => $isbnAbsent], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         $schema = ['type' => 'object', 'additionalProperties' => false, 'properties' => $properties, 'required' => array_keys($properties)];
@@ -164,17 +164,11 @@ class TenantAppController extends Controller
                 $currency = (string) ($catalog['reference_currency'] ?? $currency);
             }
             $price = number_format($suggestedPrice > 0 ? $suggestedPrice : .50, 2, '.', '').' '.$currency;
-            $catalogSummary = collect(['title', 'author', 'publisher', 'publication_year'])
-                ->map(fn (string $key): string => (string) ($values[$key] ?? ''))->filter()->implode(' · ');
-            $masterComment = trim(implode("\n", array_filter([
-                $catalogSummary,
-                (string) ($values['listing_description'] ?? ''),
-                (string) ($values['condition'] ?? ''),
-                (string) ($values['special_features'] ?? ''),
-                (string) ($values['master_comment'] ?? ''),
-                'Empfohlener niedriger Ankaufspreis / Recommended low purchase price: '.$price,
-                filled($catalog['catalog_url'] ?? null) ? 'Quelle / Source: '.$catalog['catalog_url'] : null,
-            ])));
+            $masterComment = $this->bookAssessment(
+                (string) ($values['master_comment'] ?? $values['condition'] ?? ''),
+                $price,
+                $locale,
+            );
             $values['_ai_assessment'] = $masterComment;
             $values['_book_catalog'] = $catalog;
             $values['_recommended_purchase_price'] = $price;
@@ -225,7 +219,7 @@ class TenantAppController extends Controller
             }
             $fields['isbn'] = $isbn;
         }
-        $prefillAssessment = $isBookPurchase ? trim((string) ($fields['_ai_assessment'] ?? '')) : '';
+        $prefillAssessment = $isBookPurchase ? Str::limit(trim((string) ($fields['_ai_assessment'] ?? '')), 650) : '';
         $bookCatalog = $isBookPurchase && is_array($fields['_book_catalog'] ?? null) ? $fields['_book_catalog'] : [];
         $recommendedPurchasePrice = $isBookPurchase ? trim((string) ($fields['_recommended_purchase_price'] ?? '')) : '';
         unset($fields['_ai_assessment'], $fields['_book_catalog'], $fields['_recommended_purchase_price']);
@@ -974,6 +968,22 @@ class TenantAppController extends Controller
     private function servicePayload(TenantService $service, string $locale): array
     {
         return ['id' => $service->id, 'name' => $service->localized('name', $locale), 'description' => $service->localized('description', $locale), 'inclusions' => $service->localized('inclusions', $locale), 'result' => $service->localized('result', $locale), 'image' => $this->assetUrl($service->image_path), 'duration' => $service->duration_minutes, 'price' => $service->price, 'currency' => $service->currency];
+    }
+
+    private function bookAssessment(string $comment, string $price, string $locale): string
+    {
+        $comment = Str::limit(trim((string) preg_replace('/\s+/u', ' ', $comment)), 420);
+        $priceLabel = match ($locale) {
+            'ru' => 'Закупка',
+            'uk' => 'Закупівля',
+            'de' => 'Ankauf',
+            default => 'Purchase',
+        };
+
+        return trim(implode("\n", array_filter([
+            $comment !== '' ? '• '.$comment : null,
+            '• '.$priceLabel.': '.$price,
+        ])));
     }
 
     private function requestPayload(TenantRequest $request): array

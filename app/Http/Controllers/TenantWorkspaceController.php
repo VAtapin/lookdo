@@ -394,10 +394,43 @@ class TenantWorkspaceController extends Controller
             $base['values'] = $r->values;
             $base['messages'] = $r->messages;
             $base['details'] = $this->requestDetails($r);
-            $base['ai_assessment'] = data_get($r->values->firstWhere('field_key', 'ai_condition_assessment')?->value, 'value');
+            $base['ai_assessment'] = $this->compactAssessment(
+                $r->values->firstWhere('field_key', 'ai_condition_assessment')?->value,
+                $r->locale ?: 'de',
+            );
         }
 
         return $base;
+    }
+
+    private function compactAssessment(mixed $value, string $locale): ?string
+    {
+        if (! is_array($value)) {
+            $text = trim((string) $value);
+
+            return $text === '' ? null : Str::limit($text, 650);
+        }
+
+        if (filled($value['display_value'] ?? null)) {
+            return Str::limit(trim((string) $value['display_value']), 650);
+        }
+
+        $comment = (string) ($value['comment'] ?? $value['condition'] ?? $value['value'] ?? '');
+        $comment = Str::limit(trim((string) preg_replace('/\s+/u', ' ', $comment)), 420);
+        $price = Str::limit(trim((string) ($value['recommended_purchase_price'] ?? '')), 40);
+        $basis = Str::limit(trim((string) preg_replace('/\s+/u', ' ', (string) ($value['price_basis'] ?? ''))), 140);
+        $priceLabel = match ($locale) {
+            'ru' => 'Закупка',
+            'uk' => 'Закупівля',
+            'de' => 'Ankauf',
+            default => 'Purchase',
+        };
+        $result = trim(implode("\n", array_filter([
+            $comment !== '' ? '• '.$comment : null,
+            $price !== '' ? '• '.$priceLabel.': '.$price.($basis !== '' ? ' — '.$basis : '') : null,
+        ])));
+
+        return $result === '' ? null : $result;
     }
 
     private function requestDetails(TenantRequest $tenantRequest): array
