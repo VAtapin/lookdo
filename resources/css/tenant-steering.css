@@ -203,7 +203,7 @@
 .theme-steering .ta-hero-header .ta-language-trigger {
     border-color: rgba(224, 170, 80, .62);
     background: rgba(10, 11, 12, .78);
-    color: var(--ta-gold-soft);
+    color: #fff;
     opacity: 1;
 }
 
