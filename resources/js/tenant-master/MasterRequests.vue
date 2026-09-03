@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+    computed,
+    nextTick,
+    onBeforeUnmount,
+    onMounted,
+    ref,
+    watch,
+} from "vue";
 import { api } from "../api";
 const props = defineProps<{
     tenantId: number;
@@ -149,20 +156,13 @@ async function suggest() {
     busy.value = true;
     error.value = "";
     try {
-        const context = [
-            selected.value.summary,
-            ...(selected.value.messages || [])
-                .slice(-8)
-                .map((x: any) => x.body),
-        ]
-            .filter(Boolean)
-            .join("\\n");
         const r: any = await api(`/tenant/${props.tenantId}/workspace/ai`, {
             method: "POST",
             body: JSON.stringify({
                 task: "reply",
                 locale: props.locale,
-                context,
+                request_id: selected.value.id,
+                internal_note: note.value,
             }),
         });
         reply.value = r.text;
@@ -432,7 +432,10 @@ onBeforeUnmount(() => window.removeEventListener("keydown", handleEscape));
                 </div>
                 <section v-if="selected.ai_assessment" class="mw-ai-assessment">
                     <span>AI</span>
-                    <div><h3>{{ t("aiConditionAssessment") }}</h3><p>{{ selected.ai_assessment }}</p></div>
+                    <div>
+                        <h3>{{ t("aiConditionAssessment") }}</h3>
+                        <p>{{ selected.ai_assessment }}</p>
+                    </div>
                 </section>
                 <section
                     v-if="selected.details?.length"

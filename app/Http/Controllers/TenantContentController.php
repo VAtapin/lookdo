@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\AuthorizesTenantWorkspace;
 use App\Models\Tenant;
 use App\Models\TenantPortfolioItem;
+use App\Models\TenantRequest;
 use App\Models\TenantReview;
 use App\Models\TenantSocialDraft;
 use App\Services\EntitlementService;
@@ -265,8 +266,25 @@ class TenantContentController extends Controller
         $data = $request->validate([
             'task' => 'required|in:reply,reminder,repeat_visit,vacancy,social,translate',
             'locale' => 'required|in:de,en,ru,uk',
-            'context' => 'required|string|max:8000',
+            'context' => 'nullable|string|max:8000',
+            'request_id' => 'nullable|integer',
+            'internal_note' => 'nullable|string|max:5000',
         ]);
+
+        $isRequestReply = $data['task'] === 'reply' && filled($data['request_id'] ?? null);
+        if ($isRequestReply) {
+            $tenantRequest = $tenant->appRequests()
+                ->with(['customer', 'values', 'messages.senderUser', 'template'])
+                ->findOrFail($data['request_id']);
+            $data['context'] = $this->replyContext(
+                $tenant,
+                $tenantRequest,
+                array_key_exists('internal_note', $data) ? $data['internal_note'] : $tenantRequest->internal_note,
+            );
+        }
+        if (blank($data['context'] ?? null)) {
+            throw ValidationException::withMessages(['context' => 'Context is required.']);
+        }
 
         if ($data['task'] === 'repeat_visit') {
             abort_unless($this->enabled($entitlements, $tenant, 'repeat_visit_enabled'), 403, 'REPEAT_VISITS_NOT_INCLUDED');
@@ -280,7 +298,9 @@ class TenantContentController extends Controller
 
         $budget->ensureAvailable($request->user()->id);
         $language = ['de' => 'German', 'en' => 'English', 'ru' => 'Russian', 'uk' => 'Ukrainian'][$data['locale']];
-        $instructions = 'You assist a service-business owner. Write only the final text in '.$language.'. Be concise, honest and friendly. Never invent prices, availability, promises, results or customer facts. Do not wrap the answer in JSON, quotes or markdown. Task: '.$data['task'];
+        $instructions = $isRequestReply
+            ? 'You assist a business owner replying to a customer. Read the complete application data, AI assessment, internal note and chronological conversation before drafting anything. Identify the latest actual customer question or request and answer it directly. System notices are background information, never customer questions. Never repeat, paraphrase or resend information the business already sent in the conversation. If the latest message is from the business and the customer has not replied, propose only a useful new next step when one is justified by the available facts. Do not write another acknowledgement that the request was received. Use the internal note as private guidance but never mention that it is an internal note. Write only the final message in '.$language.', normally 1–4 short sentences. Be concrete, honest and friendly. Never invent prices, availability, shipping details, promises, results or customer facts. Do not use JSON, quotes, markdown, headings or commentary.'
+            : 'You assist a service-business owner. Write only the final text in '.$language.'. Be concise, honest and friendly. Never invent prices, availability, promises, results or customer facts. Do not wrap the answer in JSON, quotes or markdown. Task: '.$data['task'];
 
         try {
             $result = $openAi->text($instructions, $data['context']);
@@ -302,6 +322,51 @@ class TenantContentController extends Controller
         $budget->record('tenant_'.$data['task'], $result['model'], $result['input_tokens'], $result['output_tokens'], $request->user()->id, null, $tenant->id);
 
         return response()->json(['text' => $text]);
+    }
+
+    private function replyContext(Tenant $tenant, TenantRequest $tenantRequest, ?string $internalNote): string
+    {
+        $messages = $tenantRequest->messages
+            ->sortBy(fn ($message) => sprintf('%s-%010d', $message->created_at?->toIso8601String() ?? '', $message->id))
+            ->values()
+            ->map(fn ($message) => [
+                'role' => match ($message->sender_type) {
+                    'customer' => 'customer',
+                    'master' => 'business',
+                    default => 'system_notice',
+                },
+                'text' => $message->body,
+                'sent_at' => $message->created_at?->toIso8601String(),
+            ])
+            ->all();
+        $lastCustomerMessage = collect($messages)->last(fn (array $message) => $message['role'] === 'customer');
+        $fields = $tenantRequest->values
+            ->reject(fn ($value) => in_array($value->field_key, ['ai_analysis_status', 'ai_analysis_error'], true))
+            ->mapWithKeys(fn ($value) => [$value->field_key => $value->value])
+            ->all();
+        $context = [
+            'business' => [
+                'name' => $tenant->name,
+                'description' => $tenant->business_description,
+            ],
+            'application' => [
+                'number' => $tenantRequest->number,
+                'status' => $tenantRequest->status,
+                'summary' => $tenantRequest->summary,
+                'locale' => $tenantRequest->locale,
+                'customer' => [
+                    'name' => $tenantRequest->customer?->name,
+                    'preferred_channel' => $tenantRequest->customer?->preferred_channel
+                        ?: data_get($tenantRequest->contact_snapshot, 'preferred_channel'),
+                ],
+                'fields_and_ai_assessment' => $fields,
+            ],
+            'private_internal_note' => filled($internalNote) ? trim((string) $internalNote) : null,
+            'latest_customer_message' => $lastCustomerMessage,
+            'full_conversation_oldest_to_newest' => $messages,
+        ];
+
+        return json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
     }
 
     private function enabled(EntitlementService $entitlements, Tenant $tenant, string $key): bool

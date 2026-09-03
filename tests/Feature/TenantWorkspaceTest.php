@@ -10,9 +10,11 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -127,6 +129,79 @@ class TenantWorkspaceTest extends TestCase
             ->assertOk()
             ->assertJsonPath('requests.0.messages.1.body', 'Можно завтра в 10:00.')
             ->assertJsonPath('requests.0.messages.1.sender', 'master');
+    }
+
+    public function test_ai_reply_uses_full_request_chat_assessment_and_internal_note(): void
+    {
+        config(['services.openai.key' => 'test-key', 'services.openai.text_model' => 'gpt-5.6-luna']);
+        Http::fake([
+            'api.openai.com/v1/responses' => Http::response([
+                'output_text' => 'Книгу можно отправить по указанному в заявке адресу. Перед отправкой, пожалуйста, надёжно упакуйте её.',
+                'model' => 'gpt-5.6-luna',
+                'usage' => ['input_tokens' => 420, 'output_tokens' => 35],
+            ]),
+        ]);
+        $tenant = $this->tenant('contextual-ai-reply');
+        $owner = $this->owner($tenant);
+        DB::table('tenant_entitlement_overrides')->insert([
+            'tenant_id' => $tenant->id,
+            'key' => 'ai_communication_enabled',
+            'value' => '1',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $customer = $tenant->customers()->create(['name' => 'Владимир', 'locale' => 'ru']);
+        $appRequest = $tenant->appRequests()->create([
+            'customer_id' => $customer->id,
+            'request_template_id' => $tenant->businessProfile->request_template_id,
+            'number' => 'R-BOOK-001',
+            'status' => 'viewed',
+            'summary' => 'Книга в твёрдом переплёте, состояние хорошее.',
+            'internal_note' => 'Старая сохранённая заметка.',
+            'locale' => 'ru',
+            'contact_snapshot' => ['name' => 'Владимир', 'preferred_channel' => 'sms'],
+        ]);
+        $appRequest->values()->create(['field_key' => 'isbn', 'value' => ['value' => '9783689593292']]);
+        $appRequest->values()->create(['field_key' => 'ai_condition_assessment', 'value' => [
+            'comment' => 'Переплёт и корешок целые.',
+            'recommended_purchase_price' => '8 EUR',
+        ]]);
+        foreach ([
+            ['system', 'Ваша заявка получена. Мастер изучит её и ответит здесь.'],
+            ['master', 'Мы готовы купить книгу за 8 евро.'],
+            ['customer', 'Хорошо, куда и как отправить?'],
+        ] as [$sender, $body]) {
+            $appRequest->messages()->create([
+                'tenant_id' => $tenant->id,
+                'customer_id' => $customer->id,
+                'sender_type' => $sender,
+                'body' => $body,
+            ]);
+        }
+
+        $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/workspace/ai', [
+            'task' => 'reply',
+            'locale' => 'ru',
+            'request_id' => $appRequest->id,
+            'internal_note' => 'Отправка на склад в Берлине; адрес сообщить клиенту отдельно.',
+        ])->assertOk()->assertJsonPath('text', 'Книгу можно отправить по указанному в заявке адресу. Перед отправкой, пожалуйста, надёжно упакуйте её.');
+
+        Http::assertSent(function (HttpRequest $request): bool {
+            if ($request->url() !== 'https://api.openai.com/v1/responses') {
+                return false;
+            }
+            $input = (string) $request['input'];
+            $instructions = (string) $request['instructions'];
+
+            return str_contains($input, '9783689593292')
+                && str_contains($input, 'Переплёт и корешок целые.')
+                && str_contains($input, 'Мы готовы купить книгу за 8 евро.')
+                && str_contains($input, 'Хорошо, куда и как отправить?')
+                && str_contains($input, 'Отправка на склад в Берлине')
+                && str_contains($input, 'system_notice')
+                && str_contains($instructions, 'Never repeat, paraphrase or resend')
+                && str_contains($instructions, 'System notices are background information');
+        });
     }
 
     public function test_same_phone_on_unknown_device_is_only_duplicate_signal_and_never_opens_history(): void
