@@ -299,10 +299,16 @@ class TenantController extends Controller
             'variation' => $tenant->businessProfile?->variation?->localized('name', $tenant->locale),
             'template' => $tenant->businessProfile?->template?->code,
         ];
+        if ($data['asset'] === 'logo_horizontal') {
+            return response()->json([
+                'prompt' => $this->horizontalLogoPrompt($tenant),
+                'asset' => $data['asset'],
+                'image_generation' => $imageGenerations->status($tenant),
+            ]);
+        }
         $budget->ensureAvailable($request->user()?->id);
         $instructions = match ($data['asset']) {
             'logo' => 'Write one editable image-generation prompt entirely in '.$language.' for a simple premium square business logo mark. It must remain legible as a tiny app icon, use no copyrighted marks, vehicle brand logos, photographs, mockups, text, letters or watermarks.',
-            'logo_horizontal' => 'Write one editable image-generation prompt entirely in '.$language.' for a premium horizontal business logo lockup for a compact app header. Use a simple symbol and a clean wordmark with the exact business name, keep generous spacing and strong legibility at small size, and require a transparent or plain background. Include no photographs, mockups, slogans, watermarks, copyrighted marks or vehicle brand logos.',
             default => 'Write one editable image-generation prompt entirely in '.$language.' for a premium vertical mobile-app hero photograph. Show the exact service in a realistic workplace, leave darker clean areas for interface text, and include no text, logos, vehicle brand marks, number plates, UI or watermarks.',
         };
         $result = $openAi->structured($instructions.' Return JSON only.', json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 'tenant_branding_prompt', [
@@ -334,7 +340,11 @@ class TenantController extends Controller
                 'logo_horizontal' => '1536x1024',
                 default => '1024x1536',
             };
-            $result = $openAi->image($data['prompt'], 'medium', $size);
+            $generationPrompt = $data['prompt'];
+            if (in_array($data['asset'], ['logo', 'logo_horizontal'], true)) {
+                $generationPrompt .= '\n\nHard constraint: render no words, letters, initials, numbers, company names, slogans, signatures, watermarks, or pseudo-text anywhere in the image.';
+            }
+            $result = $openAi->image($generationPrompt, 'medium', $size);
         } catch (Throwable $exception) {
             if ($reservation) {
                 $imageGenerations->release($tenant, $reservation);
@@ -377,6 +387,21 @@ class TenantController extends Controller
         $audit->log('tenant.branding.asset_generated', $profile, ['path' => $old], ['asset' => $data['asset'], 'path' => $path, 'usage' => $reservation['type']], $tenant->id);
 
         return response()->json(['asset' => $data['asset'], 'path' => $path, 'url' => Storage::disk('public')->url($path), 'branding' => $branding, 'image_generation' => $imageGenerations->status($tenant)], 201);
+    }
+
+    private function horizontalLogoPrompt(Tenant $tenant): string
+    {
+        $locale = in_array($tenant->locale, ['de', 'en', 'ru', 'uk'], true) ? $tenant->locale : 'en';
+        $subject = $tenant->businessProfile?->variation?->localized('name', $locale)
+            ?: $tenant->businessProfile?->category?->localized('name', $locale);
+        $subject = trim((string) $subject);
+
+        return match ($locale) {
+            'de' => 'Erstelle ein hochwertiges, horizontales und rein grafisches Markenzeichen für den kompakten Header einer App im Bereich '.($subject ?: 'lokale Dienstleistungen').'. Verwende ein einfaches, unverwechselbares Symbol, klare Vektorformen, ausgewogene Proportionen und hohen Kontrast. Ordne alle wichtigen Elemente innerhalb des mittleren horizontalen Bandes an und lasse an allen vier Seiten mindestens 15 Prozent Sicherheitsabstand. Transparenter oder ruhiger einfarbiger Hintergrund. Keine Wörter, Buchstaben, Initialen, Zahlen, Firmennamen, Slogans, Signaturen, Wasserzeichen, Scheintexte, Fotos oder Mockups.',
+            'ru' => 'Создай премиальный горизонтальный графический знак для компактной шапки приложения в сфере «'.($subject ?: 'локальные услуги').'». Используй простой узнаваемый символ, чистую векторную графику, спокойные пропорции и высокий контраст. Все важные элементы расположи в центральной горизонтальной полосе и оставь со всех сторон не менее 15% безопасного свободного поля. Фон прозрачный или однотонный. Строго без слов, букв, инициалов, цифр, названия фирмы, слоганов, подписей, водяных знаков, псевдотекста, фотографий и мокапов.',
+            'uk' => 'Створи преміальний горизонтальний графічний знак для компактної шапки застосунку у сфері «'.($subject ?: 'локальні послуги').'». Використай простий упізнаваний символ, чисту векторну графіку, спокійні пропорції та високий контраст. Усі важливі елементи розташуй у центральній горизонтальній смузі та залиш з усіх боків щонайменше 15% безпечного вільного поля. Фон прозорий або однотонний. Суворо без слів, літер, ініціалів, цифр, назви компанії, слоганів, підписів, водяних знаків, псевдотексту, фотографій і мокапів.',
+            default => 'Create a premium horizontal graphic mark for a compact app header in the field of '.($subject ?: 'local services').'. Use one simple recognizable symbol, clean vector geometry, balanced proportions, and strong contrast. Keep every important element inside the central horizontal band with at least 15% safe empty space on all four sides. Use a transparent or calm solid background. No words, letters, initials, numbers, company names, slogans, signatures, watermarks, pseudo-text, photographs, or mockups.',
+        };
     }
 
     public function uploadSocialImage(Request $request, Tenant $tenant, AuditService $audit, ImageStorageService $images): JsonResponse

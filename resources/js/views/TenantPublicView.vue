@@ -128,6 +128,55 @@ const heroHeaderLabel = computed(() =>
         ? app.value?.tenant?.name
         : app.value?.template?.hero?.eyebrow,
 );
+const bookHomeCopy = computed(() => {
+    const values: Record<
+        TenantLocale,
+        {
+            eyebrow: string;
+            title: string;
+            steps: Array<{ icon: string; title: string; text: string }>;
+        }
+    > = {
+        de: {
+            eyebrow: "SO FUNKTIONIERT ES",
+            title: "Von den Fotos zur persönlichen Antwort",
+            steps: [
+                { icon: "camera", title: "Fotografieren", text: "Cover, ISBN und sichtbare Mängel." },
+                { icon: "image", title: "Erkennen", text: "Ausgabe und Zustand werden vorgeprüft." },
+                { icon: "message", title: "Antwort erhalten", text: "Der Käufer meldet sich persönlich." },
+            ],
+        },
+        en: {
+            eyebrow: "HOW IT WORKS",
+            title: "From photos to a personal answer",
+            steps: [
+                { icon: "camera", title: "Take photos", text: "Cover, ISBN, and visible defects." },
+                { icon: "image", title: "Identify", text: "Edition and condition are reviewed." },
+                { icon: "message", title: "Get an answer", text: "The buyer replies personally." },
+            ],
+        },
+        ru: {
+            eyebrow: "КАК ЭТО РАБОТАЕТ",
+            title: "От фотографий до личного ответа",
+            steps: [
+                { icon: "camera", title: "Сфотографируйте", text: "Обложку, ISBN и заметные дефекты." },
+                { icon: "image", title: "Мы распознаем", text: "Издание и состояние книги." },
+                { icon: "message", title: "Получите ответ", text: "Покупатель ответит лично." },
+            ],
+        },
+        uk: {
+            eyebrow: "ЯК ЦЕ ПРАЦЮЄ",
+            title: "Від фотографій до особистої відповіді",
+            steps: [
+                { icon: "camera", title: "Сфотографуйте", text: "Обкладинку, ISBN і помітні дефекти." },
+                { icon: "image", title: "Ми розпізнаємо", text: "Видання та стан книги." },
+                { icon: "message", title: "Отримайте відповідь", text: "Покупець відповість особисто." },
+            ],
+        },
+    };
+
+    return values[locale.value];
+});
 const theme = computed(() => ({
     "--ta-primary": isSteering.value
         ? "#e2ad55"
@@ -1030,6 +1079,27 @@ const loginContext = {
                                     <span><AppIcon :name="item.icon" /></span>
                                     <p>{{ item.label }}</p>
                                 </article>
+                            </section>
+                            <section
+                                v-if="isBookPurchase"
+                                class="ta-book-process"
+                                :style="{ order: 103 }"
+                            >
+                                <header>
+                                    <small>{{ bookHomeCopy.eyebrow }}</small>
+                                    <h2>{{ bookHomeCopy.title }}</h2>
+                                </header>
+                                <div>
+                                    <article
+                                        v-for="(step, index) in bookHomeCopy.steps"
+                                        :key="step.title"
+                                    >
+                                        <span><AppIcon :name="step.icon" /></span>
+                                        <small>0{{ index + 1 }}</small>
+                                        <h3>{{ step.title }}</h3>
+                                        <p>{{ step.text }}</p>
+                                    </article>
+                                </div>
                             </section>
                             <section
                                 v-if="portfolioVideos.length && homeBlockVisible('videos')"

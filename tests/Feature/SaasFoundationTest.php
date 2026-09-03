@@ -1356,12 +1356,7 @@ class SaasFoundationTest extends TestCase
     {
         Storage::fake('public');
         config(['services.openai.key' => 'test-key', 'services.openai.image_model' => 'gpt-image-2']);
-        $reviewedPrompt = 'Создайте широкий логотип для шапки приложения с точным названием Golden Books, простым знаком книги и чистым светлым фоном без макета.';
-        Http::fake(function (HttpRequest $request) use ($reviewedPrompt) {
-            if ($request->url() === 'https://api.openai.com/v1/responses') {
-                return Http::response(['output_text' => json_encode(['prompt' => $reviewedPrompt]), 'model' => 'gpt-5.6-luna', 'usage' => ['input_tokens' => 80, 'output_tokens' => 30]]);
-            }
-
+        Http::fake(function (HttpRequest $request) {
             return Http::response(['data' => [['b64_json' => base64_encode('generated-horizontal-logo')]]]);
         });
         $owner = User::factory()->create();
@@ -1372,8 +1367,9 @@ class SaasFoundationTest extends TestCase
 
         $prompt = $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/branding/prompt', ['asset' => 'logo_horizontal'])
             ->assertOk()
-            ->assertJsonPath('asset', 'logo_horizontal')
-            ->assertJsonPath('prompt', $reviewedPrompt);
+            ->assertJsonPath('asset', 'logo_horizontal');
+        $this->assertStringContainsString('Строго без слов, букв', $prompt->json('prompt'));
+        $this->assertStringNotContainsString('Golden Books', $prompt->json('prompt'));
 
         $generated = $this->actingAs($owner)->postJson('/api/tenant/'.$tenant->id.'/branding/generate', [
             'asset' => 'logo_horizontal',
@@ -1384,12 +1380,11 @@ class SaasFoundationTest extends TestCase
 
         Storage::disk('public')->assertExists($generated->json('path'));
         $this->assertSame($generated->json('path'), data_get($tenant->profile()->firstOrFail()->content, 'branding.horizontal_logo_path'));
-        Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://api.openai.com/v1/responses'
-            && $request['input'] !== null
-            && str_contains((string) $request['instructions'], 'horizontal business logo'));
+        Http::assertNotSent(fn (HttpRequest $request) => $request->url() === 'https://api.openai.com/v1/responses');
         Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://api.openai.com/v1/images/generations'
             && $request['size'] === '1536x1024'
-            && $request['prompt'] === $reviewedPrompt);
+            && str_contains((string) $request['prompt'], 'Строго без слов, букв')
+            && str_contains((string) $request['prompt'], 'Hard constraint: render no words'));
     }
 
     public function test_image_limit_requires_credit_and_stripe_webhook_adds_it_once(): void
