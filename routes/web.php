@@ -35,7 +35,7 @@ Route::prefix('api')->middleware('locale')->group(function () {
     });
     Route::get('/platform/pages/{key}', [PlatformController::class, 'page'])->whereIn('key', ['impressum', 'datenschutz', 'agb', 'kontakt']);
     Route::post('/classify', [AuthController::class, 'classify'])->middleware('throttle:30,1');
-    Route::post('/register/transcribe', [AuthController::class, 'transcribeBusiness'])->middleware('throttle:6,1');
+    Route::post('/register/transcribe', [AuthController::class, 'transcribeBusiness'])->middleware('throttle:registration-transcription');
     Route::post('/register/availability', [AuthController::class, 'availability'])->middleware('throttle:40,1');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
     Route::post('/login', [AuthController::class, 'login']);

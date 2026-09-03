@@ -193,7 +193,9 @@ function confirmTemplate() {
 
 async function toggleRecording() {
     if (recording.value) {
-        mediaRecorder?.stop();
+        recording.value = false;
+        transcribing.value = true;
+        if (mediaRecorder?.state === 'recording') mediaRecorder.stop();
         return;
     }
     if (!microphoneSupported.value) {
@@ -213,7 +215,11 @@ async function toggleRecording() {
         mediaRecorder.start();
         recording.value = true;
         recordingTimer = window.setTimeout(() => {
-            if (mediaRecorder?.state === 'recording') mediaRecorder.stop();
+            if (mediaRecorder?.state === 'recording') {
+                recording.value = false;
+                transcribing.value = true;
+                mediaRecorder.stop();
+            }
         }, 60_000);
     } catch {
         microphoneStream?.getTracks().forEach(track => track.stop());
@@ -227,7 +233,11 @@ async function transcribeRecording() {
     recording.value = false;
     microphoneStream?.getTracks().forEach(track => track.stop());
     microphoneStream = null;
-    if (!audioChunks.length) return;
+    if (!audioChunks.length) {
+        transcribing.value = false;
+        mediaRecorder = null;
+        return;
+    }
 
     const mime = mediaRecorder?.mimeType || audioChunks[0].type || 'audio/webm';
     const extension = mime.includes('mp4') ? 'm4a' : mime.includes('ogg') ? 'ogg' : 'webm';
@@ -235,6 +245,7 @@ async function transcribeRecording() {
     body.append('audio', new File(audioChunks, `business-description.${extension}`, { type: mime }));
     body.append('locale', form.locale);
     transcribing.value = true;
+    error.value = '';
     try {
         const result = await api<{ text: string }>('/register/transcribe', { method: 'POST', body });
         classification.value = null;
@@ -242,7 +253,7 @@ async function transcribeRecording() {
         form.variation_id = null;
         form.business_description = [form.business_description.trim(), result.text.trim()].filter(Boolean).join(' ');
     } catch (exception: any) {
-        error.value = exception.message;
+        error.value = exception?.status === 429 ? tr('transcriptionRateLimited') : exception.message;
     } finally {
         transcribing.value = false;
         audioChunks = [];
