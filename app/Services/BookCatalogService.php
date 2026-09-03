@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 class BookCatalogService
@@ -35,8 +36,8 @@ class BookCatalogService
 
         $openLibrary = $responses['open_library'] ?? null;
         $googleBooks = $responses['google_books'] ?? null;
-        $open = $openLibrary?->successful() ? (array) $openLibrary->json('docs.0', []) : [];
-        $google = $googleBooks?->successful() ? (array) $googleBooks->json('items.0', []) : [];
+        $open = $openLibrary instanceof Response && $openLibrary->successful() ? (array) $openLibrary->json('docs.0', []) : [];
+        $google = $googleBooks instanceof Response && $googleBooks->successful() ? (array) $googleBooks->json('items.0', []) : [];
         $volume = (array) ($google['volumeInfo'] ?? []);
         $sale = (array) ($google['saleInfo'] ?? []);
         $dimensions = (array) ($volume['dimensions'] ?? []);
