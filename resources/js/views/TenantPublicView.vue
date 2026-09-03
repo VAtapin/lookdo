@@ -124,7 +124,7 @@ const isBookPurchase = computed(
     () => app.value?.template?.variation_code === "purchase.books",
 );
 const heroHeaderLabel = computed(() =>
-    isBookPurchase.value
+    isBookPurchase.value && app.value?.tenant?.branding?.horizontal_logo
         ? app.value?.tenant?.name
         : app.value?.template?.hero?.eyebrow,
 );

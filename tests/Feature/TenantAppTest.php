@@ -174,6 +174,33 @@ class TenantAppTest extends TestCase
             ->assertJsonPath('template.navigation', ['home', 'action', 'activity']);
     }
 
+    public function test_legacy_ai_horizontal_logo_is_not_used_in_the_public_header(): void
+    {
+        $tenant = $this->tenant('legacy-book-logo', 'purchase.general', true, 'purchase.books');
+        $tenant->profile->update(['content' => [
+            'branding' => [
+                'horizontal_logo_path' => 'tenant-app/1/branding/legacy.webp',
+                'horizontal_logo_source' => 'ai',
+            ],
+        ]]);
+
+        $this->withHeader('X-Locale', 'ru')->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('tenant.branding.horizontal_logo', null);
+
+        $tenant->profile->update(['content' => [
+            'branding' => [
+                'horizontal_logo_path' => 'tenant-app/1/branding/text-free.webp',
+                'horizontal_logo_source' => 'ai',
+                'horizontal_logo_version' => 2,
+            ],
+        ]]);
+
+        $this->withHeader('X-Locale', 'ru')->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('tenant.branding.horizontal_logo', '/storage/tenant-app/1/branding/text-free.webp');
+    }
+
     public function test_book_photos_are_immediately_enriched_from_isbn_catalogues(): void
     {
         $tenant = $this->tenant('book-recognition', 'purchase.general', true, 'purchase.books');

@@ -265,6 +265,7 @@ class TenantController extends Controller
         } elseif ($data['asset'] === 'logo_horizontal') {
             $branding['horizontal_logo_path'] = $path;
             $branding['horizontal_logo_source'] = 'upload';
+            $branding['horizontal_logo_version'] = 2;
         } else {
             $branding['hero_image_path'] = $path;
             $branding['hero_source'] = 'upload';
@@ -376,6 +377,7 @@ class TenantController extends Controller
         } elseif ($data['asset'] === 'logo_horizontal') {
             $branding['horizontal_logo_path'] = $path;
             $branding['horizontal_logo_source'] = 'ai';
+            $branding['horizontal_logo_version'] = 2;
         } else {
             $branding['hero_image_path'] = $path;
             $branding['hero_source'] = 'ai';

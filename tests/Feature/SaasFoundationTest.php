@@ -1376,7 +1376,8 @@ class SaasFoundationTest extends TestCase
             'prompt' => $prompt->json('prompt'),
         ])->assertCreated()
             ->assertJsonPath('asset', 'logo_horizontal')
-            ->assertJsonPath('branding.horizontal_logo_source', 'ai');
+            ->assertJsonPath('branding.horizontal_logo_source', 'ai')
+            ->assertJsonPath('branding.horizontal_logo_version', 2);
 
         Storage::disk('public')->assertExists($generated->json('path'));
         $this->assertSame($generated->json('path'), data_get($tenant->profile()->firstOrFail()->content, 'branding.horizontal_logo_path'));

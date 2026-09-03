@@ -952,6 +952,8 @@ class TenantAppController extends Controller
         $profile = $tenant->profile;
 
         $branding = (array) data_get($profile?->content, 'branding', []);
+        $horizontalLogoIsSafe = ($branding['horizontal_logo_source'] ?? null) !== 'ai'
+            || (int) ($branding['horizontal_logo_version'] ?? 0) >= 2;
 
         return [
             'id' => $tenant->id, 'name' => $tenant->name, 'slug' => $tenant->slug, 'locale' => $locale,
@@ -978,7 +980,7 @@ class TenantAppController extends Controller
                 'confirmed' => filled($branding['confirmed_at'] ?? null),
                 'tagline' => $this->localized($branding['tagline_translations'] ?? ($branding['tagline'] ?? null), $locale),
                 'hero_image' => $this->assetUrl($branding['hero_image_path'] ?? null),
-                'horizontal_logo' => $this->assetUrl($branding['horizontal_logo_path'] ?? null),
+                'horizontal_logo' => $horizontalLogoIsSafe ? $this->assetUrl($branding['horizontal_logo_path'] ?? null) : null,
                 'service_modes' => array_values((array) ($branding['service_modes'] ?? [])),
             ],
         ];
