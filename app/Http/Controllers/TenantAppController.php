@@ -561,6 +561,11 @@ class TenantAppController extends Controller
         }
 
         $tenantConfiguration = (array) data_get($tenant->profile?->content, 'app_configuration', []);
+        $customizationBaseTemplate = (string) data_get($tenant->profile?->content, 'ai_customization.base_template', '');
+        $activeTemplateCode = $template?->code ?: 'general-services.general';
+        if ($customizationBaseTemplate !== '' && $customizationBaseTemplate !== $activeTemplateCode) {
+            $tenantConfiguration = [];
+        }
         $configuration = array_replace_recursive($configuration, $tenantConfiguration);
         foreach (['fields', 'navigation', 'trust', 'starter_services', 'starter_portfolio', 'screens', 'actions', 'locales'] as $listKey) {
             if (array_key_exists($listKey, $tenantConfiguration)) {

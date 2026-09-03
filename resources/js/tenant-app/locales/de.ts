@@ -14,12 +14,12 @@ export default {
     step1: "Foto oder Video senden",
     step2: "Der Meister prüft alles",
     step3: "Antwort erhalten",
-    requestTitle: "Lenkrad fotografieren",
+    requestTitle: "Fotos",
     requestSubtitle: "Schritt 1 von 2",
-    requestHint: "Machen Sie 1–4 klare Fotos bei gutem Licht.",
-    captureTitle: "Lenkrad fotografieren",
+    requestHint: "Machen Sie klare Fotos bei gutem Licht.",
+    captureTitle: "Fotos hinzufügen",
     captureList:
-        "Gesamtansicht · linke Seite · rechte Seite · Rückseite und Nähte",
+        "Zeigen Sie die Gesamtansicht und wichtige Details",
     usePhoto: "Dieses Foto verwenden",
     addPhoto: "Weiteres Foto hinzufügen",
     addedPhotos: "Hinzugefügte Fotos",
@@ -32,9 +32,9 @@ export default {
     remove: "Entfernen",
     optional: "Optional",
     required: "Erforderlich",
-    details: "Lenkrad bewerten",
+    details: "Details zur Anfrage",
     detailsSubtitle: "Anfrage an den Meister senden",
-    photos: "Fotos des Lenkrads",
+    photos: "Fotos",
     vehicle: "Fahrzeug",
     vehicleModel: "Marke und Modell",
     vehicleYear: "Baujahr",
@@ -104,7 +104,7 @@ export default {
     aiAssistText:
         "Beschreiben Sie alles in einem Satz – wir füllen das Formular für Sie aus.",
     aiAssistPlaceholder:
-        "Zum Beispiel: Toyota Camry 2018, schwarzes Leder mit roter Naht",
+        "Beschreiben Sie kurz den Gegenstand, seinen Zustand und Ihr Anliegen",
     aiAssistButton: "Formular ausfüllen",
     aiAssisting: "Wird ausgefüllt…",
     aiAssistError:

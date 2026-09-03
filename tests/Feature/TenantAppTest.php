@@ -159,6 +159,24 @@ class TenantAppTest extends TestCase
             ->assertJsonPath('template.ai_assistant.accepts_media', true);
     }
 
+    public function test_template_change_does_not_merge_stale_ai_configuration_from_previous_activity(): void
+    {
+        $tenant = $this->tenant('changed-to-books', 'purchase.general', true, 'purchase.books');
+        $tenant->profile()->update(['content' => [
+            'ai_customization' => ['status' => 'ready', 'base_template' => 'automotive.steering-wheel-upholstery'],
+            'app_configuration' => [
+                'hero' => ['title' => ['ru' => 'Сфотографируйте руль']],
+                'media' => ['slots' => [['key' => 'wheel_front', 'title' => ['ru' => 'Фото руля']]]],
+            ],
+        ]]);
+
+        $this->withHeader('X-Locale', 'ru')->getJson($this->url($tenant, '/api/tenant-app/bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('template.hero.title', 'Предложите книги на продажу')
+            ->assertJsonPath('template.media_slots.0.key', 'book_cover')
+            ->assertJsonCount(4, 'template.media_slots');
+    }
+
     public function test_anonymous_customer_can_send_media_request_and_continue_on_same_device(): void
     {
         Storage::fake('public');

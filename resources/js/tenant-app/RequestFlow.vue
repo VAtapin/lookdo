@@ -24,8 +24,12 @@ const form=reactive<any>({name:'',phone:'',email:'',summary:'',preferred_channel
 
 const configuredSlots=computed<any[]>(()=>props.app.template.media_slots||[]);
 const photosMax=computed(()=>Math.max(configuredSlots.value.length,Number(props.app.template.media?.photos_max||4)));
-const slots=computed(()=>Array.from({length:photosMax.value},(_,index)=>configuredSlots.value[index]||{key:`photo_${index+1}`,required:false}));
+const visibleSlotCount=computed(()=>Math.min(photosMax.value,Math.max(1,configuredSlots.value.length,files.value.length+1)));
+const slots=computed(()=>Array.from({length:visibleSlotCount.value},(_,index)=>configuredSlots.value[index]||{key:`photo_${index+1}`,required:false}));
 const current=computed(()=>files.value[activeIndex.value]||files.value.at(-1)||null);
+const requestTitle=computed(()=>props.app.template.hero?.title||props.copy.requestTitle);
+const requestHint=computed(()=>props.app.template.hero?.subtitle||props.copy.requestHint);
+const detailsTitle=computed(()=>props.app.template.hero?.action||props.copy.details);
 const canNotify=computed(()=>Boolean(props.app.push?.enabled&&props.app.push?.public_key&&'Notification' in window&&'serviceWorker' in navigator));
 const address=computed(()=>[props.app.tenant.contact.street,[props.app.tenant.contact.postal_code,props.app.tenant.contact.city].filter(Boolean).join(' ')].filter(Boolean).join(', '));
 const contactName=computed(()=>props.app.tenant.contact.name||props.app.tenant.name);
@@ -93,7 +97,7 @@ async function assistForm(){
 async function submit(){
   if(!form.phone.trim()){error.value=props.copy.phone;return;}
   if(missingRequired.value.length){stage.value='capture';error.value=missingRequired.value.map(slot=>slot.title||slot.label||slot.key).join(', ');return;}
-  if(!files.value.length){stage.value='capture';error.value=props.copy.requestHint;return;}
+  if(!files.value.length){stage.value='capture';error.value=requestHint.value;return;}
   busy.value=true;error.value='';
   try{
     const body=new FormData();
@@ -125,7 +129,7 @@ onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));})
     <template v-if="stage==='capture'">
       <header class="ta-flow-title">
         <button class="ta-back" @click="back"><AppIcon name="back"/><span>{{copy.back}}</span></button>
-        <div><h1>{{copy.requestTitle}}</h1><p>{{copy.requestSubtitle}}</p></div>
+        <div><h1>{{requestTitle}}</h1><p>{{copy.requestSubtitle}}</p></div>
         <div class="ta-contact-shortcuts"><a v-if="app.tenant.contact.phone" :href="'tel:'+app.tenant.contact.phone"><AppIcon name="phone"/></a><a v-if="app.tenant.contact.vk_url" :href="app.tenant.contact.vk_url" target="_blank">VK</a></div>
       </header>
       <div class="ta-flow-steps"><span v-for="number in 4" :key="number" :class="{active:number===1}">{{number}}</span></div>
@@ -137,10 +141,10 @@ onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));})
         </article>
         <button class="ta-live-camera" @click="choose(nextSlotIndex())">
           <img v-if="current" :src="current.url" alt="">
-          <div v-else><AppIcon name="camera" :size="62"/><strong>{{copy.camera}}</strong><span>{{copy.requestHint}}</span></div>
+          <div v-else><AppIcon name="camera" :size="62"/><strong>{{copy.camera}}</strong><span>{{requestHint}}</span></div>
           <small>1×</small>
         </button>
-        <p class="ta-camera-hint">{{copy.requestHint}}</p>
+        <p class="ta-camera-hint">{{requestHint}}</p>
         <div class="ta-camera-controls">
           <div><img v-if="files.length" :src="files[files.length-1].url" alt=""><AppIcon v-else name="image"/><small>{{copy.lastPhoto}}</small></div>
           <button @click="choose(nextSlotIndex())"><AppIcon name="camera" :size="34"/></button>
@@ -150,13 +154,13 @@ onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));})
         <div class="ta-photo-slots" :style="{'--slot-count':Math.min(slots.length,4)}">
           <button v-for="(_,index) in slots" :key="index" :class="{filled:slotItem(index)}" @click="choose(index)">
             <img v-if="slotItem(index)" :src="slotItem(index)?.url" alt="">
-            <template v-else><AppIcon name="plus"/><span>{{slots[index]?.title||`${copy.photos} ${index+1}`}}<em v-if="slots[index]?.required">*</em></span></template>
+            <template v-else><AppIcon name="plus"/><span>{{slots[index]?.title||copy.addPhoto}}<em v-if="slots[index]?.required">*</em></span></template>
             <i v-if="slotItem(index)" @click.stop="remove(slotItem(index)!)"><AppIcon name="close" :size="14"/></i>
           </button>
         </div>
         <p v-if="error" class="ta-error">{{error}}</p>
         <button class="ta-gold-button" :disabled="!files.length" @click="continueToDetails">{{copy.usePhoto}}</button>
-        <button class="ta-outline-button" :disabled="files.length>=photosMax" @click="choose(nextSlotIndex())"><AppIcon name="plus"/>{{copy.addPhoto}}</button>
+        <button class="ta-outline-button ta-add-photo-button" :disabled="files.length>=photosMax" @click="choose(nextSlotIndex())"><AppIcon name="plus"/>{{copy.addPhoto}}</button>
       </div>
       <input ref="fileInput" hidden type="file" accept="image/*" capture="environment" @change="selected">
     </template>
@@ -164,7 +168,7 @@ onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));})
     <template v-else-if="stage==='details'">
       <header class="ta-flow-title compact">
         <button class="ta-back icon-only" @click="back"><AppIcon name="back"/></button>
-        <div><h1>{{copy.details}}</h1><p>{{copy.detailsSubtitle}}</p></div>
+        <div><h1>{{detailsTitle}}</h1><p>{{copy.detailsSubtitle}}</p></div>
         <button class="ta-help"><AppIcon name="info"/><span>{{copy.how}}</span></button>
       </header>
       <div class="ta-flow-scroll ta-detail-form">
@@ -177,7 +181,7 @@ onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));})
           <button class="ta-outline-button" :disabled="assisting||(!assistantText.trim()&&!files.length)" @click="assistForm">{{assisting?copy.aiAssisting:(aiAssistant.title||copy.aiAssistButton)}}</button>
         </section>
         <section class="ta-dark-card">
-          <h2>1. {{copy.photos}} <em>*</em></h2><p>{{copy.requestHint}}</p>
+          <h2>1. {{copy.photos}} <em>*</em></h2><p>{{requestHint}}</p>
           <div class="ta-detail-photos"><button v-for="(_,index) in slots" :key="index" @click="choose(index)"><img v-if="slotItem(index)" :src="slotItem(index)?.url" alt=""><template v-else><AppIcon name="camera"/><span>{{copy.addPhoto}}</span></template></button></div>
         </section>
         <section v-if="vehicleBrandField||vehicleModelField||vehicleYearField" class="ta-dark-card">
@@ -261,3 +265,26 @@ onBeforeUnmount(()=>{files.value.forEach(item=>URL.revokeObjectURL(item.url));})
     <div v-if="stage!=='capture'&&stage!=='details'" class="ta-mini-nav"><button @click="emit('close')"><AppIcon name="home"/><span>{{copy.home}}</span></button><button class="central" @click="stage='capture'"><AppIcon name="camera"/><span>{{copy.action}}</span></button><button @click="emit('close')"><AppIcon name="message"/><span>{{copy.messages}}</span></button></div>
   </section>
 </template>
+
+<style scoped>
+.ta-add-photo-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 52px;
+  padding: 0 20px;
+  border: 1px solid color-mix(in srgb, var(--ta-primary, #e0aa50) 72%, white);
+  border-radius: 14px;
+  background: #171a1d;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.ta-add-photo-button :deep(svg) {
+  display: block;
+  flex: 0 0 auto;
+}
+</style>
