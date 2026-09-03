@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -146,6 +147,92 @@ class AdminController extends Controller
         $sort = $this->sortColumn($request, ['name', 'email', 'is_active', 'created_at', 'last_login_at']);
 
         return response()->json($query->orderBy($sort, $this->sortDirection($request))->paginate($this->perPage($request)));
+    }
+
+    public function storeAdministrator(Request $request, AuditService $audit): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'password' => ['required', 'confirmed', Password::min(10)->letters()->numbers()],
+            'locale' => ['required', Rule::in(['de', 'en', 'ru', 'uk'])],
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $administrator = User::create([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => $data['password'],
+            'locale' => $data['locale'],
+            'is_active' => $data['is_active'],
+            'is_super_admin' => true,
+            'email_verified_at' => now(),
+        ]);
+        $audit->log('administrator.created', $administrator, null, $administrator->only(['id', 'name', 'email', 'locale', 'is_active']));
+
+        return response()->json($administrator, 201);
+    }
+
+    public function updateAdministrator(Request $request, User $administrator, AuditService $audit): JsonResponse
+    {
+        abort_unless($administrator->is_super_admin, 404);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($administrator->id)],
+            'password' => ['nullable', 'confirmed', Password::min(10)->letters()->numbers()],
+            'locale' => ['required', Rule::in(['de', 'en', 'ru', 'uk'])],
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        if ($request->user()->is($administrator) && ! $data['is_active']) {
+            throw ValidationException::withMessages(['is_active' => 'Das eigene Administratorkonto kann nicht gesperrt werden.']);
+        }
+        if (! $data['is_active'] && $administrator->is_active && User::where('is_super_admin', true)->where('is_active', true)->count() <= 1) {
+            throw ValidationException::withMessages(['is_active' => 'Der letzte aktive Super-Administrator kann nicht gesperrt werden.']);
+        }
+
+        $before = $administrator->only(['id', 'name', 'email', 'locale', 'is_active']);
+        $payload = [
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'locale' => $data['locale'],
+            'is_active' => $data['is_active'],
+        ];
+        if (filled($data['password'] ?? null)) {
+            $payload['password'] = $data['password'];
+        }
+        $administrator->update($payload);
+        if (! $data['is_active'] || filled($data['password'] ?? null)) {
+            DB::table('sessions')->where('user_id', $administrator->id)->when(
+                $request->user()->is($administrator),
+                fn ($query) => $query->where('id', '!=', $request->session()->getId()),
+            )->delete();
+        }
+        $audit->log('administrator.updated', $administrator, $before, $administrator->fresh()->only(['id', 'name', 'email', 'locale', 'is_active']));
+
+        return response()->json($administrator->fresh());
+    }
+
+    public function destroyAdministrator(Request $request, User $administrator, AuditService $audit): JsonResponse
+    {
+        abort_unless($administrator->is_super_admin, 404);
+        if ($request->user()->is($administrator)) {
+            throw ValidationException::withMessages(['administrator' => 'Das eigene Administratorkonto kann nicht gelöscht werden.']);
+        }
+        if (User::where('is_super_admin', true)->count() <= 1) {
+            throw ValidationException::withMessages(['administrator' => 'Der letzte Super-Administrator kann nicht gelöscht werden.']);
+        }
+        if ($administrator->tenants()->exists()) {
+            throw ValidationException::withMessages(['administrator' => 'Ein mit Kunden verknüpfter Benutzer kann hier nicht gelöscht werden.']);
+        }
+
+        $before = $administrator->only(['id', 'name', 'email', 'locale', 'is_active']);
+        DB::transaction(function () use ($administrator, $audit, $before): void {
+            $audit->log('administrator.deleted', $administrator, $before, ['deleted' => true]);
+            $administrator->delete();
+        });
+
+        return response()->json(['deleted' => true]);
     }
 
     public function subscriptions(Request $request): JsonResponse

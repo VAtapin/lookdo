@@ -172,10 +172,9 @@ const {
         </div>
         <div v-if="section === 'administrators'" class="registry-context">
             <span
-                >Super-Administratoren werden aus Sicherheitsgründen
-                ausschließlich über den geschützten Serverbefehl angelegt.
-                Kundenbenutzer können hier nicht zu Administratoren gemacht
-                werden.</span
+                >Administratoren können hier angelegt, bearbeitet, gesperrt und
+                gelöscht werden. Das eigene sowie das letzte verbleibende
+                Administratorkonto sind geschützt.</span
             >
         </div>
         <div v-if="section === 'backups'" class="registry-context">

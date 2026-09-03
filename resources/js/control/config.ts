@@ -49,6 +49,7 @@ export const serverSections = new Set([
 ]);
 export const addLabels: Record<string, string> = {
     tenants: "Kunde",
+    administrators: "Administrator",
     plans: "Tarif",
     templates: "Eintrag",
     ai: "Begriff",

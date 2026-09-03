@@ -21,6 +21,7 @@ import {
     tenantAccessLabel,
 } from "../control/config";
 import ControlCatalogModals from "../components/admin/ControlCatalogModals.vue";
+import ControlAdministratorModal from "../components/admin/ControlAdministratorModal.vue";
 import ControlConfirmationModals from "../components/admin/ControlConfirmationModals.vue";
 import ControlPageModal from "../components/admin/ControlPageModal.vue";
 import ControlPlanModal from "../components/admin/ControlPlanModal.vue";
@@ -47,6 +48,7 @@ const busy = ref(false);
 const translating = ref(false);
 const modal = ref("");
 const selectedTenant = ref<any>(null);
+const selectedAdministrator = ref<any>(null);
 const selectedSubscription = ref<any>(null);
 const selectedPage = ref<any>(null);
 const selectedTemplate = ref<any>(null);
@@ -54,6 +56,14 @@ const selectedAudit = ref<any>(null);
 const backupTenantId = ref<number | string>("");
 const auditCleanupScope = ref("90");
 const confirmAction = ref<any>(null);
+const administratorForm = reactive<any>({
+    name: "",
+    email: "",
+    locale: "de",
+    is_active: true,
+    password: "",
+    password_confirmation: "",
+});
 const subscriptionPaymentForm = reactive<any>({
     amount: 0,
     currency: "EUR",
@@ -356,6 +366,18 @@ function resetPlanForm() {
 }
 function openAdd() {
     if (section.value === "tenants") modal.value = "tenant";
+    if (section.value === "administrators") {
+        selectedAdministrator.value = null;
+        Object.assign(administratorForm, {
+            name: "",
+            email: "",
+            locale: "de",
+            is_active: true,
+            password: "",
+            password_confirmation: "",
+        });
+        modal.value = "administrator";
+    }
     if (section.value === "plans") {
         editingPlanId.value = null;
         resetPlanForm();
@@ -387,6 +409,61 @@ async function createTenant() {
             }),
         "Kunde wurde angelegt.",
     );
+}
+function openAdministrator(administrator: any) {
+    selectedAdministrator.value = administrator;
+    Object.assign(administratorForm, {
+        name: administrator.name || "",
+        email: administrator.email || "",
+        locale: administrator.locale || "de",
+        is_active: Boolean(administrator.is_active),
+        password: "",
+        password_confirmation: "",
+    });
+    modal.value = "administrator";
+}
+async function saveAdministrator() {
+    busy.value = true;
+    error.value = "";
+    try {
+        const editing = selectedAdministrator.value;
+        await api(
+            editing
+                ? `/control/administrators/${editing.id}`
+                : "/control/administrators",
+            {
+                method: editing ? "PUT" : "POST",
+                body: JSON.stringify(administratorForm),
+            },
+        );
+        modal.value = "";
+        selectedAdministrator.value = null;
+        toast(
+            editing
+                ? "Administrator wurde aktualisiert."
+                : "Administrator wurde angelegt.",
+        );
+        await load();
+    } catch (exception: any) {
+        error.value = exception.message;
+    } finally {
+        busy.value = false;
+    }
+}
+function askDeleteAdministrator(administrator: any) {
+    askConfirmation({
+        title: "Administrator löschen?",
+        message: `${administrator.name} (${administrator.email}) verliert den vollständigen Verwaltungszugriff. Diese Aktion kann nicht rückgängig gemacht werden.`,
+        confirmLabel: "Administrator löschen",
+        danger: true,
+        run: async () => {
+            await api(`/control/administrators/${administrator.id}`, {
+                method: "DELETE",
+            });
+            selectedAdministrator.value = null;
+            toast("Administrator wurde gelöscht.");
+        },
+    });
 }
 function selectPlanImage(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -1172,7 +1249,13 @@ const controlContext = {
     changePage,
     syncAllPlans,
     rows,
+    me,
     openTenant,
+    selectedAdministrator,
+    administratorForm,
+    openAdministrator,
+    saveAdministrator,
+    askDeleteAdministrator,
     openSubscription,
     tenantAccessClass,
     subscriptionAccessClass,
@@ -1320,6 +1403,7 @@ const controlContext = {
             @error="templateError"
         />
         <ControlTenantDrawer v-if="selectedTenant" :ctx="controlContext" />
+        <ControlAdministratorModal :ctx="controlContext" />
         <ControlSubscriptionModal :ctx="controlContext" />
         <ControlTenantCreateModal :ctx="controlContext" />
         <ControlPlanModal :ctx="controlContext" />

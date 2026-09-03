@@ -4,6 +4,9 @@ const {
     section,
     rows,
     openTenant,
+    openAdministrator,
+    askDeleteAdministrator,
+    me,
     openSubscription,
     tenantAccessClass,
     tenantAccessLabel,
@@ -79,10 +82,16 @@ const {
             <th>Letzte Anmeldung</th>
             <th>Seit</th>
             <th>Status</th>
+            <th>Aktionen</th>
         </tr>
     </thead>
     <tbody v-if="section === 'administrators'">
-        <tr v-for="item in rows" :key="item.id">
+        <tr
+            v-for="item in rows"
+            :key="item.id"
+            class="clickable"
+            @click="openAdministrator(item)"
+        >
             <td>
                 <b>{{ item.name }}</b
                 ><small>{{ item.email }}</small>
@@ -94,6 +103,19 @@ const {
             <td>{{ formatDate(item.created_at) }}</td>
             <td>
                 {{ item.is_active ? "aktiv" : "gesperrt" }}
+            </td>
+            <td class="table-actions">
+                <button type="button" @click.stop="openAdministrator(item)">
+                    Bearbeiten
+                </button>
+                <button
+                    type="button"
+                    class="danger"
+                    :disabled="item.id === me?.user?.id"
+                    @click.stop="askDeleteAdministrator(item)"
+                >
+                    Löschen
+                </button>
             </td>
         </tr>
     </tbody>

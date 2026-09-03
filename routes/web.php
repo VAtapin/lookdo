@@ -152,6 +152,9 @@ Route::prefix('api')->middleware('locale')->group(function () {
             Route::put('/tenants/{tenant}/entitlement', [AdminTenantController::class, 'setOverride']);
             Route::post('/tenants/{tenant}/impersonate', [AdminTenantController::class, 'impersonate']);
             Route::get('/administrators', [AdminController::class, 'administrators']);
+            Route::post('/administrators', [AdminController::class, 'storeAdministrator']);
+            Route::put('/administrators/{administrator}', [AdminController::class, 'updateAdministrator']);
+            Route::delete('/administrators/{administrator}', [AdminController::class, 'destroyAdministrator']);
             Route::get('/subscriptions', [AdminController::class, 'subscriptions']);
             Route::get('/subscriptions/{subscription}', [AdminSubscriptionController::class, 'show']);
             Route::patch('/subscriptions/{subscription}/status', [AdminSubscriptionController::class, 'updateStatus']);
